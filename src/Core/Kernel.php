@@ -10,6 +10,7 @@ use Doctrine\DBAL\FetchMode;
 use Shopware\Core\Framework\Framework;
 use Shopware\Core\Framework\Migration\MigrationStep;
 use Shopware\Core\Framework\Plugin;
+use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundle;
 use Shopware\Core\Framework\Plugin\KernelPluginCollection;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\ConfigCache;
@@ -61,6 +62,8 @@ class Kernel extends HttpKernel
         /** @var array $bundles */
         $bundles = require $this->getProjectDir() . '/config/bundles.php';
 
+        self::$plugins->seal();
+
         foreach ($bundles as $class => $envs) {
             if (isset($envs['all']) || isset($envs[$this->environment])) {
                 yield new $class();
@@ -68,6 +71,7 @@ class Kernel extends HttpKernel
         }
 
         yield from self::$plugins->getActives();
+        yield from self::$plugins->getPluginDependencyBundles();
     }
 
     public function boot($withPlugins = true): void
@@ -216,6 +220,7 @@ class Kernel extends HttpKernel
 
     protected function getContainerClass(): string
     {
+        // TODO add bundle
         $pluginHash = sha1(implode('', array_keys(self::getPlugins()->getActives())));
 
         return $this->name
@@ -275,6 +280,12 @@ SQL;
         foreach ($this->getBundles() as $bundle) {
             if ($bundle instanceof \Shopware\Core\Framework\Bundle) {
                 $bundle->configureRoutes($routes, (string) $this->environment);
+            }
+        }
+
+        foreach (self::$plugins->getPluginDependencyBundles() as $pluginDependencyBundle) {
+            if ($pluginDependencyBundle instanceof PluginDependencyBundle) {
+                $pluginDependencyBundle->configureRoutes($routes, (string) $this->environment);
             }
         }
     }

@@ -4,23 +4,23 @@ namespace Shopware\Core\Framework\Test\TestCaseBase;
 
 use Composer\Autoload\ClassLoader;
 use Shopware\Core\Framework\Test\Filesystem\Adapter\MemoryAdapterFactory;
+use Shopware\Core\Kernel;
 use Symfony\Bundle\FrameworkBundle\Client;
 use Symfony\Component\DependencyInjection\ResettableContainerInterface;
-use Symfony\Component\HttpKernel\KernelInterface;
 
 class KernelLifecycleManager
 {
     protected static $class;
 
     /**
-     * @var KernelInterface|null
+     * @var Kernel|null
      */
     protected static $kernel;
 
     /**
      * Get the currently active kernel
      */
-    public static function getKernel(): KernelInterface
+    public static function getKernel(): Kernel
     {
         if (static::$kernel) {
             return static::$kernel;
@@ -32,7 +32,7 @@ class KernelLifecycleManager
     /**
      * Create a web client with the default kernel and disabled reboots
      */
-    public static function createClient(KernelInterface $kernel, bool $enableReboot = false): Client
+    public static function createClient(Kernel $kernel, bool $enableReboot = false): Client
     {
         /** @var Client $apiClient */
         $apiClient = $kernel->getContainer()->get('test.client');
@@ -49,11 +49,14 @@ class KernelLifecycleManager
     /**
      * Boots the Kernel for this test.
      */
-    public static function bootKernel(): KernelInterface
+    public static function bootKernel($plugins = []): Kernel
     {
         static::ensureKernelShutdown();
 
         static::$kernel = static::createKernel();
+        foreach ($plugins as $plugin) {
+            Kernel::getPlugins()->add($plugin);
+        }
         static::$kernel->boot();
         MemoryAdapterFactory::resetInstances();
 
@@ -77,7 +80,7 @@ class KernelLifecycleManager
         return $class;
     }
 
-    private static function createKernel(): KernelInterface
+    private static function createKernel(): Kernel
     {
         if (static::$class === null) {
             static::$class = static::getKernelClass();

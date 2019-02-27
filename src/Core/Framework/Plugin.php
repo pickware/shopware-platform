@@ -8,6 +8,7 @@ use Shopware\Core\Framework\Plugin\Context\InstallContext;
 use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
 use Symfony\Component\Routing\RouteCollectionBuilder;
+use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundleDescriptor;
 
 abstract class Plugin extends Bundle
 {
@@ -16,13 +17,18 @@ abstract class Plugin extends Bundle
      */
     private $active;
 
+    /**
+     * @var array
+     */
+    private $resolvedDependencies = [];
+
     final public function __construct(bool $active = true, ?string $path = null)
     {
         $this->active = $active;
         $this->path = $path;
     }
 
-    final public function isActive(): bool
+    public function isActive(): bool
     {
         return $this->active;
     }
@@ -62,5 +68,20 @@ abstract class Plugin extends Bundle
         }
 
         parent::configureRoutes($routes, $environment);
+    }
+
+    public function getDependencyBundleDescriptors(): array
+    {
+        return [];
+    }
+
+    public function dependencyResolved(Plugin\Dependency\PluginDependencyBundleDescriptor $dependencyBundleDescriptor)
+    {
+        $this->resolvedDependencies[$dependencyBundleDescriptor->getName()] = $dependencyBundleDescriptor;
+    }
+
+    public function getResolvedDependency(string $name): ?PluginDependencyBundleDescriptor
+    {
+        return isset($this->resolvedDependencies[$name]) ? $this->resolvedDependencies[$name] : null;
     }
 }

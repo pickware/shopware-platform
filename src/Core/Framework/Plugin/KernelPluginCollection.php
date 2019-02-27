@@ -3,27 +3,46 @@
 namespace Shopware\Core\Framework\Plugin;
 
 use Shopware\Core\Framework\Plugin;
+use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundleResolver;
 
 class KernelPluginCollection
 {
     /**
      * @var Plugin[]
      */
-    private $bundles;
+    private $plugins;
 
     /**
-     * @param Plugin[] $bundles
+     * @var PluginDependencyBundleResolver|null
      */
-    public function __construct(array $bundles = [])
+    private $pluginDependencyBundleResolver;
+
+    /**
+     * @var bool
+     */
+    private $sealed;
+
+    /**
+     * @param Plugin[] $plugins
+     */
+    public function __construct(array $plugins = [])
     {
-        $this->bundles = $bundles;
+        $this->plugins = [];
+        foreach ($plugins as $plugin) {
+            $this->add($plugin);
+        }
     }
 
-    public function add(Plugin $bundle): void
+    public function add(Plugin $plugin): void
     {
-        /** @var string|false $class */
-        $class = \get_class($bundle);
+        if ($this->sealed) {
+            throw new \LogicException(
+                'Cannot add more plugins to KernelPluginCollection because it is already sealed.'
+            );
+        }
 
+        /** @var string|false $class */
+        $class = \get_class($plugin);
         if ($class === false) {
             return;
         }
@@ -32,25 +51,22 @@ class KernelPluginCollection
             return;
         }
 
-        $this->bundles[$class] = $bundle;
+        $this->plugins[$class] = $plugin;
     }
 
-    /**
-     * @param Plugin[] $bundle
-     */
-    public function addList(array $bundle): void
+    public function seal(): void
     {
-        array_map([$this, 'add'], $bundle);
+        $this->sealed = true;
     }
 
     public function has($name): bool
     {
-        return array_key_exists($name, $this->bundles);
+        return array_key_exists($name, $this->plugins);
     }
 
     public function get($name): ?Plugin
     {
-        return $this->has($name) ? $this->bundles[$name] : null;
+        return $this->has($name) ? $this->plugins[$name] : null;
     }
 
     /**
@@ -58,7 +74,7 @@ class KernelPluginCollection
      */
     public function all(): array
     {
-        return $this->bundles;
+        return $this->plugins;
     }
 
     /**
@@ -66,13 +82,23 @@ class KernelPluginCollection
      */
     public function getActives(): array
     {
-        return array_filter($this->bundles, function (Plugin $plugin) {
+        return array_filter($this->plugins, function (Plugin $plugin) {
             return $plugin->isActive();
         });
     }
 
-    public function filter(\Closure $closure)
+    public function getPluginDependencyBundles(): array
     {
-        return new static(array_filter($this->bundles, $closure));
+        if ($this->pluginDependencyBundleResolver === null) {
+            $this->seal();
+            $this->pluginDependencyBundleResolver = new PluginDependencyBundleResolver(array_values($this->plugins));
+        }
+
+        return $this->pluginDependencyBundleResolver->getResolvedBundles();
+    }
+
+    public function filter(\Closure $closure): object
+    {
+        return new static(array_filter($this->plugins, $closure));
     }
 }

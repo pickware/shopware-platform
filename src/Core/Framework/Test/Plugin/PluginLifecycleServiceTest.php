@@ -22,6 +22,7 @@ use Shopware\Core\Framework\Plugin\Requirement\RequirementsValidator;
 use Shopware\Core\Framework\Plugin\Util\AssetService;
 use Shopware\Core\Framework\Plugin\Util\PluginFinder;
 use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
+use Shopware\Core\Framework\Test\TestCaseBase\KernelLifecycleManager;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Filesystem\Filesystem;
@@ -67,6 +68,20 @@ class PluginLifecycleServiceTest extends TestCase
      */
     private $context;
 
+    public static function setUpBeforeClass(): void
+    {
+        // Boot the kernel with the SwagTest plugin
+        require_once __DIR__ . '/_fixture/plugins/SwagTest/Migration/Migration1536761533Test.php';
+        require_once __DIR__ . '/_fixture/plugins/SwagTest/SwagTest.php';
+        KernelLifecycleManager::bootKernel([new \SwagTest\SwagTest(false)]);
+    }
+
+    public static function tearDownAfterClass(): void
+    {
+        // Reboot the Kernel without the SwagTest plugin to ensure that the Kernel's state is clean for the next test
+        KernelLifecycleManager::bootKernel();
+    }
+
     protected function setUp(): void
     {
         $this->container = $this->getContainer();
@@ -80,8 +95,6 @@ class PluginLifecycleServiceTest extends TestCase
         $this->pluginCollection = $this->container->get(KernelPluginCollection::class);
         $this->connection = $this->container->get(Connection::class);
         $this->pluginLifecycleService = $this->createPluginLifecycleService();
-        require_once __DIR__ . '/_fixture/plugins/SwagTest/Migration/Migration1536761533Test.php';
-        $this->addTestPluginToKernel();
         $this->context = Context::createDefaultContext();
     }
 
@@ -329,12 +342,6 @@ class PluginLifecycleServiceTest extends TestCase
             $this->container->get(CommandExecutor::class),
             $this->container->get(RequirementsValidator::class)
         );
-    }
-
-    private function addTestPluginToKernel(): void
-    {
-        require_once __DIR__ . '/_fixture/plugins/SwagTest/SwagTest.php';
-        $this->pluginCollection->add(new \SwagTest\SwagTest(false));
     }
 
     private function pluginTableExists(): bool
