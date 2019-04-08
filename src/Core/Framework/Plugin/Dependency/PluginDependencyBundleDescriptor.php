@@ -2,8 +2,6 @@
 
 namespace Shopware\Core\Framework\Plugin\Dependency;
 
-use Symfony\Component\HttpKernel\Bundle\Bundle;
-
 /**
  * A description of a versioned bundle which one is required as a dependency by one or more plugins.
  *
@@ -32,7 +30,7 @@ class PluginDependencyBundleDescriptor
     private $bundleCreator;
 
     /**
-     * @var Bundle|null
+     * @var PluginDependencyBundle|null
      */
     private $bundle;
 
@@ -57,7 +55,7 @@ class PluginDependencyBundleDescriptor
         return $this->version;
     }
 
-    public function getBundle(): Bundle
+    public function getBundle(): PluginDependencyBundle
     {
         if (!$this->bundle) {
             $this->bundle = ($this->bundleCreator)();

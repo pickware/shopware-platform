@@ -7,10 +7,10 @@ use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\FetchMode;
+use Shopware\Core\Framework\Bundle as ShopwareBundle;
 use Shopware\Core\Framework\Framework;
 use Shopware\Core\Framework\Migration\MigrationStep;
 use Shopware\Core\Framework\Plugin;
-use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundle;
 use Shopware\Core\Framework\Plugin\KernelPluginCollection;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\ConfigCache;
@@ -224,8 +224,17 @@ class Kernel extends HttpKernel
 
     protected function getContainerClass(): string
     {
-        // TODO add bundle
-        $pluginHash = sha1(implode('', array_keys(self::getPlugins()->getActives())));
+        $bundleIdentifiers = array_map(function (Bundle $bundle) {
+            if ($bundle instanceof ShopwareBundle) {
+                return $bundle->getIdentifier();
+            }
+
+            return $bundle->getName();
+        }, $this->getBundles());
+        // Sort the array of bundle identifiers to ensure the same set of bundles always results in the same hash
+        sort($bundleIdentifiers);
+        $bundleIdentifiers = implode(',', $bundleIdentifiers);
+        $pluginHash = sha1($bundleIdentifiers);
 
         return $this->name
             . ucfirst($this->environment)
@@ -282,14 +291,8 @@ SQL;
     private function addBundleRoutes(RouteCollectionBuilder $routes): void
     {
         foreach ($this->getBundles() as $bundle) {
-            if ($bundle instanceof \Shopware\Core\Framework\Bundle) {
+            if ($bundle instanceof ShopwareBundle) {
                 $bundle->configureRoutes($routes, (string) $this->environment);
-            }
-        }
-
-        foreach (self::$plugins->getPluginDependencyBundles() as $pluginDependencyBundle) {
-            if ($pluginDependencyBundle instanceof PluginDependencyBundle) {
-                $pluginDependencyBundle->configureRoutes($routes, (string) $this->environment);
             }
         }
     }

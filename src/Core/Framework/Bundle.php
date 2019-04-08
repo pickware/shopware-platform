@@ -136,6 +136,11 @@ abstract class Bundle extends SymfonyBundle
         $container->setParameter('migration.directories', $directories);
     }
 
+    public function getIdentifier(): string
+    {
+        return get_class($this);
+    }
+
     protected function registerEvents(ContainerBuilder $container): void
     {
         $definition = $container->getDefinition(BusinessEventRegistry::class);

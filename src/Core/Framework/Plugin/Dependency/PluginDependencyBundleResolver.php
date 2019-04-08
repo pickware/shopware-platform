@@ -3,7 +3,6 @@
 namespace Shopware\Core\Framework\Plugin\Dependency;
 
 use Shopware\Core\Framework\Plugin;
-use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 /**
  * Models the resolution algorithm for plugin dependency bundles. The algorithm is straight-forward:
@@ -33,7 +32,7 @@ class PluginDependencyBundleResolver
     private $pluginsDependingOnDependencyBundles = [];
 
     /**
-     * @var Bundle[]|null
+     * @var PluginDependencyBundle[]|null
      */
     private $resolvedBundles = null;
 
@@ -46,7 +45,7 @@ class PluginDependencyBundleResolver
     }
 
     /**
-     * @return Bundle[]
+     * @return PluginDependencyBundle[]
      */
     public function getResolvedBundles(): array
     {
@@ -61,8 +60,6 @@ class PluginDependencyBundleResolver
 
     private function resolveBundles(): array
     {
-        $this->resolvedDependencyDescriptors = [];
-
         /* @var Plugin $activePlugin */
         foreach ($this->plugins as $plugin) {
             $dependencyDescriptors = $plugin->getDependencyBundleDescriptors();
@@ -75,6 +72,7 @@ class PluginDependencyBundleResolver
         $resolvedBundles = [];
         foreach ($this->resolvedDependencyDescriptors as $dependencyDescriptor) {
             $dependencyBundle = $dependencyDescriptor->getBundle();
+            $dependencyBundle->setVersion($dependencyDescriptor->getVersion());
             /** @var Plugin $plugin */
             foreach ($this->pluginsDependingOnDependencyBundles[$dependencyDescriptor->getName()] as $plugin) {
                 $plugin->dependencyResolved($dependencyDescriptor);

@@ -2,22 +2,31 @@
 
 namespace Shopware\Core\Framework\Plugin\Dependency;
 
-use Shopware\Core\Kernel;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\HttpKernel\Bundle\Bundle;
-use Symfony\Component\Routing\RouteCollectionBuilder;
+use Shopware\Core\Framework\Bundle;
 
 class PluginDependencyBundle extends Bundle
 {
-    public function configureRoutes(RouteCollectionBuilder $routes, string $environment): void
-    {
-        $fileSystem = new Filesystem();
-        $confDir = $this->getPath() . '/Resources';
+    /**
+     * @var string
+     */
+    private $version;
 
-        if ($fileSystem->exists($confDir)) {
-            $routes->import($confDir . '/{routes}/*' . Kernel::CONFIG_EXTS, '/', 'glob');
-            $routes->import($confDir . '/{routes}/' . $environment . '/**/*' . Kernel::CONFIG_EXTS, '/', 'glob');
-            $routes->import($confDir . '/{routes}' . Kernel::CONFIG_EXTS, '/', 'glob');
+    public function getVersion(): string
+    {
+        return $this->version;
+    }
+
+    public function setVersion(string $version): void
+    {
+        $this->version = $version;
+    }
+
+    public function getIdentifier(): string
+    {
+        if (!$this->getVersion()) {
+            return parent::getIdentifier();
         }
+
+        return parent::getIdentifier() . ':' . $this->getVersion();
     }
 }
