@@ -49,8 +49,12 @@ class EntityHydrator
         $collection = [];
         $this->objects = [];
 
+        $entityReflection = new \ReflectionClass($entity);
+        /** @var Entity $entity */
+        $entity = $entityReflection->newInstanceWithoutConstructor();
+
         foreach ($rows as $row) {
-            $collection[] = $this->hydrateEntity(new $entity(), $definition, $row, $root, $context);
+            $collection[] = $this->hydrateEntity($entity, $definition, $row, $root, $context);
         }
 
         return $collection;
@@ -237,8 +241,12 @@ class EntityHydrator
 
         $structClass = $field->getReferenceClass()::getEntityClass();
 
+        $entityReflection = new \ReflectionClass($structClass);
+        /** @var Entity $entity */
+        $entity = $entityReflection->newInstanceWithoutConstructor();
+
         return $this->hydrateEntity(
-            new $structClass(),
+            $entity,
             $field->getReferenceClass(),
             $row,
             $root . '.' . $field->getPropertyName(),

@@ -9,7 +9,7 @@ class ArrayEntity extends Entity implements \ArrayAccess
     /**
      * @var array
      */
-    protected $data;
+    protected $data = [];
 
     public function __construct(array $data = [])
     {
