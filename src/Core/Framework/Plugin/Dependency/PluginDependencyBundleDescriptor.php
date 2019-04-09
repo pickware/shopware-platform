@@ -2,6 +2,8 @@
 
 namespace Shopware\Core\Framework\Plugin\Dependency;
 
+use Composer\Autoload\ClassLoader;
+
 /**
  * A description of a versioned bundle which one is required as a dependency by one or more plugins.
  *
@@ -66,10 +68,10 @@ class PluginDependencyBundleDescriptor
         return $this->path;
     }
 
-    public function getBundle(): PluginDependencyBundle
+    public function getBundle(ClassLoader $classLoader): PluginDependencyBundle
     {
         if (!$this->bundle) {
-            $this->bundle = ($this->bundleCreator)();
+            $this->bundle = ($this->bundleCreator)($classLoader);
         }
 
         return $this->bundle;

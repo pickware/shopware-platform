@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\Plugin\Dependency;
 
+use Composer\Autoload\ClassLoader;
 use Shopware\Core\Framework\Plugin;
 
 /**
@@ -22,6 +23,11 @@ class PluginDependencyBundleResolver
     private $plugins;
 
     /**
+     * @var ClassLoader
+     */
+    private $classLoader;
+
+    /**
      * @var PluginDependencyBundleDescriptor[]
      */
     private $resolvedDependencyDescriptors = [];
@@ -39,9 +45,10 @@ class PluginDependencyBundleResolver
     /**
      * @param Plugin[] $plugins
      */
-    public function __construct(array $plugins)
+    public function __construct(array $plugins, ClassLoader $classLoader)
     {
         $this->plugins = $plugins;
+        $this->classLoader = $classLoader;
     }
 
     /**
@@ -71,7 +78,7 @@ class PluginDependencyBundleResolver
 
         $resolvedBundles = [];
         foreach ($this->resolvedDependencyDescriptors as $dependencyDescriptor) {
-            $dependencyBundle = $dependencyDescriptor->getBundle();
+            $dependencyBundle = $dependencyDescriptor->getBundle($this->classLoader);
             $dependencyBundle->setVersion($dependencyDescriptor->getVersion());
             $dependencyBundle->setPath($dependencyDescriptor->getPath());
             /** @var Plugin $plugin */

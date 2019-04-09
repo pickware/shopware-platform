@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\Plugin;
 
+use Composer\Autoload\ClassLoader;
 use Shopware\Core\Framework\Plugin;
 use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundleResolver;
 
@@ -87,11 +88,11 @@ class KernelPluginCollection
         });
     }
 
-    public function getPluginDependencyBundles(): array
+    public function getPluginDependencyBundles(ClassLoader $classLoader): array
     {
         if ($this->pluginDependencyBundleResolver === null) {
             $this->seal();
-            $this->pluginDependencyBundleResolver = new PluginDependencyBundleResolver(array_values($this->plugins));
+            $this->pluginDependencyBundleResolver = new PluginDependencyBundleResolver(array_values($this->plugins), $classLoader);
         }
 
         return $this->pluginDependencyBundleResolver->getResolvedBundles();

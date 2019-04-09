@@ -7,8 +7,8 @@ use Shopware\Core\Framework\Plugin\Context\DeactivateContext;
 use Shopware\Core\Framework\Plugin\Context\InstallContext;
 use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
-use Symfony\Component\Routing\RouteCollectionBuilder;
 use Shopware\Core\Framework\Plugin\Dependency\PluginDependencyBundleDescriptor;
+use Symfony\Component\Routing\RouteCollectionBuilder;
 
 abstract class Plugin extends Bundle
 {
@@ -83,5 +83,13 @@ abstract class Plugin extends Bundle
     public function getResolvedDependency(string $name): ?PluginDependencyBundleDescriptor
     {
         return isset($this->resolvedDependencies[$name]) ? $this->resolvedDependencies[$name] : null;
+    }
+
+    public function loadSharedBundle(string $sharedBundleName)
+    {
+        $bundlePath = sprintf('%1$s/SharedBundles/%2$s', $this->getPath(), $sharedBundleName);
+        $bundleDefinitionCreator = require $bundlePath . '/shared_bundle.php';
+
+        return $bundleDefinitionCreator($bundlePath);
     }
 }
