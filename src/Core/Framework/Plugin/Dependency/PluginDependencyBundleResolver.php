@@ -73,6 +73,7 @@ class PluginDependencyBundleResolver
         foreach ($this->resolvedDependencyDescriptors as $dependencyDescriptor) {
             $dependencyBundle = $dependencyDescriptor->getBundle();
             $dependencyBundle->setVersion($dependencyDescriptor->getVersion());
+            $dependencyBundle->setPath($dependencyDescriptor->getPath());
             /** @var Plugin $plugin */
             foreach ($this->pluginsDependingOnDependencyBundles[$dependencyDescriptor->getName()] as $plugin) {
                 $plugin->dependencyResolved($dependencyDescriptor);

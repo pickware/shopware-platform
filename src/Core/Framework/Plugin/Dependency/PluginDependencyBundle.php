@@ -29,4 +29,9 @@ class PluginDependencyBundle extends Bundle
 
         return parent::getIdentifier() . ':' . $this->getVersion();
     }
+
+    public function setPath($path): void
+    {
+        $this->path = $path;
+    }
 }

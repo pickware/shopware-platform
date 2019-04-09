@@ -25,6 +25,11 @@ class PluginDependencyBundleDescriptor
     private $version;
 
     /**
+     * @var string
+     */
+    private $path;
+
+    /**
      * @var callable
      */
     private $bundleCreator;
@@ -38,10 +43,11 @@ class PluginDependencyBundleDescriptor
      * @param callable $bundleCreator A closure which registers the bundle's namespace if required and returns an
      *                                instance of the bundle
      */
-    public function __construct(string $name, string $version, callable $bundleCreator)
+    public function __construct(string $name, string $version, string $path, callable $bundleCreator)
     {
         $this->name = $name;
         $this->version = $version;
+        $this->path = $path;
         $this->bundleCreator = $bundleCreator;
     }
 
@@ -53,6 +59,11 @@ class PluginDependencyBundleDescriptor
     public function getVersion(): string
     {
         return $this->version;
+    }
+
+    public function getPath(): string
+    {
+        return $this->path;
     }
 
     public function getBundle(): PluginDependencyBundle
