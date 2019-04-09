@@ -28,9 +28,9 @@ abstract class Plugin extends Bundle
         $this->path = $path;
     }
 
-    public function isActive(): bool
+    final public function isActive(): bool
     {
-        return $this->active;
+        return $this->active && $this->canBoot();
     }
 
     public function install(InstallContext $context): void
@@ -91,5 +91,10 @@ abstract class Plugin extends Bundle
         $bundleDefinitionCreator = require $bundlePath . '/shared_bundle.php';
 
         return $bundleDefinitionCreator($bundlePath);
+    }
+
+    protected function canBoot(): bool
+    {
+        return true;
     }
 }
