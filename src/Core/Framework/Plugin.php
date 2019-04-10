@@ -70,6 +70,11 @@ abstract class Plugin extends Bundle
         parent::configureRoutes($routes, $environment);
     }
 
+    public function getSubBundles(): array
+    {
+        return [];
+    }
+
     public function getDependencyBundleDescriptors(): array
     {
         return [];
