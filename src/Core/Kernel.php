@@ -30,11 +30,6 @@ class Kernel extends HttpKernel
     public const CONFIG_EXTS = '.{php,xml,yaml,yml}';
 
     /**
-     * @var ClassLoader
-     */
-    protected static $classLoader;
-
-    /**
      * @var Connection|null
      */
     protected static $connection;
@@ -45,6 +40,11 @@ class Kernel extends HttpKernel
     protected static $plugins;
 
     /**
+     * @var ClassLoader
+     */
+    protected $classLoader;
+
+    /**
      * {@inheritdoc}
      */
     public function __construct(string $environment, bool $debug, ClassLoader $classLoader)
@@ -52,7 +52,6 @@ class Kernel extends HttpKernel
         parent::__construct($environment, $debug);
 
         self::$plugins = new KernelPluginCollection();
-        self::$classLoader = $classLoader;
         self::$connection = null;
 
         $this->classLoader = $classLoader;
@@ -71,7 +70,7 @@ class Kernel extends HttpKernel
             }
         }
 
-        yield from self::$plugins->getPluginDependencyBundles(self::$classLoader);
+        yield from self::$plugins->getPluginDependencyBundles($this->classLoader);
 
         foreach (self::$plugins->getActives() as $plugin) {
             yield $plugin;
@@ -112,7 +111,7 @@ class Kernel extends HttpKernel
         $this->initializeContainer();
 
         // expose the Kernel's class loader in the container
-        $this->container->set('class_loader', self::$classLoader);
+        $this->container->set('class_loader', $this->classLoader);
 
         /** @var Bundle|ContainerAwareTrait $bundle */
         foreach ($this->getBundles() as $bundle) {
