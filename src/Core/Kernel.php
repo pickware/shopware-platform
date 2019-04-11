@@ -11,6 +11,7 @@ use Shopware\Core\Framework\Framework;
 use Shopware\Core\Framework\Migration\MigrationStep;
 use Shopware\Core\Framework\Plugin;
 use Shopware\Core\Framework\Plugin\KernelPluginCollection;
+use Shopware\Core\Framework\Routing\RouteCollectionBuilder;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\Config\ConfigCache;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -20,7 +21,6 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Symfony\Component\HttpKernel\Kernel as HttpKernel;
-use Symfony\Component\Routing\RouteCollectionBuilder;
 
 class Kernel extends HttpKernel
 {
@@ -68,6 +68,14 @@ class Kernel extends HttpKernel
         }
 
         yield from self::$plugins->getActives();
+    }
+
+    public function loadRoutes(LoaderInterface $loader)
+    {
+        $routes = new RouteCollectionBuilder($loader);
+        $this->configureRoutes($routes);
+
+        return $routes->build();
     }
 
     public function boot($withPlugins = true): void
