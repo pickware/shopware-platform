@@ -176,7 +176,7 @@ class CustomerGenerator implements DemodataGeneratorInterface
                     'title' => $title,
                     'firstName' => $firstName,
                     'lastName' => $lastName,
-                    'street' => $context->getFaker()->streetName,
+                    'street' => $context->getFaker()->streetName . ' ' . random_int(1, 300),
                     'zipcode' => $context->getFaker()->postcode,
                     'city' => $context->getFaker()->city,
                 ];

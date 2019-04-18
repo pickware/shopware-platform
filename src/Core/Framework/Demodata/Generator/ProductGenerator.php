@@ -276,6 +276,7 @@ class ProductGenerator implements DemodataGeneratorInterface
             ],
             'stock' => $faker->randomNumber(),
             'prices' => $this->createPrices($rules),
+            'weight' => round(random_int(1, 10000) / 1000, 3),
         ];
 
         return $product;
