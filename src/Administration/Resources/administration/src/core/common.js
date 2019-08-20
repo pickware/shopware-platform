@@ -7,6 +7,7 @@ const Bottle = require('bottlejs');
 
 const ModuleFactory = require('src/core/factory/module.factory').default;
 const ComponentFactory = require('src/core/factory/component.factory').default;
+const CriteriaFactory = require('src/core/factory/criteria.factory').default;
 const TemplateFactory = require('src/core/factory/template.factory').default;
 const EntityFactory = require('src/core/factory/entity.factory').default;
 const StateFactory = require('src/core/factory/state.factory').default;
@@ -32,6 +33,9 @@ const application = new ApplicationBootstrapper(container);
 application
     .addFactory('component', () => {
         return ComponentFactory;
+    })
+    .addFactory('criteria', () => {
+        return CriteriaFactory;
     })
     .addFactory('template', () => {
         return TemplateFactory;
