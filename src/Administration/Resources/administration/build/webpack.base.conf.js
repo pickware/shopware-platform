@@ -39,7 +39,29 @@ module.exports = {
         splitChunks: {
             cacheGroups: {
                 'runtime-vendor': {
-                    test: utils.resolve('node_modules'),
+                    test(module, chunk) {
+                        const nodeModulesPath = utils.resolve('node_modules');
+
+                        // The following code is copied from webpack/lib/optimize/SplitChunksPlugin.js:315-.
+                        // This emulates the behavior of the original `test: utils.resolve('node_modules')`, with the
+                        // exception that it does not split vue-loader's `componentNormalizer.js` to the vendors-node
+                        // chunk. This is required because otherwise, the plugin bundle
+                        if (module.nameForCondition && module.nameForCondition().startsWith(nodeModulesPath)) {
+                            if (module.nameForCondition().endsWith('componentNormalizer.js')) {
+                                return false;
+                            }
+
+                            return true;
+                        }
+
+                        for (const chunk of module.chunksIterable) {
+                            if (chunk.name && chunk.name.startsWith(nodeModulesPath)) {
+                                return true;
+                            }
+                        }
+
+                        return false;
+                    },
                     name: 'vendors-node',
                     chunks: 'all'
                 }
