@@ -5,47 +5,56 @@ namespace Shopware\Core\Framework\Routing;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\ContextSource;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Api\Util\AccessKeyHelper;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
-use Shopware\Core\Framework\Context\ContextSource;
-use Shopware\Core\Framework\Context\SalesChannelApiSource;
-use Shopware\Core\Framework\Context\SystemSource;
 use Shopware\Core\Framework\Routing\Exception\LanguageNotFoundException;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\PlatformRequest;
 use Shopware\Core\SalesChannelRequest;
 use Symfony\Component\HttpFoundation\Request;
+use function Flag\next3722;
 
 class ApiRequestContextResolver implements RequestContextResolverInterface
 {
+    use RouteScopeCheckTrait;
+
     /**
      * @var Connection
      */
     private $connection;
 
-    public function __construct(Connection $connection)
-    {
+    /**
+     * @var RouteScopeRegistry
+     */
+    private $routeScopeRegistry;
+
+    public function __construct(
+        Connection $connection,
+        RouteScopeRegistry $routeScopeRegistry
+    ) {
         $this->connection = $connection;
+        $this->routeScopeRegistry = $routeScopeRegistry;
     }
 
-    public function resolve(Request $master, Request $request): void
+    public function resolve(Request $request): void
     {
-        //sub requests can use context of master
-        if ($master->attributes->has(PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT)) {
-            $request->attributes->set(
-                PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT,
-                $master->attributes->get(PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT)
-            );
-
+        if ($request->attributes->has(PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT)) {
             return;
         }
 
-        $params = $this->getContextParameters($master);
+        if (!$this->isRequestScoped($request, ApiContextRouteScopeDependant::class)) {
+            return;
+        }
+
+        $params = $this->getContextParameters($request);
         $languageIdChain = $this->getLanguageIdChain($params);
 
         $context = new Context(
-            $this->resolveContextOrigin($request),
+            $this->resolveContextSource($request),
             [],
             $params['currencyId'],
             $languageIdChain,
@@ -58,7 +67,12 @@ class ApiRequestContextResolver implements RequestContextResolverInterface
         $request->attributes->set(PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT, $context);
     }
 
-    private function getContextParameters(Request $master)
+    protected function getScopeRegistry(): RouteScopeRegistry
+    {
+        return $this->routeScopeRegistry;
+    }
+
+    private function getContextParameters(Request $request)
     {
         $params = [
             'currencyId' => Defaults::CURRENCY,
@@ -66,11 +80,11 @@ class ApiRequestContextResolver implements RequestContextResolverInterface
             'systemFallbackLanguageId' => Defaults::LANGUAGE_SYSTEM,
             'currencyFactory' => 1.0,
             'currencyPrecision' => 2,
-            'versionId' => $master->headers->get(PlatformRequest::HEADER_VERSION_ID),
+            'versionId' => $request->headers->get(PlatformRequest::HEADER_VERSION_ID),
             'considerInheritance' => false,
         ];
 
-        $runtimeParams = $this->getRuntimeParameters($master);
+        $runtimeParams = $this->getRuntimeParameters($request);
         $params = array_replace_recursive($params, $runtimeParams);
 
         return $params;
@@ -95,14 +109,18 @@ class ApiRequestContextResolver implements RequestContextResolverInterface
         return $parameters;
     }
 
-    private function resolveContextOrigin(Request $request): ContextSource
+    private function resolveContextSource(Request $request): ContextSource
     {
         if ($request->attributes->has(SalesChannelRequest::ATTRIBUTE_IS_SALES_CHANNEL_REQUEST)) {
             return new SalesChannelApiSource(Defaults::SALES_CHANNEL);
         }
 
         if ($userId = $request->attributes->get(PlatformRequest::ATTRIBUTE_OAUTH_USER_ID)) {
-            return new AdminApiSource($userId);
+            $hasAdminScope = in_array('admin', $request->attributes->get('oauth_scopes'), true);
+            $adminApiSource = $this->getAdminApiSource($userId);
+            $adminApiSource->setIsAdmin($hasAdminScope || $adminApiSource->isAdmin());
+
+            return $adminApiSource;
         }
 
         if (!$request->attributes->has(PlatformRequest::ATTRIBUTE_OAUTH_ACCESS_TOKEN_ID)) {
@@ -115,13 +133,13 @@ class ApiRequestContextResolver implements RequestContextResolverInterface
         if ($keyOrigin === 'user') {
             $userId = $this->getUserIdByAccessKey($clientId);
 
-            return new AdminApiSource($userId);
+            return $this->getAdminApiSource($userId);
         }
 
         if ($keyOrigin === 'integration') {
             $integrationId = $this->getIntegrationIdByAccessKey($clientId);
 
-            return new AdminApiSource(null, $integrationId);
+            return $this->getAdminApiSource(null, $integrationId);
         }
 
         if ($keyOrigin === 'sales-channel') {
@@ -203,5 +221,42 @@ class ApiRequestContextResolver implements RequestContextResolverInterface
             ->fetchColumn();
 
         return Uuid::fromBytesToHex($id);
+    }
+
+    private function getAdminApiSource(?string $userId, ?string $integrationId = null): AdminApiSource
+    {
+        $adminApiSource = new AdminApiSource($userId, $integrationId);
+        if (!next3722()) {
+            $adminApiSource->setIsAdmin(true);
+
+            return $adminApiSource;
+        }
+        if ($userId !== null) {
+            $this->enrichAdminApiSourceWithAclPermissions($adminApiSource);
+        }
+
+        return $adminApiSource;
+    }
+
+    private function enrichAdminApiSourceWithAclPermissions(AdminApiSource $source): AdminApiSource
+    {
+        $source->addPermissions($this->fetchPermissions($source->getUserId()));
+
+        return $source;
+    }
+
+    private function fetchPermissions(string $userId): array
+    {
+        $permissions = $this->connection->createQueryBuilder()
+            ->select(['resource', 'privilege'])
+            ->from('acl_user_role', 'mapping')
+            ->innerJoin('mapping', 'acl_role', 'role', 'mapping.acl_role_id = role.id')
+            ->innerJoin('role', 'acl_resource', 'res', 'res.acl_role_id = role.id')
+            ->where('mapping.user_id = :userId')
+            ->setParameter('userId', Uuid::fromHexToBytes($userId))
+            ->execute()
+            ->fetchAll(FetchMode::ASSOCIATIVE);
+
+        return $permissions;
     }
 }

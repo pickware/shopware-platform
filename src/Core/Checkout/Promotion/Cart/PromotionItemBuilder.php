@@ -11,14 +11,11 @@ use Shopware\Core\Checkout\Cart\Price\Struct\PercentagePriceDefinition;
 use Shopware\Core\Checkout\Cart\Price\Struct\QuantityPriceDefinition;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscount\PromotionDiscountEntity;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscountPrice\PromotionDiscountPriceCollection;
-use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscountPrice\PromotionDiscountPriceEntity;
 use Shopware\Core\Checkout\Promotion\Exception\UnknownPromotionDiscountTypeException;
 use Shopware\Core\Checkout\Promotion\PromotionEntity;
 use Shopware\Core\Content\Rule\RuleCollection;
-use Shopware\Core\Content\Rule\RuleEntity;
 use Shopware\Core\Framework\Rule\Container\OrRule;
 use Shopware\Core\Framework\Rule\Rule;
-use Shopware\Core\System\SalesChannel\SalesChannelContext;
 
 class PromotionItemBuilder
 {
@@ -64,13 +61,9 @@ class PromotionItemBuilder
      * @throws InvalidQuantityException
      * @throws UnknownPromotionDiscountTypeException
      */
-    public function buildDiscountLineItem(PromotionEntity $promotion, PromotionDiscountEntity $discount, SalesChannelContext $context): LineItem
+    public function buildDiscountLineItem(string $code, PromotionEntity $promotion, PromotionDiscountEntity $discount, int $currencyPrecision, string $currencyId): LineItem
     {
-        /** @var int $currencyPrecision */
-        $currencyPrecision = $context->getContext()->getCurrencyPrecision();
-
         //get the rules collection of discount
-        /** @var RuleCollection|null $discountRuleCollection */
         $discountRuleCollection = $discount->getDiscountRules();
 
         // this is our target Filter that may be null if discount has no filters
@@ -81,7 +74,6 @@ class PromotionItemBuilder
         if ($discountRuleCollection instanceof RuleCollection && $discount->isConsiderAdvancedRules() && $discountRuleCollection->count() > 0) {
             $targetFilter = new OrRule();
 
-            /** @var RuleEntity $discountRule */
             foreach ($discountRuleCollection as $discountRule) {
                 /** @var Rule|string|null $rule */
                 $rule = $discountRule->getPayload();
@@ -99,17 +91,21 @@ class PromotionItemBuilder
 
         switch ($discount->getType()) {
             case PromotionDiscountEntity::TYPE_ABSOLUTE:
-                $promotionValue = -abs($this->getCurrencySpecificValue($discount, $discount->getValue(), $context));
+                $promotionValue = -$this->getCurrencySpecificValue($discount, $discount->getValue(), $currencyId);
                 $promotionDefinition = new AbsolutePriceDefinition($promotionValue, $currencyPrecision, $targetFilter);
+
                 break;
 
             case PromotionDiscountEntity::TYPE_PERCENTAGE:
                 $promotionDefinition = new PercentagePriceDefinition($promotionValue, $currencyPrecision, $targetFilter);
+
                 break;
 
             case PromotionDiscountEntity::TYPE_FIXED:
-                $promotionValue = -abs($this->getCurrencySpecificValue($discount, $discount->getValue(), $context));
+            case PromotionDiscountEntity::TYPE_FIXED_UNIT:
+                $promotionValue = -abs($this->getCurrencySpecificValue($discount, $discount->getValue(), $currencyId));
                 $promotionDefinition = new AbsolutePriceDefinition($promotionValue, $currencyPrecision, $targetFilter);
+
                 break;
 
             default:
@@ -131,18 +127,21 @@ class PromotionItemBuilder
         $promotionItem->setPriceDefinition($promotionDefinition);
 
         // always make sure we have a valid code entry.
-        // this helps us to identify the item by code later on
-        if ($promotion->isUseCodes()) {
-            $promotionItem->setReferencedId((string) $promotion->getCode());
-        }
+        // this helps us to identify the item by code later on.
+        // we use the one from the argument, because that one tells us why this
+        // promotion is added...it might not just be the promotion code, but
+        // one of the thousand individual codes for it...thus we have an
+        // external algorithm that makes our lookup why this promotion is added.
+        $promotionItem->setReferencedId($code);
 
         // add custom content to our payload.
         // we need this as meta data information.
         $promotionItem->setPayload(
             $this->buildPayload(
-                $promotion,
+                $code,
                 $discount,
-                $context
+                $promotion,
+                $currencyId
             )
         );
 
@@ -187,7 +186,7 @@ class PromotionItemBuilder
      * This will make sure we have our eligible items referenced as meta data
      * and also have the code in our payload.
      */
-    private function buildPayload(PromotionEntity $promotion, PromotionDiscountEntity $discount, SalesChannelContext $context): array
+    private function buildPayload(string $code, PromotionDiscountEntity $discount, PromotionEntity $promotion, string $currencyId): array
     {
         $payload = [];
 
@@ -200,29 +199,68 @@ class PromotionItemBuilder
         // set the discount type absolute, percentage, ...
         $payload['discountType'] = $discount->getType();
 
+        // set the code of this discount
+        $payload['code'] = $code;
+
         // set value of discount in payload
         $payload['value'] = (string) $discount->getValue();
 
         // set our max value for maximum percentage discounts
+        $payload['maxValue'] = '';
         if ($discount->getType() === PromotionDiscountEntity::TYPE_PERCENTAGE && $discount->getMaxValue() !== null) {
-            $payload['maxValue'] = (string) $this->getCurrencySpecificValue($discount, $discount->getMaxValue(), $context);
-        } else {
-            $payload['maxValue'] = '';
+            $payload['maxValue'] = (string) $this->getCurrencySpecificValue($discount, $discount->getMaxValue(), $currencyId);
         }
 
         // set the scope of the discount cart, delivery....
         $payload['discountScope'] = $discount->getScope();
 
+        $payload['groupId'] = '';
+        // if we have set a custom setgroup scope, then the group id
+        // is used as suffix in the scopeKey...
+        if ($discount->isScopeSetGroup()) {
+            $payload['groupId'] = $discount->getSetGroupId();
+            $payload['discountScope'] = PromotionDiscountEntity::SCOPE_SETGROUP;
+        }
+
+        // add all our set groups to our configuration
+        // if existing. always make sure to have at least a node
+        $payload['setGroups'] = [];
+
+        if ($promotion->getSetgroups() !== null) {
+            foreach ($promotion->getSetgroups() as $group) {
+                $payload['setGroups'][] = [
+                    'groupId' => $group->getId(),
+                    'packagerKey' => $group->getPackagerKey(),
+                    'value' => $group->getValue(),
+                    'sorterKey' => $group->getSorterKey(),
+                    'rules' => $group->getSetGroupRules(),
+                ];
+            }
+        }
+
+        $payload['filter'] = [
+            'sorterKey' => null,
+            'applierKey' => null,
+            'usageKey' => null,
+        ];
+
+        if ($discount->isConsiderAdvancedRules()) {
+            $payload['filter'] = [
+                'sorterKey' => $discount->getSorterKey(),
+                'applierKey' => $discount->getApplierKey(),
+                'usageKey' => $discount->getUsageKey(),
+            ];
+        }
+
         return $payload;
     }
 
     /**
-     * get the absolute price from collection if there is a price defined for the SalesChannelContext currency
-     * if no price is defined return standard discount price
+     * Gets the absolute price for the provided currency.
+     * This can either be a specific value or the default discount value.
      */
-    private function getCurrencySpecificValue(PromotionDiscountEntity $discount, float $default, SalesChannelContext $context): float
+    private function getCurrencySpecificValue(PromotionDiscountEntity $discount, float $default, string $currencyId): float
     {
-        /** @var PromotionDiscountPriceCollection|null $currencyPrices */
         $currencyPrices = $discount->getPromotionDiscountPrices();
 
         // if there is no special defined price return default value
@@ -232,17 +270,13 @@ class PromotionItemBuilder
 
         // there are defined special prices, let's look if we may find one in collection for sales channel currency
         // if there is one we want to return this otherwise we return standard value
-
-        /** @var string $currencyId */
-        $currencyId = $context->getCurrency()->getId();
-
         $discountValue = $default;
 
-        /** @var PromotionDiscountPriceEntity $currencyPrice */
         foreach ($currencyPrices as $currencyPrice) {
             if ($currencyPrice->getCurrencyId() === $currencyId) {
                 // we have found a defined price, we overwrite standard value and break loop
                 $discountValue = $currencyPrice->getPrice();
+
                 break;
             }
         }

@@ -18,6 +18,7 @@ use Shopware\Core\Framework\Uuid\Uuid;
 class EntitySearcherTest extends TestCase
 {
     use IntegrationTestBehaviour;
+
     /**
      * @var EntityRepositoryInterface
      */
@@ -36,7 +37,7 @@ class EntitySearcherTest extends TestCase
         $this->productRepository = $this->getContainer()->get('product.repository');
     }
 
-    public function testTotalCountWithSearchTerm()
+    public function testTotalCountWithSearchTerm(): void
     {
         $id1 = Uuid::randomHex();
         $id2 = Uuid::randomHex();
@@ -46,7 +47,6 @@ class EntitySearcherTest extends TestCase
                 'id' => $id1,
                 'productNumber' => Uuid::randomHex(),
                 'name' => 'test matching product',
-                'productNumber' => 'Test',
                 'stock' => 10,
                 'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
                 'manufacturer' => ['name' => 'test'],
@@ -56,7 +56,6 @@ class EntitySearcherTest extends TestCase
                 'id' => $id2,
                 'productNumber' => Uuid::randomHex(),
                 'name' => 'test matching',
-                'productNumber' => 'Test 2',
                 'stock' => 10,
                 'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
                 'manufacturer' => ['name' => 'test'],
@@ -87,7 +86,7 @@ class EntitySearcherTest extends TestCase
         static::assertCount(2, $result->getEntities());
     }
 
-    public function testSortingAndTotalCountWithManyAssociation()
+    public function testSortingAndTotalCountWithManyAssociation(): void
     {
         $redId = Uuid::randomHex();
         $greenId = Uuid::randomHex();
@@ -200,7 +199,7 @@ class EntitySearcherTest extends TestCase
         static::assertCount(6, $result->getEntities());
     }
 
-    public function testJsonListEqualsAnyFilter()
+    public function testJsonListEqualsAnyFilter(): void
     {
         $redId = Uuid::randomHex();
         $greenId = Uuid::randomHex();

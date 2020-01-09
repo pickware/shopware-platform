@@ -1,0 +1,52 @@
+{
+  "sw-settings-mailer": {
+    "general": {
+      "mainMenuItemGeneral": "Mailer",
+      "textHeadline": "Mailer",
+      "buttonSave": "Speichern"
+    },
+    "mailer-configuration": {
+      "card-title": "Mailer-Konfiguration",
+      "agent": "Bevorzugter E-Mail-Agent",
+      "local-agent": "Lokaler E-Mail-Agent",
+      "local-helptext": "Es wird der Standard-Mailer (Sendmail) Deines Systems verwendet. Stelle sicher, dass Sendmail in Deiner Host-Umgebung verfügbar ist und funktioniert.",
+      "smtp-server": "SMTP-Server"
+    },
+    "first-configuration": {
+      "headline": "E-Mail-Kommunikation einrichten",
+      "description": "Die Kommunikation mit den Kunden ist ein Schlüsselfaktor im täglichen E-Commerce. Daher sollte die Einrichtung eines Mailingsystems so schnell wie möglich von Deiner Liste gestrichen werden."
+    },
+    "card-smtp": {
+      "host": "Host",
+      "host-placeholder": "Host-Namen eingeben ...",
+      "port": "Port",
+      "port-placeholder": "Port-Nummer eingeben ...",
+      "username": "Benutzername",
+      "username-placeholder": "Gib Deinen Benutzernamen ein ...",
+      "password": "Passwort",
+      "password-placeholder": "Gib ein Passwort ein ...",
+      "encryption": "Verschlüsselungsmethode",
+      "encryption-placeholder": "Verschlüsselungsmethode auswählen ...",
+      "authentication": "Authentifizierungsmethode",
+      "authentication-placeholder": "Authentifizierungsmethode auswählen ...",
+      "sender-address": "Absender-Adresse",
+      "sender-address-placeholder": "Gib eine E-Mail-Adresse ein, auf die Du Zugriff hast ...",
+      "delivery-address": "Empfänger-Adresse",
+      "delivery-address-placeholder": "Gib eine E-Mail-Adresse für Testzwecke ein ...",
+      "delivery-address-helptext": "Alle ausgehenden E-Mails werden ebenfalls an diese Adresse gesendet. Diese Funktion dient nur zu Testzwecken.",
+      "disable-delivery": "E-Mail-Versand (vorrübergehend) deaktivieren"
+    },
+    "encryption": {
+      "no-encryption": "Keine Verschlüsselung",
+      "ssl": "SSL",
+      "tls": "TLS"
+    },
+    "authentication": {
+      "no-authentication": "Keine Authentifizierung",
+      "plain": "Einfach",
+      "login": "Login",
+      "cram-md5": "Cram MD5"
+    }
+  }
+}
+

@@ -4,6 +4,8 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Dbal;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
+use Doctrine\DBAL\Query\QueryBuilder as DbalQueryBuilderAlias;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityTranslationDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\CanNotFindParentStorageFieldException;
@@ -17,18 +19,19 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\MappingEntityDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\ChangeSet;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\ChangeSetAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\DeleteCommand;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\InsertCommand;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\JsonUpdateCommand;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\UpdateCommand;
-use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommandInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommand;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommandQueue;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityWriteGatewayInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Validation\PostWriteValidationEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Validation\PreWriteValidationEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteContext;
-use Shopware\Core\Framework\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -44,10 +47,19 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
      */
     private $eventDispatcher;
 
-    public function __construct(Connection $connection, EventDispatcherInterface $eventDispatcher)
-    {
+    /**
+     * @var ExceptionHandlerRegistry
+     */
+    private $exceptionHandlerRegistry;
+
+    public function __construct(
+        Connection $connection,
+        EventDispatcherInterface $eventDispatcher,
+        ExceptionHandlerRegistry $exceptionHandlerRegistry
+    ) {
         $this->connection = $connection;
         $this->eventDispatcher = $eventDispatcher;
+        $this->exceptionHandlerRegistry = $exceptionHandlerRegistry;
     }
 
     /**
@@ -63,7 +75,7 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
 
         $wasChild = $this->wasChild($definition, $state);
 
-        return new EntityExistence($definition, $primaryKey, $exists, $isChild, $wasChild, $state);
+        return new EntityExistence($definition->getEntityName(), Uuid::fromBytesToHexList($primaryKey), $exists, $isChild, $wasChild, $state);
     }
 
     /**
@@ -71,69 +83,106 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
      */
     public function execute(array $commands, WriteContext $context): void
     {
-        $this->connection->transactional(function () use ($commands, $context) {
+        $this->connection->beginTransaction();
+
+        try {
             // throws exception on violation and then aborts/rollbacks this transaction
             $event = new PreWriteValidationEvent($context, $commands);
             $this->eventDispatcher->dispatch($event);
+
+            $this->generateChangeSets($commands);
+
             $context->getExceptions()->tryToThrow();
 
-            /** @var WriteCommandInterface $command */
             foreach ($commands as $command) {
-                $definition = $command->getDefinition();
-                $table = $definition->getEntityName();
-
-                if ($command instanceof DeleteCommand) {
-                    $this->connection->delete(EntityDefinitionQueryHelper::escape($table), $command->getPrimaryKey());
+                if (!$command->isValid()) {
                     continue;
                 }
 
-                if ($command instanceof JsonUpdateCommand) {
-                    $this->executeJsonUpdate($command);
-                    continue;
-                }
-
-                /** @var InsertCommand $command */
-                if ($definition instanceof MappingEntityDefinition && $command instanceof InsertCommand) {
-                    $queue = new MultiInsertQueryQueue($this->connection, 1, false, true);
-                    $queue->addInsert($definition->getEntityName(), $command->getPayload());
-                    $queue->execute();
-                    continue;
-                }
-
-                if ($command instanceof UpdateCommand) {
-                    if (!$command->isValid()) {
-                        continue;
+                try {
+                    $this->executeCommand($command);
+                } catch (\Exception $e) {
+                    $innerException = $this->exceptionHandlerRegistry->matchException($e, $command);
+                    if ($innerException instanceof \Exception) {
+                        $e = $innerException;
                     }
-                    $this->connection->update(
-                        EntityDefinitionQueryHelper::escape($table),
-                        $this->escapeColumnKeys($command->getPayload()),
-                        $command->getPrimaryKey()
-                    );
-                    continue;
-                }
+                    $context->getExceptions()->add($e);
 
-                if ($command instanceof InsertCommand) {
-                    $this->connection->insert(
-                        EntityDefinitionQueryHelper::escape($table),
-                        $this->escapeColumnKeys($command->getPayload())
-                    );
-                    continue;
+                    throw $e;
                 }
-
-                throw new UnsupportedCommandTypeException($command);
             }
 
             // throws exception on violation and then aborts/rollbacks this transaction
             $event = new PostWriteValidationEvent($context, $commands);
             $this->eventDispatcher->dispatch($event);
-
             $context->getExceptions()->tryToThrow();
-        });
+
+            //only commit if transaction is not already marked for rollback
+            if (!$this->connection->isRollbackOnly()) {
+                $this->connection->commit();
+            } else {
+                $this->connection->rollBack();
+            }
+        } catch (\Throwable $e) {
+            $this->connection->rollBack();
+
+            throw $e;
+        }
+    }
+
+    private function executeCommand(WriteCommand $command): void
+    {
+        $definition = $command->getDefinition();
+        $table = $definition->getEntityName();
+
+        if ($command instanceof DeleteCommand) {
+            $this->connection->delete(
+                EntityDefinitionQueryHelper::escape($table),
+                $command->getPrimaryKey()
+            );
+
+            return;
+        }
+
+        if ($command instanceof JsonUpdateCommand) {
+            $this->executeJsonUpdate($command);
+
+            return;
+        }
+
+        if ($definition instanceof MappingEntityDefinition && $command instanceof InsertCommand) {
+            $queue = new MultiInsertQueryQueue($this->connection, 1, false, true);
+            $queue->addInsert($definition->getEntityName(), $command->getPayload());
+            $queue->execute();
+
+            return;
+        }
+
+        if ($command instanceof UpdateCommand) {
+            $this->connection->update(
+                EntityDefinitionQueryHelper::escape($table),
+                $this->escapeColumnKeys($command->getPayload()),
+                $command->getPrimaryKey()
+            );
+
+            return;
+        }
+
+        if ($command instanceof InsertCommand) {
+            $this->connection->insert(
+                EntityDefinitionQueryHelper::escape($table),
+                $this->escapeColumnKeys($command->getPayload())
+            );
+
+            return;
+        }
+
+        throw new UnsupportedCommandTypeException($command);
     }
 
     private static function isAssociative(array $array): bool
     {
-        foreach ($array as $key => $_) {
+        foreach ($array as $key => $_value) {
             if (!is_int($key)) {
                 return true;
             }
@@ -192,21 +241,22 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
         $storageName = $command->getStorageName();
         $query->set(
             $storageName,
-            sprintf('JSON_SET(IFNULL(%s, "{}"), %s)',
+            sprintf(
+                'JSON_SET(IFNULL(%s, "{}"), %s)',
                 EntityDefinitionQueryHelper::escape($storageName),
                 implode(', ', $sets)
             )
         );
 
         $identifier = $command->getPrimaryKey();
-        foreach ($identifier as $key => $value) {
+        foreach ($identifier as $key => $_value) {
             $query->andWhere(EntityDefinitionQueryHelper::escape($key) . ' = ?');
         }
         $query->setParameters(array_merge($values, array_values($identifier)));
         $query->execute();
     }
 
-    private function escapeColumnKeys($payload): array
+    private function escapeColumnKeys(array $payload): array
     {
         $escaped = [];
         foreach ($payload as $key => $value) {
@@ -257,6 +307,7 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
             if ($command instanceof DeleteCommand) {
                 $state = [];
                 $useDatabase = false;
+
                 continue;
             }
 
@@ -314,9 +365,7 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
 
         if ($definition->isChildrenAware()) {
             $query->addSelect('parent_id');
-        } elseif (!$definition->isInheritanceAware()) {
-            $query->addSelect('1 as `exists`');
-        } else {
+        } elseif ($definition->isInheritanceAware()) {
             $parent = $this->getParentField($definition);
 
             $query->addSelect(
@@ -391,5 +440,97 @@ class EntityWriteGateway implements EntityWriteGatewayInterface
         $existence = $this->getExistence($parent, $parentPrimaryKey, [], $commandQueue);
 
         return $existence->isChild();
+    }
+
+    private function generateChangeSets(array $commands): void
+    {
+        $primaryKeys = [];
+        $definitions = [];
+
+        /** @var WriteCommand|ChangeSetAware $command */
+        foreach ($commands as $command) {
+            if (!$command instanceof ChangeSetAware || !$command instanceof WriteCommand) {
+                continue;
+            }
+
+            if (!$command->requiresChangeSet()) {
+                continue;
+            }
+
+            $entity = $command->getDefinition()->getEntityName();
+
+            $primaryKeys[$entity][] = $command->getPrimaryKey();
+            $definitions[$entity] = $command->getDefinition();
+        }
+
+        if (empty($primaryKeys)) {
+            return;
+        }
+
+        $states = [];
+        foreach ($primaryKeys as $entity => $ids) {
+            $query = $this->connection->createQueryBuilder();
+
+            $definition = $definitions[$entity];
+
+            $query->addSelect('*');
+            $query->from(EntityDefinitionQueryHelper::escape($definition->getEntityName()));
+
+            $this->addPrimaryCondition($query, $ids);
+
+            $states[$entity] = $query->execute()->fetchAll();
+        }
+
+        foreach ($commands as $command) {
+            if (!$command instanceof ChangeSetAware || !$command instanceof WriteCommand) {
+                continue;
+            }
+
+            if (!$command->requiresChangeSet()) {
+                continue;
+            }
+
+            $entity = $command->getDefinition()->getEntityName();
+
+            $command->setChangeSet(
+                $this->calculateChangeSet($command, $states[$entity])
+            );
+        }
+    }
+
+    private function addPrimaryCondition(DbalQueryBuilderAlias $query, array $primaryKeys): void
+    {
+        $all = [];
+        $i = 0;
+        foreach ($primaryKeys as $primaryKey) {
+            $where = [];
+
+            foreach ($primaryKey as $field => $value) {
+                ++$i;
+                $field = EntityDefinitionQueryHelper::escape($field);
+                $where[] = $field . ' = :param' . $i;
+                $query->setParameter('param' . $i, $value);
+            }
+
+            $all[] = implode(' AND ', $where);
+        }
+
+        $query->andWhere(implode(' OR ', $all));
+    }
+
+    private function calculateChangeSet(WriteCommand $command, array $states): ChangeSet
+    {
+        foreach ($states as $state) {
+            // check if current loop matches the command primary key
+            $primaryKey = array_intersect($command->getPrimaryKey(), $state);
+
+            if (!$primaryKey) {
+                continue;
+            }
+
+            return new ChangeSet($state, $command->getPayload(), $command instanceof DeleteCommand);
+        }
+
+        return new ChangeSet([], [], $command instanceof DeleteCommand);
     }
 }

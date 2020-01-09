@@ -3,8 +3,8 @@
 namespace Shopware\Core\Framework\DataAbstractionLayer\Write;
 
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Language\LanguageDefinition;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Language\LanguageDefinition;
 
 class WriteContext
 {
@@ -41,7 +41,7 @@ class WriteContext
         $this->exceptions = new WriteException();
     }
 
-    public function setLanguages($languages): void
+    public function setLanguages(array $languages): void
     {
         $this->languages = $languages;
         $this->languageCodeIdMapping = null;
@@ -59,11 +59,11 @@ class WriteContext
     public function getLanguageId(string $identifier): ?string
     {
         if (Uuid::isValid($identifier)) {
-            return $this->getLanguages()[strtolower($identifier)]['id'] ?? null;
+            return $this->getLanguages()[mb_strtolower($identifier)]['id'] ?? null;
         }
         $mapping = $this->getLanguageCodeToIdMapping();
 
-        return $mapping[strtolower($identifier)] ?? null;
+        return $mapping[mb_strtolower($identifier)] ?? null;
     }
 
     public static function createFromContext(Context $context): self
@@ -118,6 +118,17 @@ class WriteContext
         return $this->exceptions;
     }
 
+    public function scope(string $scope, callable $callback): void
+    {
+        $originalContext = $this->context;
+
+        $this->context->scope($scope, function (Context $context) use ($callback, $originalContext): void {
+            $this->context = $context;
+            $callback($this);
+            $this->context = $originalContext;
+        });
+    }
+
     private function getLanguageCodeToIdMapping(): array
     {
         if ($this->languageCodeIdMapping !== null) {
@@ -130,7 +141,7 @@ class WriteContext
             if (!$language['code']) {
                 continue;
             }
-            $mapping[strtolower($language['code'])] = $language['id'];
+            $mapping[mb_strtolower($language['code'])] = $language['id'];
         }
 
         return $this->languageCodeIdMapping = $mapping;

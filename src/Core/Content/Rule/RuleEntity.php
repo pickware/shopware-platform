@@ -4,6 +4,7 @@ namespace Shopware\Core\Content\Rule;
 
 use Shopware\Core\Checkout\Payment\PaymentMethodCollection;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscount\PromotionDiscountCollection;
+use Shopware\Core\Checkout\Promotion\Aggregate\PromotionSetGroup\PromotionSetGroupCollection;
 use Shopware\Core\Checkout\Promotion\PromotionCollection;
 use Shopware\Core\Checkout\Shipping\Aggregate\ShippingMethodPrice\ShippingMethodPriceCollection;
 use Shopware\Core\Checkout\Shipping\ShippingMethodCollection;
@@ -81,6 +82,11 @@ class RuleEntity extends Entity
      * @var PromotionDiscountCollection|null
      */
     protected $promotionDiscounts;
+
+    /**
+     * @var PromotionSetGroupCollection|null
+     */
+    protected $promotionSetGroups;
 
     /**
      * @var ShippingMethodPriceCollection|null
@@ -167,7 +173,7 @@ class RuleEntity extends Entity
         return $this->paymentMethods;
     }
 
-    public function setPaymentMethods(?PaymentMethodCollection $paymentMethods): void
+    public function setPaymentMethods(PaymentMethodCollection $paymentMethods): void
     {
         $this->paymentMethods = $paymentMethods;
     }
@@ -227,9 +233,19 @@ class RuleEntity extends Entity
         return $this->promotionDiscounts;
     }
 
-    public function setPromotionDiscounts(?PromotionDiscountCollection $promotionDiscounts): void
+    public function setPromotionDiscounts(PromotionDiscountCollection $promotionDiscounts): void
     {
         $this->promotionDiscounts = $promotionDiscounts;
+    }
+
+    public function getPromotionSetGroups(): ?PromotionSetGroupCollection
+    {
+        return $this->promotionSetGroups;
+    }
+
+    public function setPromotionSetGroups(PromotionSetGroupCollection $promotionSetGroups): void
+    {
+        $this->promotionSetGroups = $promotionSetGroups;
     }
 
     public function getShippingMethodPriceCalculations(): ?ShippingMethodPriceCollection
@@ -255,7 +271,7 @@ class RuleEntity extends Entity
      * Sets a list of all promotions where this rule should be
      * used as Persona Condition
      */
-    public function setPersonaPromotions(?PromotionCollection $personaPromotions): void
+    public function setPersonaPromotions(PromotionCollection $personaPromotions): void
     {
         $this->personaPromotions = $personaPromotions;
     }
@@ -273,7 +289,7 @@ class RuleEntity extends Entity
      * Sets a list of all promotions where this rule should be
      * used as Order Condition.
      */
-    public function setOrderPromotions(?PromotionCollection $orderPromotions): void
+    public function setOrderPromotions(PromotionCollection $orderPromotions): void
     {
         $this->orderPromotions = $orderPromotions;
     }
@@ -291,7 +307,7 @@ class RuleEntity extends Entity
      * Sets a list of all promotions where this rule should be
      * used as Cart Condition.
      */
-    public function setCartPromotions(?PromotionCollection $cartPromotions): void
+    public function setCartPromotions(PromotionCollection $cartPromotions): void
     {
         $this->cartPromotions = $cartPromotions;
     }

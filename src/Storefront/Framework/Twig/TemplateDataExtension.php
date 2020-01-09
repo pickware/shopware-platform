@@ -31,11 +31,28 @@ class TemplateDataExtension extends AbstractExtension implements GlobalsInterfac
      */
     private $themeService;
 
-    public function __construct(RequestStack $requestStack, SystemConfigService $systemConfigService, ThemeService $themeService)
-    {
+    /**
+     * @var bool
+     */
+    private $csrfEnabled;
+
+    /**
+     * @var string
+     */
+    private $csrfMode;
+
+    public function __construct(
+        RequestStack $requestStack,
+        SystemConfigService $systemConfigService,
+        ThemeService $themeService,
+        bool $csrfEnabled,
+        string $csrfMode
+    ) {
         $this->requestStack = $requestStack;
         $this->systemConfigService = $systemConfigService;
         $this->themeService = $themeService;
+        $this->csrfEnabled = $csrfEnabled;
+        $this->csrfMode = $csrfMode;
     }
 
     public function getGlobals(): array
@@ -60,11 +77,13 @@ class TemplateDataExtension extends AbstractExtension implements GlobalsInterfac
         return [
             'shopware' => [
                 'config' => array_merge(
-                    $this->systemConfigService->getConfigArray($context->getSalesChannel()->getId()),
+                    $this->systemConfigService->all($context->getSalesChannel()->getId()),
                     $this->getDefaultConfiguration()
                 ),
                 'theme' => $this->getThemeConfig($context->getSalesChannel()->getId(), $themeId),
                 'dateFormat' => DATE_ATOM,
+                'csrfEnabled' => $this->csrfEnabled,
+                'csrfMode' => $this->csrfMode,
             ],
             'controllerName' => $controllerInfo->getName(),
             'controllerAction' => $controllerInfo->getAction(),
@@ -92,7 +111,8 @@ class TemplateDataExtension extends AbstractExtension implements GlobalsInterfac
 
         $themePrefix = ThemeCompiler::getThemePrefix($salesChannelId, $themeId);
 
-        $themeConfig = array_merge($themeConfig,
+        $themeConfig = array_merge(
+            $themeConfig,
             [
                 'assets' => [
                     'css' => [
@@ -122,6 +142,9 @@ class TemplateDataExtension extends AbstractExtension implements GlobalsInterfac
             ],
             'confirm' => [
                 'revocationNotice' => true,
+            ],
+            'detail' => [
+                'showReviews' => true,
             ],
         ];
     }

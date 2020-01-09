@@ -8,8 +8,8 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\MessageQueue\Message\RetryMessage;
 use Shopware\Core\Framework\MessageQueue\ScheduledTask\RequeueDeadMessagesTask;
-use Shopware\Core\Framework\ScheduledTask\ScheduledTaskDefinition;
-use Shopware\Core\Framework\ScheduledTask\ScheduledTaskEntity;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskDefinition;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskEntity;
 use Shopware\Core\Framework\Test\MessageQueue\fixtures\TestMessage;
 use Shopware\Core\Framework\Test\TestCaseBase\AdminFunctionalTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\QueueTestBehaviour;
@@ -21,7 +21,7 @@ class ScheduledTaskControllerTest extends TestCase
     use AdminFunctionalTestBehaviour;
     use QueueTestBehaviour;
 
-    public function testRunScheduledTasks()
+    public function testRunScheduledTasks(): void
     {
         $connection = $this->getContainer()->get(Connection::class);
         $connection->exec('DELETE FROM scheduled_task');
@@ -51,7 +51,7 @@ class ScheduledTaskControllerTest extends TestCase
         static::assertEquals(ScheduledTaskDefinition::STATUS_QUEUED, $task->getStatus());
     }
 
-    public function testGetMinRunInterval()
+    public function testGetMinRunInterval(): void
     {
         $connection = $this->getContainer()->get(Connection::class);
         $connection->exec('DELETE FROM scheduled_task');

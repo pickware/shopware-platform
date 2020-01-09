@@ -9,7 +9,9 @@ use Shopware\Core\Content\Media\MediaDefinition;
 use Shopware\Core\Content\Product\Aggregate\ProductCategory\ProductCategoryDefinition;
 use Shopware\Core\Content\Product\Aggregate\ProductCategoryTree\ProductCategoryTreeDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
-use Shopware\Core\Framework\Context\SalesChannelApiSource;
+use Shopware\Core\Content\Seo\MainCategory\MainCategoryDefinition;
+use Shopware\Core\Content\Seo\SeoUrl\SeoUrlDefinition;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\BoolField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ChildCountField;
@@ -23,6 +25,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\ReverseInherited;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\SearchRanking;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\WriteProtected;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
@@ -36,7 +39,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\TreeLevelField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TreePathField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
-use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
 use Shopware\Core\System\SalesChannel\SalesChannelDefinition;
 use Shopware\Core\System\Tag\TagDefinition;
 
@@ -65,16 +67,12 @@ class CategoryDefinition extends EntityDefinition
         return CategoryEntity::class;
     }
 
-    public function getDefaults(EntityExistence $existence): array
+    public function getDefaults(): array
     {
-        $defaults = parent::getDefaults($existence);
-
-        if (!$existence->exists()) {
-            $defaults['displayNestedProducts'] = true;
-            $defaults['type'] = self::TYPE_PAGE;
-        }
-
-        return $defaults;
+        return [
+            'displayNestedProducts' => true,
+            'type' => self::TYPE_PAGE,
+        ];
     }
 
     protected function defineFields(): FieldCollection
@@ -92,6 +90,7 @@ class CategoryDefinition extends EntityDefinition
             new FkField('media_id', 'mediaId', MediaDefinition::class),
 
             (new BoolField('display_nested_products', 'displayNestedProducts'))->addFlags(new Required()),
+            (new IntField('auto_increment', 'autoIncrement'))->addFlags(new WriteProtected()),
 
             (new TranslatedField('breadcrumb'))->addFlags(new WriteProtected()),
             new TreeLevelField('level', 'level'),
@@ -107,6 +106,9 @@ class CategoryDefinition extends EntityDefinition
             new TranslatedField('slotConfig'),
             new TranslatedField('externalLink'),
             new TranslatedField('description'),
+            new TranslatedField('metaTitle'),
+            new TranslatedField('metaDescription'),
+            new TranslatedField('keywords'),
 
             new ParentAssociationField(self::class, 'id'),
             new ChildrenAssociationField(self::class),
@@ -125,6 +127,9 @@ class CategoryDefinition extends EntityDefinition
             (new OneToManyAssociationField('navigationSalesChannels', SalesChannelDefinition::class, 'navigation_category_id'))->addFlags(new ReadProtected(SalesChannelApiSource::class)),
             (new OneToManyAssociationField('footerSalesChannels', SalesChannelDefinition::class, 'footer_category_id'))->addFlags(new ReadProtected(SalesChannelApiSource::class)),
             (new OneToManyAssociationField('serviceSalesChannels', SalesChannelDefinition::class, 'service_category_id'))->addFlags(new ReadProtected(SalesChannelApiSource::class)),
+
+            (new OneToManyAssociationField('mainCategories', MainCategoryDefinition::class, 'category_id'))->addFlags(new CascadeDelete()),
+            new OneToManyAssociationField('seoUrls', SeoUrlDefinition::class, 'foreign_key'),
         ]);
     }
 }

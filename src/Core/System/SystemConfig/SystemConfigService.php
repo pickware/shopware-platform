@@ -4,6 +4,7 @@ namespace Shopware\Core\System\SystemConfig;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
+use Shopware\Core\Framework\Bundle;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
@@ -13,8 +14,11 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\Framework\Uuid\Exception\InvalidUuidException;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SystemConfig\Exception\BundleConfigNotFoundException;
 use Shopware\Core\System\SystemConfig\Exception\InvalidDomainException;
 use Shopware\Core\System\SystemConfig\Exception\InvalidKeyException;
+use Shopware\Core\System\SystemConfig\Util\ConfigReader;
+use Symfony\Component\Config\Util\XmlUtils;
 
 class SystemConfigService
 {
@@ -28,59 +32,57 @@ class SystemConfigService
      */
     private $systemConfigRepository;
 
-    public function __construct(Connection $connection, EntityRepositoryInterface $systemConfigRepository)
-    {
+    /**
+     * @var array[]
+     */
+    private $configs = [];
+
+    /**
+     * @var ConfigReader
+     */
+    private $configReader;
+
+    public function __construct(
+        Connection $connection,
+        EntityRepositoryInterface $systemConfigRepository,
+        ConfigReader $configReader
+    ) {
         $this->connection = $connection;
         $this->systemConfigRepository = $systemConfigRepository;
+        $this->configReader = $configReader;
     }
 
-    public function get(string $key, ?string $salesChannelId = null, bool $inherit = true)
+    public function get(string $key, ?string $salesChannelId = null)
     {
-        $criteria = new Criteria();
+        $config = $this->load($salesChannelId);
 
-        $filter = [new EqualsFilter('salesChannelId', $salesChannelId)];
-        if ($inherit) {
-            $filter[] = new EqualsFilter('salesChannelId', null);
+        $parts = explode('.', $key);
+
+        $pointer = $config;
+
+        foreach ($parts as $part) {
+            if (!\is_array($pointer)) {
+                return null;
+            }
+
+            if (\array_key_exists($part, $pointer)) {
+                $pointer = $pointer[$part];
+
+                continue;
+            }
+
+            return null;
         }
 
-        $criteria->addFilter(new MultiFilter(
-            MultiFilter::CONNECTION_OR,
-            $filter
-        ));
-        $criteria->addFilter(new EqualsFilter('configurationKey', $key));
-        $criteria->addSorting(new FieldSorting('salesChannelId', FieldSorting::ASCENDING));
-
-        /** @var SystemConfigEntity|null $last */
-        $last = $this->systemConfigRepository
-            ->search($criteria, Context::createDefaultContext())
-            ->last();
-
-        return $last ? $last->getConfigurationValue() : null;
+        return $pointer;
     }
 
     /**
      * gets all available shop configs and returns them as an array
      */
-    public function getConfigArray(?string $salesChannelId = null, bool $inherit = true): array
+    public function all(?string $salesChannelId = null): array
     {
-        $criteria = new Criteria();
-
-        $filter = [new EqualsFilter('salesChannelId', $salesChannelId)];
-        if ($inherit) {
-            $filter[] = new EqualsFilter('salesChannelId', null);
-        }
-
-        $criteria->addFilter(new MultiFilter(
-            MultiFilter::CONNECTION_OR,
-            $filter
-        ));
-
-        $criteria->addSorting(new FieldSorting('salesChannelId', FieldSorting::ASCENDING));
-
-        /** @var SystemConfigCollection $systemConfigs */
-        $systemConfigs = $this->systemConfigRepository->search($criteria, Context::createDefaultContext())->getEntities();
-
-        return $this->buildSystemConfigArray($systemConfigs);
+        return $this->load($salesChannelId);
     }
 
     /**
@@ -133,7 +135,9 @@ class SystemConfigService
         $merged = [];
         foreach ($collection as $cur) {
             // use the last one with the same key. entities with sales_channel_id === null are sorted before the others
-            $merged[$cur->getConfigurationKey()] = $cur->getConfigurationValue();
+            if (!array_key_exists($cur->getConfigurationKey(), $merged) || !empty($cur->getConfigurationValue())) {
+                $merged[$cur->getConfigurationKey()] = $cur->getConfigurationValue();
+            }
         }
 
         return $merged;
@@ -141,6 +145,9 @@ class SystemConfigService
 
     public function set(string $key, $value, ?string $salesChannelId = null): void
     {
+        // reset internal cache
+        $this->configs = [];
+
         $key = trim($key);
         $this->validate($key, $salesChannelId);
 
@@ -168,8 +175,70 @@ class SystemConfigService
     }
 
     /**
-     * the keys of the systemconfigs look like core.loginRegistration.showPhoneNumberField
-     * this method splits those strings and builds an array structur
+     * Fetches default values from bundle configuration and saves it to database
+     */
+    public function savePluginConfiguration(Bundle $bundle, bool $override = false): void
+    {
+        try {
+            $config = $this->configReader->getConfigFromBundle($bundle);
+        } catch (BundleConfigNotFoundException $e) {
+            return;
+        }
+
+        $prefix = $bundle->getName() . '.config.';
+
+        foreach ($config as $card) {
+            foreach ($card['elements'] as $element) {
+                $key = $prefix . $element['name'];
+                if (!isset($element['defaultValue'])) {
+                    continue;
+                }
+
+                $value = XmlUtils::phpize($element['defaultValue']);
+                if ($override || $this->get($key) === null) {
+                    $this->set($key, $value);
+                }
+            }
+        }
+    }
+
+    private function load(?string $salesChannelId): array
+    {
+        $key = $salesChannelId ?? 'global';
+
+        if (isset($this->configs[$key])) {
+            return $this->configs[$key];
+        }
+
+        $criteria = new Criteria();
+
+        if ($salesChannelId === null) {
+            $criteria->addFilter(new EqualsFilter('salesChannelId', null));
+        } else {
+            $criteria->addFilter(
+                new MultiFilter(
+                    MultiFilter::CONNECTION_OR,
+                    [
+                        new EqualsFilter('salesChannelId', $salesChannelId),
+                        new EqualsFilter('salesChannelId', null),
+                    ]
+                )
+            );
+        }
+
+        $criteria->addSorting(new FieldSorting('salesChannelId', FieldSorting::ASCENDING));
+
+        /** @var SystemConfigCollection $systemConfigs */
+        $systemConfigs = $this->systemConfigRepository->search($criteria, Context::createDefaultContext())->getEntities();
+
+        $this->configs[$key] = $this->buildSystemConfigArray($systemConfigs);
+
+        return $this->configs[$key];
+    }
+
+    /**
+     * The keys of the system configs look like `core.loginRegistration.showPhoneNumberField`.
+     * This method splits those strings and builds an array structure
      *
      * ```
      * Array
@@ -178,7 +247,7 @@ class SystemConfigService
      *         (
      *             [loginRegistration] => Array
      *                 (
-     *                     [showPhoneNumberField] => 'somevalue'
+     *                     [showPhoneNumberField] => 'someValue'
      *                 )
      *         )
      * )
@@ -188,7 +257,6 @@ class SystemConfigService
     {
         $configValues = [];
 
-        /** @var SystemConfigEntity $systemConfig */
         foreach ($systemConfigs as $systemConfig) {
             $keys = explode('.', $systemConfig->getConfigurationKey());
 
@@ -203,9 +271,13 @@ class SystemConfigService
         $key = array_shift($keys);
 
         if (empty($keys)) {
+            if ($value !== false && empty($value)) {
+                return $configValues;
+            }
+
             $configValues[$key] = $value;
         } else {
-            if (!array_key_exists($key, $configValues)) {
+            if (!\array_key_exists($key, $configValues)) {
                 $configValues[$key] = [];
             }
 
@@ -215,6 +287,10 @@ class SystemConfigService
         return $configValues;
     }
 
+    /**
+     * @throws InvalidKeyException
+     * @throws InvalidUuidException
+     */
     private function validate(string $key, ?string $salesChannelId): void
     {
         $key = trim($key);
@@ -226,7 +302,7 @@ class SystemConfigService
         }
     }
 
-    private function getId($key, ?string $salesChannelId = null): ?string
+    private function getId(string $key, ?string $salesChannelId = null): ?string
     {
         $criteria = new Criteria();
         $criteria->addFilter(

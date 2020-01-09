@@ -2,8 +2,8 @@
 
 namespace Shopware\Core\System\User\Command;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
-use Shopware\Core\Framework\Provisioning\UserProvisioner;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
+use Shopware\Core\System\User\Service\UserProvisioner;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -13,6 +13,8 @@ use Symfony\Component\Console\Question\Question;
 
 class UserCreateCommand extends Command
 {
+    protected static $defaultName = 'user:create';
+
     /**
      * @var UserProvisioner
      */
@@ -29,8 +31,9 @@ class UserCreateCommand extends Command
      */
     protected function configure(): void
     {
-        $this->setName('user:create')
+        $this
             ->addArgument('username', InputArgument::REQUIRED, 'Username for the user')
+            ->addOption('admin', 'a', InputOption::VALUE_NONE, 'mark the user as admin')
             ->addOption('password', 'p', InputOption::VALUE_REQUIRED, 'Password for the user')
             ->addOption('firstName', null, InputOption::VALUE_REQUIRED, 'The user\'s firstname')
             ->addOption('lastName', null, InputOption::VALUE_REQUIRED, 'The user\'s lastname')
@@ -41,7 +44,7 @@ class UserCreateCommand extends Command
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new ShopwareStyle($input, $output);
 
@@ -66,9 +69,14 @@ class UserCreateCommand extends Command
         if ($input->getOption('email')) {
             $additionalData['email'] = $input->getOption('email');
         }
+        if ($input->getOption('admin')) {
+            $additionalData['admin'] = true;
+        }
 
         $this->userProvisioner->provision($username, $password, $additionalData);
 
         $io->success(sprintf('User "%s" successfully created.', $username));
+
+        return 0;
     }
 }

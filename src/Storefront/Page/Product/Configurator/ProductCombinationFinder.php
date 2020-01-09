@@ -32,9 +32,10 @@ class ProductCombinationFinder
         }
 
         while (\count($options) > 1) {
-            foreach ($options as $groupId => $optionId) {
+            foreach ($options as $groupId => $_optionId) {
                 if ($groupId !== $wishedGroupId) {
                     unset($options[$groupId]);
+
                     break;
                 }
             }

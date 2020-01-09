@@ -5,6 +5,7 @@ namespace Shopware\Core\Checkout\Order\Aggregate\OrderLineItem;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDeliveryPosition\OrderDeliveryPositionDefinition;
 use Shopware\Core\Checkout\Order\OrderDefinition;
 use Shopware\Core\Content\Media\MediaDefinition;
+use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\BoolField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CalculatedPriceField;
@@ -47,6 +48,13 @@ class OrderLineItemDefinition extends EntityDefinition
         return OrderLineItemEntity::class;
     }
 
+    public function getDefaults(): array
+    {
+        return [
+            'position' => 1,
+        ];
+    }
+
     protected function getParentDefinitionClass(): ?string
     {
         return OrderDefinition::class;
@@ -60,6 +68,9 @@ class OrderLineItemDefinition extends EntityDefinition
 
             (new FkField('order_id', 'orderId', OrderDefinition::class))->addFlags(new Required()),
             (new ReferenceVersionField(OrderDefinition::class))->addFlags(new Required()),
+
+            new FkField('product_id', 'productId', ProductDefinition::class),
+            (new ReferenceVersionField(ProductDefinition::class))->addFlags(new Required()),
 
             new ParentFkField(self::class),
             (new ReferenceVersionField(self::class, 'parent_version_id'))->addFlags(new Required()),
@@ -75,6 +86,7 @@ class OrderLineItemDefinition extends EntityDefinition
             new BoolField('good', 'good'),
             new BoolField('removable', 'removable'),
             new BoolField('stackable', 'stackable'),
+            (new IntField('position', 'position'))->addFlags(new Required()),
 
             (new CalculatedPriceField('price', 'price'))->setFlags(new Required()),
             new PriceDefinitionField('price_definition', 'priceDefinition'),
@@ -85,6 +97,7 @@ class OrderLineItemDefinition extends EntityDefinition
             new StringField('type', 'type'),
             new CustomFields(),
             new ManyToOneAssociationField('order', 'order_id', OrderDefinition::class, 'id', false),
+            new ManyToOneAssociationField('product', 'product_id', ProductDefinition::class, 'id', false),
             (new OneToManyAssociationField('orderDeliveryPositions', OrderDeliveryPositionDefinition::class, 'order_line_item_id', 'id'))->addFlags(new CascadeDelete(), new WriteProtected()),
         ]);
     }

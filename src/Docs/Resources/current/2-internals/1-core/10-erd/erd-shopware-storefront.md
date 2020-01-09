@@ -7,14 +7,9 @@ The storefront application of Shopware 6. Therefore contains Storefront specific
 ![Storefront](./dist/erd-shopware-storefront.png)
 
 
-### Table `seo_url`
+### Table `theme`
 
-Search engine optimized urls manually created from user input to optimize for different search engines and make the storefronts content a more prominent search result.
-
-
-### Table `seo_url_template`
-
-A template to generate seo urls from.
+__EMPTY__
 
 
 [Back to modules](./../10-modules.md)

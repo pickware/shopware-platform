@@ -5,7 +5,7 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Write\Validation;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntityDefinitionQueryHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\InsertCommand;
-use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommandInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommand;
 use Shopware\Core\Framework\Validation\WriteConstraintViolationException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Validator\ConstraintViolation;
@@ -47,7 +47,7 @@ class LockValidator implements EventSubscriberInterface
 
         $message = 'The %s entity is locked and can neither be modified nor deleted.';
 
-        foreach ($lockedEntities as $entity => $isLocked) {
+        foreach ($lockedEntities as $entity => $_isLocked) {
             $violations->add(new ConstraintViolation(
                 sprintf($message, $entity),
                 sprintf($message, '{{ entity }}'),
@@ -64,14 +64,14 @@ class LockValidator implements EventSubscriberInterface
     }
 
     /**
-     * @param WriteCommandInterface[] $writeCommands
+     * @param WriteCommand[] $writeCommands
      */
     private function containsLockedEntities(array $writeCommands): array
     {
         $ids = [];
         $locked = [];
 
-        foreach ($writeCommands as $index => $command) {
+        foreach ($writeCommands as $command) {
             if ($command instanceof InsertCommand) {
                 continue;
             }

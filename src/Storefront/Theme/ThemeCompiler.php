@@ -9,11 +9,9 @@ use ScssPhp\ScssPhp\Formatter\Crunched;
 use ScssPhp\ScssPhp\Formatter\Expanded;
 use Shopware\Storefront\Theme\Exception\InvalidThemeException;
 use Shopware\Storefront\Theme\Exception\ThemeCompileException;
-use Shopware\Storefront\Theme\StorefrontPluginConfiguration\File;
 use Shopware\Storefront\Theme\StorefrontPluginConfiguration\FileCollection;
 use Shopware\Storefront\Theme\StorefrontPluginConfiguration\StorefrontPluginConfiguration;
 use Shopware\Storefront\Theme\StorefrontPluginConfiguration\StorefrontPluginConfigurationCollection;
-use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Finder\Finder;
 
 class ThemeCompiler
@@ -22,11 +20,6 @@ class ThemeCompiler
      * @var FilesystemInterface
      */
     private $publicFilesystem;
-
-    /**
-     * @var Filesystem
-     */
-    private $localFileSystem;
 
     /**
      * @var string
@@ -45,13 +38,11 @@ class ThemeCompiler
 
     public function __construct(
         FilesystemInterface $publicFilesystem,
-        Filesystem $localFileSystem,
         ThemeFileResolver $themeFileResolver,
         string $cacheDir,
         bool $debug
     ) {
         $this->publicFilesystem = $publicFilesystem;
-        $this->localFileSystem = $localFileSystem;
         $this->themeFileResolver = $themeFileResolver;
         $this->cacheDir = $cacheDir;
 
@@ -80,7 +71,6 @@ class ThemeCompiler
         $styleFiles = $resolvedFiles[ThemeFileResolver::STYLE_FILES];
 
         $concatenatedStyles = '';
-        /** @var File $file */
         foreach ($styleFiles as $file) {
             $concatenatedStyles .= '@import \'' . $file->getFilepath() . '\';' . PHP_EOL;
         }
@@ -113,20 +103,21 @@ class ThemeCompiler
         StorefrontPluginConfiguration $configuration,
         StorefrontPluginConfigurationCollection $configurationCollection,
         string $outputPath
-    ) {
+    ): void {
         if (!$configuration->getAssetPaths()) {
             return;
         }
 
         foreach ($configuration->getAssetPaths() as $asset) {
-            if (strpos($asset, '@') === 0) {
-                $name = substr($asset, 1);
+            if (mb_strpos($asset, '@') === 0) {
+                $name = mb_substr($asset, 1);
                 $config = $configurationCollection->getByTechnicalName($name);
                 if (!$config) {
                     throw new InvalidThemeException($name);
                 }
 
                 $this->copyAssets($config, $configurationCollection, $outputPath);
+
                 continue;
             }
 
@@ -147,7 +138,7 @@ class ThemeCompiler
                 $content = file_get_contents($asset . DIRECTORY_SEPARATOR . $relativePathname);
 
                 $this->publicFilesystem->put(
-                    'bundles' . DIRECTORY_SEPARATOR . strtolower($configuration->getTechnicalName()) . DIRECTORY_SEPARATOR . $assetDir . DIRECTORY_SEPARATOR . $relativePathname,
+                    'bundles' . DIRECTORY_SEPARATOR . mb_strtolower($configuration->getTechnicalName()) . DIRECTORY_SEPARATOR . $assetDir . DIRECTORY_SEPARATOR . $relativePathname,
                     $content
                 );
 
@@ -167,8 +158,8 @@ class ThemeCompiler
         $this->scssCompiler->addImportPath(function ($originalPath) use ($resolveMappings) {
             foreach ($resolveMappings as $resolve => $resolvePath) {
                 $resolve = '~' . $resolve;
-                if (strpos($originalPath, $resolve) === 0) {
-                    $dirname = $resolvePath . dirname(substr($originalPath, strlen($resolve)));
+                if (mb_strpos($originalPath, $resolve) === 0) {
+                    $dirname = $resolvePath . dirname(mb_substr($originalPath, mb_strlen($resolve)));
                     $filename = basename($originalPath);
                     $extension = pathinfo($filename, PATHINFO_EXTENSION) === '' ? '.scss' : '';
                     $path = $dirname . DIRECTORY_SEPARATOR . $filename . $extension;

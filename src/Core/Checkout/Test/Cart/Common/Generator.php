@@ -20,7 +20,6 @@ use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Payment\PaymentMethodEntity;
 use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Checkout\Test\Payment\Handler\SyncTestPaymentHandler;
-use Shopware\Core\Content\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\Content\Product\Cart\ProductGateway;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
@@ -28,6 +27,7 @@ use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\Country\Aggregate\CountryState\CountryStateEntity;
 use Shopware\Core\System\Country\CountryEntity;
 use Shopware\Core\System\Currency\CurrencyEntity;
+use Shopware\Core\System\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SalesChannel\SalesChannelEntity;
 use Shopware\Core\System\Tax\TaxCollection;
@@ -55,6 +55,7 @@ class Generator extends TestCase
         if ($salesChannel === null) {
             $salesChannel = new SalesChannelEntity();
             $salesChannel->setId('ffa32a50e2d04cf38389a53f8d6cd594');
+            $salesChannel->setNavigationCategoryId(Uuid::randomHex());
         }
 
         $currency = $currency ?: (new CurrencyEntity())->assign([
@@ -202,7 +203,7 @@ class Generator extends TestCase
         return $cart;
     }
 
-    private function createTaxDetector($useGross, $isNetDelivery): TaxDetector
+    private function createTaxDetector(bool $useGross, bool $isNetDelivery): TaxDetector
     {
         /** @var MockObject|TaxDetector $mock */
         $mock = $this->createMock(TaxDetector::class);

@@ -10,9 +10,10 @@ use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteException;
 use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Shopware\Core\Framework\Validation\WriteConstraintViolationException;
+use Shopware\Core\Framework\Validation\Constraint\ArrayOfUuid;
 use Shopware\Core\System\Currency\Rule\CurrencyRule;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\Type;
 
 class CurrencyRuleTest extends TestCase
 {
@@ -41,135 +42,125 @@ class CurrencyRuleTest extends TestCase
         $this->context = Context::createDefaultContext();
     }
 
-    public function testValidateWithMissingCurrencyIds(): void
+    public function testValidateWithMissingValue(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new CurrencyRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/currencyIds', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $errors = iterator_to_array($stackException->getErrors());
+            static::assertCount(2, $errors);
+
+            static::assertEquals('/0/value/currencyIds', $errors[0]['source']['pointer']);
+            static::assertEquals(NotBlank::IS_BLANK_ERROR, $errors[0]['code']);
+
+            static::assertEquals('/0/value/operator', $errors[1]['source']['pointer']);
+            static::assertEquals(NotBlank::IS_BLANK_ERROR, $errors[1]['code']);
         }
     }
 
     public function testValidateWithEmptyCurrencyIds(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new CurrencyRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'currencyIds' => [],
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/currencyIds', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $errors = iterator_to_array($stackException->getErrors());
+            static::assertCount(1, $errors);
+
+            static::assertEquals('/0/value/currencyIds', $errors[0]['source']['pointer']);
+            static::assertEquals(NotBlank::IS_BLANK_ERROR, $errors[0]['code']);
         }
     }
 
     public function testValidateWithStringCurrencyIds(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new CurrencyRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'currencyIds' => '0915d54fbf80423c917c61ad5a391b48',
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/currencyIds', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame('This value should be of type array.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $errors = iterator_to_array($stackException->getErrors());
+            static::assertCount(1, $errors);
+
+            static::assertEquals('/0/value/currencyIds', $errors[0]['source']['pointer']);
+            static::assertEquals(Type::INVALID_TYPE_ERROR, $errors[0]['code']);
         }
     }
 
     public function testValidateWithInvalidArrayCurrencyIds(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new CurrencyRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'currencyIds' => [true, 3, null, '0915d54fbf80423c917c61ad5a391b48'],
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(3, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/currencyIds', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame('The value "1" is not a valid uuid.', $exception->getViolations()->get(0)->getMessage());
-                static::assertSame('The value "3" is not a valid uuid.', $exception->getViolations()->get(1)->getMessage());
-                static::assertSame('The value "" is not a valid uuid.', $exception->getViolations()->get(2)->getMessage());
-            }
+            $errors = iterator_to_array($stackException->getErrors());
+            static::assertCount(3, $errors);
+
+            static::assertEquals('/0/value/currencyIds', $errors[0]['source']['pointer']);
+            static::assertEquals('/0/value/currencyIds', $errors[1]['source']['pointer']);
+            static::assertEquals('/0/value/currencyIds', $errors[2]['source']['pointer']);
+
+            static::assertEquals(ArrayOfUuid::INVALID_TYPE_CODE, $errors[0]['code']);
+            static::assertEquals(ArrayOfUuid::INVALID_TYPE_CODE, $errors[1]['code']);
+            static::assertEquals(ArrayOfUuid::INVALID_TYPE_CODE, $errors[2]['code']);
         }
     }
 
     public function testValidateWithInvalidCurrencyIdsUuid(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new CurrencyRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'currencyIds' => ['Invalid', '1234abcd'],
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(2, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/currencyIds', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame('The value "Invalid" is not a valid uuid.', $exception->getViolations()->get(0)->getMessage());
-                static::assertSame('The value "1234abcd" is not a valid uuid.', $exception->getViolations()->get(1)->getMessage());
-            }
+            $errors = iterator_to_array($stackException->getErrors());
+            static::assertCount(2, $errors);
+
+            static::assertEquals('/0/value/currencyIds', $errors[0]['source']['pointer']);
+            static::assertEquals('/0/value/currencyIds', $errors[1]['source']['pointer']);
+
+            static::assertEquals(ArrayOfUuid::INVALID_TYPE_CODE, $errors[0]['code']);
+            static::assertEquals(ArrayOfUuid::INVALID_TYPE_CODE, $errors[1]['code']);
         }
     }
 
@@ -189,6 +180,7 @@ class CurrencyRuleTest extends TestCase
                 'ruleId' => $ruleId,
                 'value' => [
                     'currencyIds' => [Uuid::randomHex(), Uuid::randomHex()],
+                    'operator' => CurrencyRule::OPERATOR_EQ,
                 ],
             ],
         ], $this->context);

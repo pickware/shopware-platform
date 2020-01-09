@@ -39,7 +39,7 @@ class SalesChannelRule extends Rule
                 return !\in_array($salesChannelId, $this->salesChannelIds, true);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -47,7 +47,7 @@ class SalesChannelRule extends Rule
     {
         return [
             'salesChannelIds' => [new NotBlank(), new ArrayOfUuid()],
-            'operator' => [new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
         ];
     }
 

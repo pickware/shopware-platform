@@ -17,6 +17,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class ThemeDumpCommand extends Command
 {
+    protected static $defaultName = 'theme:dump';
+
     /**
      * @var StorefrontPluginRegistry
      */
@@ -62,12 +64,7 @@ class ThemeDumpCommand extends Command
         $this->context = Context::createDefaultContext();
     }
 
-    protected function configure()
-    {
-        $this->setName('theme:dump');
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new SymfonyStyle($input, $output);
 
@@ -77,7 +74,8 @@ class ThemeDumpCommand extends Command
 
         if ($themes->count() === 0) {
             $this->io->error('No theme found which is connected to a storefront sales channel');
-            exit(1);
+
+            return 1;
         }
 
         /** @var ThemeEntity $themeEntity */
@@ -96,5 +94,7 @@ class ThemeDumpCommand extends Command
             $this->cacheDir . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'theme-files.json',
             json_encode($dump, JSON_PRETTY_PRINT)
         );
+
+        return 0;
     }
 }

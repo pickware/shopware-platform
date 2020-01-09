@@ -50,7 +50,7 @@ class LineItemTagRule extends Rule
                 return empty(array_intersect($identifiers, $this->identifiers));
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -58,7 +58,7 @@ class LineItemTagRule extends Rule
     {
         return [
             'identifiers' => [new NotBlank(), new ArrayOfUuid()],
-            'operator' => [new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
         ];
     }
 

@@ -10,6 +10,7 @@ use Shopware\Core\Content\Cms\SalesChannel\SalesChannelCmsPageRepository;
 use Shopware\Core\Content\Product\Exception\ProductNotFoundException;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Content\Product\SalesChannel\SalesChannelProductEntity;
+use Shopware\Core\Content\Property\Aggregate\PropertyGroupOption\PropertyGroupOptionCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -19,6 +20,8 @@ use Shopware\Core\System\SalesChannel\Entity\SalesChannelRepositoryInterface;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Storefront\Page\GenericPageLoader;
 use Shopware\Storefront\Page\Product\Configurator\ProductPageConfiguratorLoader;
+use Shopware\Storefront\Page\Product\CrossSelling\CrossSellingLoader;
+use Shopware\Storefront\Page\Product\Review\ProductReviewLoader;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -58,10 +61,21 @@ class ProductPageLoader
      * @var ProductDefinition
      */
     private $productDefinition;
+
     /**
      * @var ProductLoader
      */
     private $productLoader;
+
+    /**
+     * @var ProductReviewLoader
+     */
+    private $productReviewLoader;
+
+    /**
+     * @var CrossSellingLoader
+     */
+    private $crossSellingLoader;
 
     public function __construct(
         GenericPageLoader $genericLoader,
@@ -71,7 +85,9 @@ class ProductPageLoader
         CmsSlotsDataResolver $slotDataResolver,
         ProductPageConfiguratorLoader $configuratorLoader,
         ProductDefinition $productDefinition,
-        ProductLoader $productLoader
+        ProductLoader $productLoader,
+        ProductReviewLoader $productReviewLoader,
+        CrossSellingLoader $crossSellingLoader
     ) {
         $this->genericLoader = $genericLoader;
         $this->productRepository = $productRepository;
@@ -81,6 +97,8 @@ class ProductPageLoader
         $this->configuratorLoader = $configuratorLoader;
         $this->productDefinition = $productDefinition;
         $this->productLoader = $productLoader;
+        $this->productReviewLoader = $productReviewLoader;
+        $this->crossSellingLoader = $crossSellingLoader;
     }
 
     /**
@@ -104,14 +122,23 @@ class ProductPageLoader
         $product = $this->productLoader->load($productId, $salesChannelContext);
         $page->setProduct($product);
 
+        $reviews = $this->productReviewLoader->load($request, $salesChannelContext);
+        $page->setReviews($reviews);
+
         $page->setConfiguratorSettings(
             $this->configuratorLoader->load($product, $salesChannelContext)
+        );
+
+        $page->setCrossSellings(
+            $this->crossSellingLoader->loadForProduct($product, $salesChannelContext)
         );
 
         if ($cmsPage = $this->getCmsPage($salesChannelContext)) {
             $this->loadSlotData($cmsPage, $salesChannelContext, $product);
             $page->setCmsPage($cmsPage);
         }
+        $this->loadOptions($page);
+        $this->loadMetaData($page);
 
         $this->eventDispatcher->dispatch(
             new ProductPageLoadedEvent($page, $salesChannelContext, $request)
@@ -120,12 +147,59 @@ class ProductPageLoader
         return $page;
     }
 
+    private function loadOptions(ProductPage $page): void
+    {
+        $options = new PropertyGroupOptionCollection();
+        $optionIds = $page->getProduct()->getOptionIds();
+
+        foreach ($page->getConfiguratorSettings() as $group) {
+            $groupOptions = $group->getOptions();
+            if ($groupOptions === null) {
+                continue;
+            }
+            foreach ($optionIds as $optionId) {
+                if ($groupOptions->has($optionId)) {
+                    $options->add($groupOptions->get($optionId));
+                }
+            }
+        }
+
+        $page->setSelectedOptions($options);
+    }
+
+    private function loadMetaData(ProductPage $page): void
+    {
+        $metaInformation = $page->getMetaInformation();
+
+        $metaDescription = $page->getProduct()->getMetaDescription()
+            ?? $page->getProduct()->getDescription();
+        $metaInformation->setMetaDescription((string) $metaDescription);
+
+        $metaInformation->setMetaKeywords((string) $page->getProduct()->getKeywords());
+
+        if ((string) $page->getProduct()->getMetaTitle() !== '') {
+            $metaInformation->setMetaTitle((string) $page->getProduct()->getMetaTitle());
+
+            return;
+        }
+
+        $metaTitleParts = [$page->getProduct()->getTranslation('name')];
+
+        foreach ($page->getSelectedOptions() as $option) {
+            $metaTitleParts[] = $option->getName();
+        }
+
+        $metaTitleParts[] = $page->getProduct()->getProductNumber();
+
+        $metaInformation->setMetaTitle(implode(' | ', $metaTitleParts));
+    }
+
     private function loadSlotData(
         CmsPageEntity $page,
         SalesChannelContext $salesChannelContext,
         SalesChannelProductEntity $product
     ): void {
-        if (!$page->getBlocks()) {
+        if (!$page->getSections()) {
             return;
         }
 
@@ -133,9 +207,11 @@ class ProductPageLoader
         $request = new Request();
 
         $resolverContext = new EntityResolverContext($salesChannelContext, $request, $this->productDefinition, $product);
-        $slots = $this->slotDataResolver->resolve($page->getBlocks()->getSlots(), $resolverContext);
 
-        $page->getBlocks()->setSlots($slots);
+        foreach ($page->getSections() as $section) {
+            $slots = $this->slotDataResolver->resolve($section->getBlocks()->getSlots(), $resolverContext);
+            $section->getBlocks()->setSlots($slots);
+        }
     }
 
     private function getCmsPage(SalesChannelContext $context): ?CmsPageEntity

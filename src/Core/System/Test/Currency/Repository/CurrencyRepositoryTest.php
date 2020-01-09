@@ -4,14 +4,17 @@ namespace Shopware\Core\System\Test\Currency\Repository;
 
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\EntityScoreQueryBuilder;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\SearchTermInterpreter;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Validation\RestrictDeleteViolationException;
 use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Currency\CurrencyDefinition;
 
 class CurrencyRepositoryTest extends TestCase
 {
@@ -40,8 +43,8 @@ class CurrencyRepositoryTest extends TestCase
         $recordB = Uuid::randomHex();
 
         $records = [
-            ['id' => $recordA, 'decimalPrecision' => 2, 'name' => 'match', 'isoCode' => 'USD', 'shortName' => 'test', 'factor' => 1, 'symbol' => 'A'],
-            ['id' => $recordB, 'decimalPrecision' => 2, 'name' => 'not', 'isoCode' => 'EUR', 'shortName' => 'match', 'factor' => 1, 'symbol' => 'A'],
+            ['id' => $recordA, 'decimalPrecision' => 2, 'name' => 'match', 'isoCode' => 'FOO', 'shortName' => 'test', 'factor' => 1, 'symbol' => 'A'],
+            ['id' => $recordB, 'decimalPrecision' => 2, 'name' => 'not', 'isoCode' => 'BAR', 'shortName' => 'match', 'factor' => 1, 'symbol' => 'A'],
         ];
 
         $this->currencyRepository->create($records, Context::createDefaultContext());
@@ -50,7 +53,13 @@ class CurrencyRepositoryTest extends TestCase
 
         $builder = $this->getContainer()->get(EntityScoreQueryBuilder::class);
         $pattern = $this->getContainer()->get(SearchTermInterpreter::class)->interpret('match');
-        $queries = $builder->buildScoreQueries($pattern, $this->currencyRepository->getDefinition(), $this->currencyRepository->getDefinition()->getEntityName());
+        $context = Context::createDefaultContext();
+        $queries = $builder->buildScoreQueries(
+            $pattern,
+            $this->currencyRepository->getDefinition(),
+            $this->currencyRepository->getDefinition()->getEntityName(),
+            $context
+        );
         $criteria->addQuery(...$queries);
 
         $result = $this->currencyRepository->searchIds($criteria, Context::createDefaultContext());
@@ -66,5 +75,29 @@ class CurrencyRepositoryTest extends TestCase
             $result->getDataFieldOfId($recordB, '_score'),
             $result->getDataFieldOfId($recordA, '_score')
         );
+    }
+
+    public function testDeleteNonDefaultCurrency(): void
+    {
+        $context = Context::createDefaultContext();
+        $recordA = Uuid::randomHex();
+
+        $records = [
+            ['id' => $recordA, 'decimalPrecision' => 2, 'name' => 'match', 'isoCode' => 'FOO', 'shortName' => 'test', 'factor' => 1, 'symbol' => 'A'],
+        ];
+
+        $this->currencyRepository->create($records, $context);
+
+        $deleteEvent = $this->currencyRepository->delete([['id' => $recordA]], $context);
+
+        static::assertEquals($recordA, $deleteEvent->getEventByEntityName(CurrencyDefinition::ENTITY_NAME)->getWriteResults()[0]->getPrimaryKey());
+    }
+
+    public function testDeleteDefaultCurrency(): void
+    {
+        $context = Context::createDefaultContext();
+
+        $this->expectException(RestrictDeleteViolationException::class);
+        $this->currencyRepository->delete([['id' => Defaults::CURRENCY]], $context);
     }
 }

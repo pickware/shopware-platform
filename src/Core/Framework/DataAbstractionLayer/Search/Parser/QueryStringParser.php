@@ -45,6 +45,7 @@ class QueryStringParser
                         $queries[] = self::fromArray($definition, $subQuery, $exception, $path . '/queries/' . $index);
                     } catch (InvalidFilterQueryException $ex) {
                         $exception->add($ex, $ex->getPath());
+
                         continue;
                     }
                 }
@@ -149,7 +150,7 @@ class QueryStringParser
     {
         $prefix = $definition->getEntityName() . '.';
 
-        if (strpos($fieldName, $prefix) === false) {
+        if (mb_strpos($fieldName, $prefix) === false) {
             return $prefix . $fieldName;
         }
 

@@ -2,7 +2,7 @@
 
 namespace Shopware\Core\Framework\Migration\Command;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\Migration\Exception\MigrateException;
 use Shopware\Core\Framework\Migration\MigrationCollectionLoader;
 use Shopware\Core\Framework\Migration\MigrationRuntime;
@@ -16,6 +16,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class MigrationCommand extends Command
 {
+    protected static $defaultName = 'database:migrate';
+
     /**
      * @var MigrationCollectionLoader
      */
@@ -48,11 +50,6 @@ class MigrationCommand extends Command
         $this->cache = $cache;
     }
 
-    protected function getMigrationCommandName(): string
-    {
-        return 'database:migrate';
-    }
-
     protected function getMigrationGenerator(?int $until, ?int $limit): \Generator
     {
         yield from $this->runner->migrate($until, $limit);
@@ -65,14 +62,14 @@ class MigrationCommand extends Command
 
     protected function configure(): void
     {
-        $this->setName($this->getMigrationCommandName())
+        $this
             ->addArgument('identifier', InputArgument::OPTIONAL, 'identifier to determine which migrations to run', MigrationCollectionLoader::SHOPWARE_CORE_MIGRATION_IDENTIFIER)
             ->addArgument('until', InputArgument::OPTIONAL, 'timestamp cap for migrations')
             ->addOption('all', 'all', InputOption::VALUE_NONE, 'no migration timestamp cap')
             ->addOption('limit', 'l', InputOption::VALUE_OPTIONAL, '', '0');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         if (!$input->getArgument('until') && !$input->getOption('all')) {
             throw new \InvalidArgumentException('missing timestamp cap or --all option');
@@ -98,12 +95,13 @@ class MigrationCommand extends Command
         $migratedCounter = 0;
 
         try {
-            foreach ($this->getMigrationGenerator($until, $limit) as $key => $return) {
+            foreach ($this->getMigrationGenerator($until, $limit) as $_return) {
                 $this->io->progressAdvance();
                 ++$migratedCounter;
             }
         } catch (\Exception $e) {
             $this->finishProgress($migratedCounter, $total);
+
             throw new MigrateException($e->getMessage() . PHP_EOL . 'Trace: ' . PHP_EOL . $e->getTraceAsString());
         }
 
@@ -112,6 +110,8 @@ class MigrationCommand extends Command
 
         $this->cache->clear();
         $this->io->writeln('cleared the shopware cache');
+
+        return 0;
     }
 
     private function finishProgress(int $migrated, int $total): void

@@ -4,9 +4,9 @@ namespace Shopware\Docs\Command;
 
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
-use Shopware\Core\Framework\Version\Aggregate\VersionCommit\VersionCommitDefinition;
-use Shopware\Core\Framework\Version\Aggregate\VersionCommitData\VersionCommitDataDefinition;
-use Shopware\Core\Framework\Version\VersionDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Version\Aggregate\VersionCommit\VersionCommitDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Version\Aggregate\VersionCommitData\VersionCommitDataDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Version\VersionDefinition;
 use Shopware\Docs\Inspection\ArrayWriter;
 use Shopware\Docs\Inspection\ErdDefinition;
 use Shopware\Docs\Inspection\ErdGenerator;
@@ -20,6 +20,8 @@ use Symfony\Component\Filesystem\Filesystem;
 
 class DocsDumpErd extends Command
 {
+    protected static $defaultName = 'docs:dump-erd';
+
     private $ignoredDefinitions = [
         VersionCommitDataDefinition::class,
         VersionCommitDefinition::class,
@@ -48,11 +50,10 @@ class DocsDumpErd extends Command
     protected function configure(): void
     {
         $this
-            ->setName('docs:dump-erd')
             ->setDescription('Dump an entity relationship diagram');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
@@ -74,6 +75,8 @@ class DocsDumpErd extends Command
 
         $this->generateModuleErd($modules, $descriptionsShort, $destPath, $descriptionsLong);
         $this->generateGlobalErd($modules, $descriptionsShort, $destPath, $definitions);
+
+        return 0;
     }
 
     protected function updateTranslations(array $definitions, ArrayWriter $descriptionsLong, ArrayWriter $descriptionsShort, array $modules): void
@@ -82,12 +85,14 @@ class DocsDumpErd extends Command
             if ($definition->isMapping()) {
                 $descriptionsLong->set($definition->toClassName(), '');
                 $descriptionsShort->set($definition->toClassName(), 'M:N Mapping');
+
                 continue;
             }
 
             if ($definition->isTranslation()) {
                 $descriptionsLong->set($definition->toClassName(), '');
                 $descriptionsShort->set($definition->toClassName(), 'Translations');
+
                 continue;
             }
 
@@ -130,7 +135,7 @@ class DocsDumpErd extends Command
 
     private function toFileName($moduleName): string
     {
-        return strtolower(str_replace('\\', '-', $moduleName));
+        return mb_strtolower(str_replace('\\', '-', $moduleName));
     }
 
     /**

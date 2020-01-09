@@ -3,10 +3,14 @@
 namespace Shopware\Core\Framework\Api\Controller;
 
 use Shopware\Core\Framework\Api\Util\AccessKeyHelper;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class AccessKeyController extends AbstractController
 {
     /**
@@ -38,6 +42,16 @@ class AccessKeyController extends AbstractController
     {
         return new JsonResponse([
             'accessKey' => AccessKeyHelper::generateAccessKey('sales-channel'),
+        ]);
+    }
+
+    /**
+     * @Route("/api/v{version}/_action/access-key/product-export", name="api.action.access-key.product-export", methods={"GET"})
+     */
+    public function generateProductExportKey(): JsonResponse
+    {
+        return new JsonResponse([
+            'accessKey' => AccessKeyHelper::generateAccessKey('product-export'),
         ]);
     }
 }

@@ -1,10 +1,10 @@
 [titleEn]: <>(Updating your plugin via migrations)
-[metaDescriptionEn]: <>(Whenever you decide to release a new version of your plugin, including new features, you might have to take care about new database tables or about updating existing ones. This can be done using the Migration system in your plugin.)
+[metaDescriptionEn]: <>(Whenever you decide to release a new version of your plugin, including new features, you might have to take care of new database tables or about updating existing ones. This can be done using the Migration system in your plugin.)
 
 ## Overview
 
 Whenever you decide to release a new version of your plugin, including new features, you might have to take
-care about new database tables or about updating existing ones.
+care of new database tables or about updating existing ones.
 This also includes checking, if an update was already applied, mostly done so by including a multitude of
 version checks into your plugin's `update` method.
 As you might notice, this will bloat the `update` method sooner or later, becoming more and more of a pain to
@@ -22,7 +22,7 @@ This example won't explain how to create a plugin in the first instance.
 How to create your first plugin is explained in detail [here](./../2-internals/4-plugins/010-plugin-quick-start.md).
 
 By default, Shopware 6 is looking for migration files in a folder called `Migration` relative to your plugin's base class directory.
-You can adjust this behaviour by overwriting the [getMigrationNamespace](./../2-internals/4-plugins/020-plugin-base-class.md#getMigrationNamespace()) method in your plugin.
+You can adjust this behaviour by overwriting the [getMigrationNamespace()](./../2-internals/4-plugins/020-plugin-base-class.md#getMigrationNamespace) method in your plugin.
 
 ## The migration file
 
@@ -63,10 +63,25 @@ SQL;
 
     public function updateDestructive(Connection $connection): void
     {
-        // implement update destructive
     }
 }
 ```
+
+## Generating migration
+There are two commands available which could help you writing your migration file.
+
+### Migration file
+First you should create the migration class with `bin/console database:create-migration --plugin PluginMigrationExample --name ExampleDescription`.
+This command will create a class with a unique timestamp and the two update methods.
+
+### SQL schema
+After that you could execute the following command: `bin/console dal:create:schema`
+This command selects all active entity definitions known to Shopware and tries to create SQL queries on base of the fields.
+*Note: Your plugin has to be activated, otherwise your custom entity definition will not be considered.*
+The queries are outputted into `/schema`.
+Search for the correct SQL file and copy the query to your migration file. 
+*Note: This command is in beta state and should not be used blindly*
+Double check if the generated SQL query really fits your needs.
 
 ## Source
 

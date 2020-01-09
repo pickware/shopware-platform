@@ -6,6 +6,8 @@ use Shopware\Core\Content\Category\Aggregate\CategoryTranslation\CategoryTransla
 use Shopware\Core\Content\Cms\CmsPageEntity;
 use Shopware\Core\Content\Media\MediaEntity;
 use Shopware\Core\Content\Product\ProductCollection;
+use Shopware\Core\Content\Seo\MainCategory\MainCategoryCollection;
+use Shopware\Core\Content\Seo\SeoUrl\SeoUrlCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
 use Shopware\Core\System\SalesChannel\SalesChannelCollection;
@@ -14,10 +16,16 @@ use Shopware\Core\System\Tag\TagCollection;
 class CategoryEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string|null
      */
     protected $parentId;
+
+    /**
+     * @var int
+     */
+    protected $autoIncrement;
 
     /**
      * @var string|null
@@ -154,6 +162,31 @@ class CategoryEntity extends Entity
      */
     protected $description;
 
+    /**
+     * @var string|null
+     */
+    protected $metaTitle;
+
+    /**
+     * @var string|null
+     */
+    protected $metaDescription;
+
+    /**
+     * @var string|null
+     */
+    protected $keywords;
+
+    /**
+     * @var MainCategoryCollection|null
+     */
+    protected $mainCategories;
+
+    /**
+     * @var SeoUrlCollection|null
+     */
+    protected $seoUrls;
+
     public function getParentId(): ?string
     {
         return $this->parentId;
@@ -272,6 +305,16 @@ class CategoryEntity extends Entity
     public function setProducts(ProductCollection $products): void
     {
         $this->products = $products;
+    }
+
+    public function getAutoIncrement(): int
+    {
+        return $this->autoIncrement;
+    }
+
+    public function setAutoIncrement(int $autoIncrement): void
+    {
+        $this->autoIncrement = $autoIncrement;
     }
 
     public function getNestedProducts(): ?ProductCollection
@@ -424,13 +467,125 @@ class CategoryEntity extends Entity
         $this->description = $description;
     }
 
-    public function getBreadcrumb(): ?array
+    public function getBreadcrumb(): array
     {
-        return $this->breadcrumb;
+        return array_values($this->getBreadcrumbMapping());
+    }
+
+    public function getPlainBreadcrumb(): array
+    {
+        return $this->getBreadcrumbMapping();
     }
 
     public function setBreadcrumb(?array $breadcrumb): void
     {
         $this->breadcrumb = $breadcrumb;
+    }
+
+    public function buildSeoBreadcrumb(?string $navigationCategoryId): ?array
+    {
+        $categoryBreadcrumb = $this->getBreadcrumbMapping();
+
+        // If the current SalesChannel is null ( which refers to the default template SalesChannel) or
+        // this category has no root, we return the full breadcrumb
+        if ($navigationCategoryId === null) {
+            return $categoryBreadcrumb;
+        }
+
+        // root case
+        if (count($categoryBreadcrumb) < 2) {
+            return null;
+        }
+
+        // Check where this category is located in relation to the navigation entry point of the sales channel
+        $salesChannelPos = array_search($navigationCategoryId, array_keys($categoryBreadcrumb), true);
+
+        if ($salesChannelPos !== false) {
+            // Remove all breadcrumbs preceding the navigation category
+            return array_slice($categoryBreadcrumb, $salesChannelPos + 1);
+        }
+
+        return $categoryBreadcrumb;
+    }
+
+    public function jsonSerialize(): array
+    {
+        // Make sure that the sorted breadcrumb gets serialized
+        $data = parent::jsonSerialize();
+        $data['translated']['breadcrumb'] = $data['breadcrumb'] = $this->getBreadcrumb();
+
+        return $data;
+    }
+
+    public function getMainCategories(): ?MainCategoryCollection
+    {
+        return $this->mainCategories;
+    }
+
+    public function setMainCategories(MainCategoryCollection $mainCategories): void
+    {
+        $this->mainCategories = $mainCategories;
+    }
+
+    public function getMetaTitle(): ?string
+    {
+        return $this->metaTitle;
+    }
+
+    public function setMetaTitle(?string $metaTitle): void
+    {
+        $this->metaTitle = $metaTitle;
+    }
+
+    public function getMetaDescription(): ?string
+    {
+        return $this->metaDescription;
+    }
+
+    public function setMetaDescription(?string $metaDescription): void
+    {
+        $this->metaDescription = $metaDescription;
+    }
+
+    public function getKeywords(): ?string
+    {
+        return $this->keywords;
+    }
+
+    public function setKeywords(?string $keywords): void
+    {
+        $this->keywords = $keywords;
+    }
+
+    public function getSeoUrls(): ?SeoUrlCollection
+    {
+        return $this->seoUrls;
+    }
+
+    public function setSeoUrls(SeoUrlCollection $seoUrls): void
+    {
+        $this->seoUrls = $seoUrls;
+    }
+
+    private function getBreadcrumbMapping(): array
+    {
+        $breadcrumb = $this->getTranslation('breadcrumb');
+        if ($breadcrumb === null) {
+            return [];
+        }
+        if ($this->path === null) {
+            return $breadcrumb;
+        }
+
+        $parts = array_slice(explode('|', $this->path), 1, -1);
+
+        $filtered = [];
+        foreach ($parts as $id) {
+            $filtered[$id] = $breadcrumb[$id];
+        }
+
+        $filtered[$this->getId()] = $breadcrumb[$this->getId()];
+
+        return $filtered;
     }
 }

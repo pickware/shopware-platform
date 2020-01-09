@@ -5,9 +5,10 @@ namespace Shopware\Core\Content\Product\SalesChannel;
 use Shopware\Core\Checkout\Cart\Price\QuantityPriceCalculator;
 use Shopware\Core\Checkout\Cart\Price\Struct\PriceCollection;
 use Shopware\Core\Content\Product\SalesChannel\Price\ProductPriceDefinitionBuilderInterface;
-use Shopware\Core\Framework\Pricing\CalculatedListingPrice;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\CalculatedListingPrice;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelEntityLoadedEvent;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 class SalesChannelProductSubscriber implements EventSubscriberInterface
@@ -22,10 +23,19 @@ class SalesChannelProductSubscriber implements EventSubscriberInterface
      */
     private $priceDefinitionBuilder;
 
-    public function __construct(QuantityPriceCalculator $priceCalculator, ProductPriceDefinitionBuilderInterface $priceDefinitionBuilder)
-    {
+    /**
+     * @var SystemConfigService
+     */
+    private $systemConfigService;
+
+    public function __construct(
+        QuantityPriceCalculator $priceCalculator,
+        ProductPriceDefinitionBuilderInterface $priceDefinitionBuilder,
+        SystemConfigService $systemConfigService
+    ) {
         $this->priceCalculator = $priceCalculator;
         $this->priceDefinitionBuilder = $priceDefinitionBuilder;
+        $this->systemConfigService = $systemConfigService;
     }
 
     public static function getSubscribedEvents()
@@ -45,6 +55,16 @@ class SalesChannelProductSubscriber implements EventSubscriberInterface
 
     private function calculatePrices(SalesChannelContext $context, SalesChannelProductEntity $product): void
     {
+        $markAsNewDayRange = $this->systemConfigService->get('core.listing.markAsNew', $context->getSalesChannel()->getId());
+
+        $now = new \DateTime();
+
+        /* @var SalesChannelProductEntity $product */
+        $product->setIsNew(
+            $product->getReleaseDate() instanceof \DateTimeInterface
+            && $product->getReleaseDate()->diff($now)->days <= $markAsNewDayRange
+        );
+
         $prices = $this->priceDefinitionBuilder->build($product, $context);
 
         //calculate listing price

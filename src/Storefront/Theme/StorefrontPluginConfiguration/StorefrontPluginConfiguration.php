@@ -197,15 +197,12 @@ class StorefrontPluginConfiguration
         $config->setTechnicalName($bundle->getName());
         $config->setStorefrontEntryFilepath(self::getEntryFile($bundle));
         $config->setBasePath($bundle->getPath());
-        if ($bundle->getStorefrontStylePath()) {
-            $path = $bundle->getPath() . DIRECTORY_SEPARATOR . ltrim($bundle->getStorefrontStylePath(), DIRECTORY_SEPARATOR);
-            $config->setStyleFiles(FileCollection::createFromArray(self::getFilesInDir($path)));
-        }
 
-        if ($bundle->getStorefrontScriptPath()) {
-            $path = $bundle->getPath() . DIRECTORY_SEPARATOR . ltrim($bundle->getStorefrontScriptPath(), DIRECTORY_SEPARATOR);
-            $config->setScriptFiles(FileCollection::createFromArray(self::getFilesInDir($path)));
-        }
+        $path = $bundle->getPath() . DIRECTORY_SEPARATOR . 'Resources/app/storefront/src/scss';
+        $config->setStyleFiles(FileCollection::createFromArray(self::getFilesInDir($path)));
+
+        $path = $bundle->getPath() . DIRECTORY_SEPARATOR . 'Resources/app/storefront/dist/storefront/js';
+        $config->setScriptFiles(FileCollection::createFromArray(self::getFilesInDir($path)));
 
         return $config;
     }
@@ -215,13 +212,14 @@ class StorefrontPluginConfiguration
         if (!($bundle instanceof ThemeInterface)) {
             throw new InvalidThemeBundleException($bundle->getName());
         }
-        $pathname = $bundle->getPath() . DIRECTORY_SEPARATOR . ltrim($bundle->getThemeConfigPath(), DIRECTORY_SEPARATOR);
+        $pathname = $bundle->getPath() . DIRECTORY_SEPARATOR . 'Resources/theme.json';
 
         if (!file_exists($pathname)) {
             throw new InvalidThemeBundleException($bundle->getName());
         }
 
         $config = new self();
+
         try {
             $data = json_decode(file_get_contents($pathname), true);
             if (json_last_error() !== JSON_ERROR_NONE) {
@@ -245,6 +243,7 @@ class StorefrontPluginConfiguration
                 foreach ($data['style'] as $style) {
                     if (!is_array($style)) {
                         $fileCollection->add(new File($style));
+
                         continue;
                     }
 
@@ -283,7 +282,8 @@ class StorefrontPluginConfiguration
         } catch (ThemeCompileException $e) {
             throw $e;
         } catch (\Exception $e) {
-            throw new ThemeCompileException($bundle->getName(),
+            throw new ThemeCompileException(
+                $bundle->getName(),
                 sprintf(
                     'Got exception while parsing theme config. Exception message "%s"',
                     $e->getMessage()
@@ -296,7 +296,7 @@ class StorefrontPluginConfiguration
 
     private static function getEntryFile(Bundle $bundle): ?string
     {
-        $path = rtrim($bundle->getPath(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $bundle->getStorefrontEntryPath();
+        $path = rtrim($bundle->getPath(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'Resources/app/storefront/src';
 
         if (file_exists($path . DIRECTORY_SEPARATOR . 'main.ts')) {
             return $path . DIRECTORY_SEPARATOR . 'main.ts';
@@ -312,7 +312,7 @@ class StorefrontPluginConfiguration
     private static function addBasePathToCollection(FileCollection $fileCollection, string $basePath): FileCollection
     {
         foreach ($fileCollection as $file) {
-            if (strpos($file->getFilepath(), '@') === 0) {
+            if (mb_strpos($file->getFilepath(), '@') === 0) {
                 continue;
             }
             $file->setFilepath(self::addBasePath($file->getFilepath(), $basePath));
@@ -323,8 +323,8 @@ class StorefrontPluginConfiguration
 
     private static function addBasePathToArray(array $files, string $basePath): array
     {
-        array_walk($files, function (&$path) use ($basePath) {
-            if (strpos($path, '@') === 0) {
+        array_walk($files, function (&$path) use ($basePath): void {
+            if (mb_strpos($path, '@') === 0) {
                 return;
             }
             $path = self::addBasePath($path, $basePath);

@@ -3,7 +3,6 @@
 namespace Shopware\Core\Framework;
 
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\ExtensionRegistry;
 use Shopware\Core\Framework\DependencyInjection\CompilerPass\ActionEventCompilerPass;
 use Shopware\Core\Framework\DependencyInjection\CompilerPass\EntityCompilerPass;
@@ -45,6 +44,7 @@ class Framework extends Bundle
 
         $loader = new XmlFileLoader($container, new FileLocator(__DIR__ . '/DependencyInjection/'));
         $loader->load('services.xml');
+        $loader->load('acl.xml');
         $loader->load('api.xml');
         $loader->load('custom-field.xml');
         $loader->load('data-abstraction-layer.xml');
@@ -58,6 +58,7 @@ class Framework extends Bundle
         $loader->load('store.xml');
         $loader->load('language.xml');
         $loader->load('update.xml');
+        $loader->load('seo.xml');
 
         if ($container->getParameter('kernel.environment') === 'test') {
             $loader->load('services_test.xml');
@@ -75,7 +76,11 @@ class Framework extends Bundle
     {
         parent::boot();
 
-        $this->registerEntityExtensions();
+        $this->registerEntityExtensions(
+            $this->container->get(DefinitionInstanceRegistry::class),
+            $this->container->get(SalesChannelDefinitionInstanceRegistry::class),
+            $this->container->get(ExtensionRegistry::class)
+        );
     }
 
     protected function registerMigrationPath(ContainerBuilder $container): void
@@ -86,14 +91,9 @@ class Framework extends Bundle
         $container->setParameter('migration.directories', $directories);
     }
 
-    protected function registerFilesystem(ContainerBuilder $container, string $key): void
-    {
-        // empty body intended to prevent circular filesystem references
-    }
-
     private function buildConfig(ContainerBuilder $container, $environment): void
     {
-        $locator = new FileLocator($this->getConfigPath());
+        $locator = new FileLocator('Resources/config');
 
         $resolver = new LoaderResolver([
             new XmlFileLoader($container, $locator),
@@ -107,28 +107,21 @@ class Framework extends Bundle
 
         $configLoader = new DelegatingLoader($resolver);
 
-        $confDir = $this->getPath() . '/' . $this->getConfigPath();
+        $confDir = $this->getPath() . '/Resources/config';
 
         $configLoader->load($confDir . '/{packages}/*' . Kernel::CONFIG_EXTS, 'glob');
         $configLoader->load($confDir . '/{packages}/' . $environment . '/*' . Kernel::CONFIG_EXTS, 'glob');
     }
 
-    private function registerEntityExtensions(): void
-    {
-        /** @var DefinitionInstanceRegistry $definitionRegistry */
-        $definitionRegistry = $this->container->get(DefinitionInstanceRegistry::class);
-
-        /** @var SalesChannelDefinitionInstanceRegistry $salesChannelRegistry */
-        $salesChannelRegistry = $this->container->get(SalesChannelDefinitionInstanceRegistry::class);
-
-        /** @var ExtensionRegistry $registry */
-        $registry = $this->container->get(ExtensionRegistry::class);
-
+    private function registerEntityExtensions(
+        DefinitionInstanceRegistry $definitionRegistry,
+        SalesChannelDefinitionInstanceRegistry $salesChannelRegistry,
+        ExtensionRegistry $registry
+    ): void {
         foreach ($registry->getExtensions() as $extension) {
             /** @var string $class */
             $class = $extension->getDefinitionClass();
 
-            /** @var EntityDefinition $definition */
             $definition = $definitionRegistry->get($class);
 
             $definition->addExtension($extension);
@@ -136,7 +129,7 @@ class Framework extends Bundle
             $salesChannelDefinition = $salesChannelRegistry->get($class);
 
             // same definition? do not added extension
-            if (get_class($salesChannelDefinition) !== get_class($definition)) {
+            if ($salesChannelDefinition !== $definition) {
                 $salesChannelDefinition->addExtension($extension);
             }
         }

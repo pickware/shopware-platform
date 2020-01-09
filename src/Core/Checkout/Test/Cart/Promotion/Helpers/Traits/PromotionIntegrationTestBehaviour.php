@@ -9,16 +9,34 @@ use Shopware\Core\Checkout\Promotion\Cart\PromotionItemBuilder;
 use Shopware\Core\Checkout\Promotion\Cart\PromotionProcessor;
 use Shopware\Core\Checkout\Promotion\Subscriber\Storefront\StorefrontCartSubscriber;
 use Shopware\Core\Content\Product\Cart\ProductLineItemFactory;
+use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Symfony\Component\HttpFoundation\Session\Session;
 
 trait PromotionIntegrationTestBehaviour
 {
+    private $context;
+
+    /**
+     * Gets a faked sales channel context
+     * for the unit tests.
+     */
+    public function getContext(): SalesChannelContext
+    {
+        if ($this->context === null) {
+            $this->context = $this->getContainer()->get(SalesChannelContextFactory::class)->create(Uuid::randomHex(), Defaults::SALES_CHANNEL);
+        }
+
+        return $this->context;
+    }
+
     /**
      * This function makes sure all our required session data
      * is gone after clearing it.
      */
-    public function clearSession()
+    public function clearSession(): void
     {
         /** @var Session $session */
         $session = $this->getContainer()->get('session');
@@ -48,10 +66,8 @@ trait PromotionIntegrationTestBehaviour
     {
         $itemBuilder = new PromotionItemBuilder();
 
-        /** @var LineItem $lineItem */
         $lineItem = $itemBuilder->buildPlaceholderItem($code, $context->getContext()->getCurrencyPrecision());
 
-        /** @var Cart $cart */
         $cart = $cartService->add($cart, $lineItem, $context);
 
         return $cart;
@@ -65,7 +81,6 @@ trait PromotionIntegrationTestBehaviour
         /** @var LineItem[] $promotions */
         $promotions = $cart->getLineItems()->filterType(PromotionProcessor::LINE_ITEM_TYPE);
 
-        /** @var LineItem $promotion */
         foreach ($promotions as $promotion) {
             if ($promotion->getReferencedId() === $code) {
                 return $cartService->remove($cart, $promotion->getId(), $context);
@@ -73,5 +88,21 @@ trait PromotionIntegrationTestBehaviour
         }
 
         return $cart;
+    }
+
+    /**
+     * Gets all promotion codes that have been added
+     * to the current session.
+     */
+    public function getSessionCodes(): array
+    {
+        /** @var Session $session */
+        $session = $this->getContainer()->get('session');
+
+        if (!$session->has(StorefrontCartSubscriber::SESSION_KEY_PROMOTION_CODES)) {
+            return [];
+        }
+
+        return $session->get(StorefrontCartSubscriber::SESSION_KEY_PROMOTION_CODES);
     }
 }

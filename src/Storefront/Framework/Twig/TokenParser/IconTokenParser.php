@@ -2,7 +2,7 @@
 
 namespace Shopware\Storefront\Framework\Twig\TokenParser;
 
-use Shopware\Core\Framework\Twig\Node\SwInclude;
+use Shopware\Core\Framework\Adapter\Twig\Node\SwInclude;
 use Twig\Node\Expression\ArrayExpression;
 use Twig\Node\Expression\ConstantExpression;
 use Twig\Parser;
@@ -22,7 +22,7 @@ final class IconTokenParser extends AbstractTokenParser
 
         $icon = $expr->getAttribute('value');
 
-        $expr->setAttribute('value', '@Storefront/utilities/icon.html.twig');
+        $expr->setAttribute('value', '@Storefront/storefront/utilities/icon.html.twig');
 
         $stream = $this->parser->getStream();
 

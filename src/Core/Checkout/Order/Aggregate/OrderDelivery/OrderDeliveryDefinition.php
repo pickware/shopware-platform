@@ -16,9 +16,11 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\PrimaryKey;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\SearchRanking;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\ListField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\StateMachineStateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
@@ -43,6 +45,13 @@ class OrderDeliveryDefinition extends EntityDefinition
         return OrderDeliveryEntity::class;
     }
 
+    public function getDefaults(): array
+    {
+        return [
+            'trackingCodes' => [],
+        ];
+    }
+
     protected function getParentDefinitionClass(): ?string
     {
         return OrderDefinition::class;
@@ -62,10 +71,10 @@ class OrderDeliveryDefinition extends EntityDefinition
 
             (new FkField('shipping_method_id', 'shippingMethodId', ShippingMethodDefinition::class))->addFlags(new Required()),
 
-            (new FkField('state_id', 'stateId', StateMachineStateDefinition::class))->addFlags(new Required()),
-            new ManyToOneAssociationField('stateMachineState', 'state_id', StateMachineStateDefinition::class, 'id', false),
+            (new StateMachineStateField('state_id', 'stateId', OrderDeliveryStates::STATE_MACHINE))->addFlags(new Required()),
+            new ManyToOneAssociationField('stateMachineState', 'state_id', StateMachineStateDefinition::class, 'id', true),
 
-            (new StringField('tracking_code', 'trackingCode'))->addFlags(new SearchRanking(SearchRanking::HIGH_SEARCH_RANKING)),
+            (new ListField('tracking_codes', 'trackingCodes', StringField::class))->addFlags(new Required(), new SearchRanking(SearchRanking::HIGH_SEARCH_RANKING)),
             (new DateTimeField('shipping_date_earliest', 'shippingDateEarliest'))->addFlags(new Required(), new SearchRanking(SearchRanking::MIDDLE_SEARCH_RANKING)),
             (new DateTimeField('shipping_date_latest', 'shippingDateLatest'))->addFlags(new Required(), new SearchRanking(SearchRanking::MIDDLE_SEARCH_RANKING)),
             new CalculatedPriceField('shipping_costs', 'shippingCosts'),

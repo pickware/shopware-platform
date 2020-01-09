@@ -5,13 +5,13 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Cache;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Aggregation\Aggregation;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Aggregation\Bucket\FilterAggregation;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\AggregationResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\AggregationResultCollection;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregatorResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntityAggregatorInterface;
 use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
-use Symfony\Component\Cache\CacheItem;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class CachedEntityAggregator implements EntityAggregatorInterface
 {
@@ -30,33 +30,19 @@ class CachedEntityAggregator implements EntityAggregatorInterface
      */
     private $cacheKeyGenerator;
 
-    /**
-     * @var bool
-     */
-    private $enabled;
-
-    /**
-     * @var int
-     */
-    private $expirationTime;
-
     public function __construct(
         TagAwareAdapterInterface $cache,
         EntityAggregatorInterface $decorated,
-        EntityCacheKeyGenerator $cacheKeyGenerator,
-        bool $enabled,
-        int $expirationTime
+        EntityCacheKeyGenerator $cacheKeyGenerator
     ) {
         $this->cache = $cache;
         $this->decorated = $decorated;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
-        $this->enabled = $enabled;
-        $this->expirationTime = $expirationTime;
     }
 
-    public function aggregate(EntityDefinition $definition, Criteria $criteria, Context $context): AggregatorResult
+    public function aggregate(EntityDefinition $definition, Criteria $criteria, Context $context): AggregationResultCollection
     {
-        if (!$this->enabled) {
+        if (!$context->getUseCache()) {
             return $this->decorated->aggregate($definition, $criteria, $context);
         }
 
@@ -72,7 +58,7 @@ class CachedEntityAggregator implements EntityAggregatorInterface
         $fallback = array_diff(array_values($names), array_values($result->getKeys()));
 
         if (empty($fallback)) {
-            return new AggregatorResult($result, $context, $criteria);
+            return $result;
         }
 
         //clone criteria to only load aggregations from storage which are not loaded from cache
@@ -89,31 +75,30 @@ class CachedEntityAggregator implements EntityAggregatorInterface
         $this->cacheResult($definition, $context, $criteria, $persistent);
         $this->cache->commit();
 
-        foreach ($persistent->getAggregations() as $item) {
+        foreach ($persistent as $item) {
             $result->add($item);
         }
 
-        return new AggregatorResult($result, $context, $criteria);
+        return $result;
     }
 
-    private function cacheResult(EntityDefinition $definition, Context $context, Criteria $criteria, AggregatorResult $result): void
+    private function cacheResult(EntityDefinition $definition, Context $context, Criteria $criteria, AggregationResultCollection $aggregations): void
     {
-        /** @var AggregationResult $aggregationResult */
-        foreach ($result->getAggregations() as $aggregationResult) {
-            $key = $this->cacheKeyGenerator->getAggregationCacheKey(
-                $aggregationResult->getAggregation(),
-                $definition,
-                $criteria,
-                $context
-            );
+        foreach ($criteria->getAggregations() as $aggregation) {
+            $result = $this->getAggregationResult($aggregation, $aggregations);
 
-            $tags = $this->cacheKeyGenerator->getAggregationTags($definition, $criteria, $aggregationResult->getAggregation());
+            if (!$result) {
+                continue;
+            }
 
-            /** @var CacheItem $item */
+            $key = $this->cacheKeyGenerator->getAggregationCacheKey($aggregation, $definition, $criteria, $context);
+
+            $tags = $this->cacheKeyGenerator->getAggregationTags($definition, $criteria, $aggregation);
+
+            /** @var ItemInterface $item */
             $item = $this->cache->getItem($key);
-            $item->set($aggregationResult);
+            $item->set($result);
             $item->tag($tags);
-            $item->expiresAfter($this->expirationTime);
 
             //deferred saves are persisted with the cache->commit()
             $this->cache->saveDeferred($item);
@@ -137,5 +122,14 @@ class CachedEntityAggregator implements EntityAggregatorInterface
         }
 
         return new AggregationResultCollection(array_filter($filtered));
+    }
+
+    private function getAggregationResult(Aggregation $aggregation, AggregationResultCollection $aggregations): ?AggregationResult
+    {
+        if ($aggregation instanceof FilterAggregation) {
+            return $this->getAggregationResult($aggregation->getAggregation(), $aggregations);
+        }
+
+        return $aggregations->get($aggregation->getName());
     }
 }

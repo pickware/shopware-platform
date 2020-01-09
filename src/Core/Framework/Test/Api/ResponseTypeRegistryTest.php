@@ -6,11 +6,11 @@ use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Category\CategoryDefinition;
 use Shopware\Core\Content\Category\CategoryEntity;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\Api\Response\ResponseFactoryInterface;
 use Shopware\Core\Framework\Api\Response\ResponseFactoryRegistry;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
-use Shopware\Core\Framework\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
@@ -206,7 +206,7 @@ class ResponseTypeRegistryTest extends TestCase
         $this->setVersionHack($request, $version);
         $this->setOrigin($request, $context);
 
-        return $this->getFactory($request)->createDetailResponse($category, $definition, $request, $context, $setLocationHeader);
+        return $this->getFactory($request)->createDetailResponse(new Criteria(), $category, $definition, $request, $context, $setLocationHeader);
     }
 
     private function getListResponse($context, $id, $path, $version = '', $accept): Response
@@ -214,14 +214,15 @@ class ResponseTypeRegistryTest extends TestCase
         $category = $this->getTestCategory($id);
 
         $col = new EntityCollection([$category]);
-        $searchResult = new EntitySearchResult(1, $col, null, new Criteria(), $context);
+        $criteria = new Criteria();
+        $searchResult = new EntitySearchResult(1, $col, null, $criteria, $context);
 
         $definition = $this->getContainer()->get(CategoryDefinition::class);
         $request = Request::create($path, 'GET', [], [], [], ['HTTP_ACCEPT' => $accept]);
         $this->setVersionHack($request, $version);
         $this->setOrigin($request, $context);
 
-        return $this->getFactory($request)->createListingResponse($searchResult, $definition, $request, $context);
+        return $this->getFactory($request)->createListingResponse($criteria, $searchResult, $definition, $request, $context);
     }
 
     private function getTestCategory($id): CategoryEntity
@@ -245,7 +246,7 @@ class ResponseTypeRegistryTest extends TestCase
         $this->setRequestAttributeHack($request, PlatformRequest::ATTRIBUTE_CONTEXT_OBJECT, $context);
     }
 
-    private function setRequestAttributeHack(Request $request, $key, $value): void
+    private function setRequestAttributeHack(Request $request, string $key, $value): void
     {
         $r = new \ReflectionProperty(Request::class, 'attributes');
         $r->setAccessible(true);

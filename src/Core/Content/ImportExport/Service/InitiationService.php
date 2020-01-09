@@ -10,8 +10,8 @@ use Shopware\Core\Content\ImportExport\Exception\UnexpectedFileTypeException;
 use Shopware\Core\Content\ImportExport\ImportExportProfileEntity;
 use Shopware\Core\Content\ImportExport\Iterator\IteratorFactoryInterface;
 use Shopware\Core\Content\ImportExport\Iterator\RecordIterator;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Uuid\Uuid;
@@ -138,7 +138,7 @@ class InitiationService
             $logEntity->setUserId($userId);
         }
 
-        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($logEntity) {
+        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($logEntity): void {
             $logData = array_filter($logEntity->jsonSerialize(), function ($value) {
                 return $value !== null;
             });

@@ -68,6 +68,7 @@ Below you'll find a list of all available `<input-field type="?">`.
 |---------------|--------------------------------------------------|-------------------|
 | int           | disabled, label, helpText                        | Integer field     |
 | text          | copyable, disabled, label, placeholder, helpText | Text field        |
+| textarea      | copyable, disabled, label, placeholder, helpText | Textarea          |
 | single-select | options, disabled, label, placeholder, helpText  | Single-Select box |
 | multi-select  | options, disabled, label, placeholder, helpText  | Multi-Select box  |
 | password      | disabled, label, placeholder, helpText           | Password field    |
@@ -81,6 +82,22 @@ Below you'll find a list of all available `<input-field type="?">`.
 Options are used to configure your `<input-field>`.
 **Every `<input-field>` has to start with the `<name>` element.**
 After the `<name>` element you can configure any of the other options mentioned above.
+
+### defaultValue
+
+Add the `defaultValue` option to your `<input-field>` to define a default value for it.
+This value will be imported into the database on installing and updating the plugin.
+We use [Symfony\Component\Config\Util\XmlUtils](https://github.com/symfony/config/blob/master/Util/XmlUtils.php#L215) for casting the values into the correct PHP types.
+
+Below you'll find an example how to use this option.
+
+```xml
+<input-field type="text">
+    <name>textField</name>
+    <label>Test field with default value</label>
+    <defaultValue>test</defaultValue>
+</input-field>
+```
 
 ### disabled
 
@@ -138,8 +155,8 @@ Below you"ll find an example.
 ```
 
 Each `<options>` element must contain at least one `<option>` element.
-Each `<option>` element must contain at least one `<value>` and one `<label>` element.
-As you can see above, `<label>` elements are translatable via the `lang` attribute.
+Each `<option>` element must contain at least one `<id>` and one `<name>` element.
+As you can see above, `<name>` elements are translatable via the `lang` attribute.
 
 ### Label, placeholder and help text
 
@@ -218,3 +235,6 @@ Now all that's left to do is to present you a working example `config.xml` and s
 ```
 
 ![Example plugin config](./img/plugin-config.png)
+
+There's a GitHub repository available, containing this example source.
+Check it out [here](https://github.com/shopware/swag-docs-plugin-config).

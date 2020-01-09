@@ -19,16 +19,19 @@ final class ContactFormEvent extends Event implements BusinessEventInterface, Ma
      * @var Context
      */
     private $context;
+
     /**
      * @var string
      */
     private $salesChannelId;
+
     /**
      * @var MailRecipientStruct
      */
     private $recipients;
+
     /**
-     * @var DataBag
+     * @var array
      */
     private $contactFormData;
 
@@ -37,7 +40,7 @@ final class ContactFormEvent extends Event implements BusinessEventInterface, Ma
         $this->context = $context;
         $this->salesChannelId = $salesChannelId;
         $this->recipients = $recipients;
-        $this->contactFormData = $contactFormData;
+        $this->contactFormData = $contactFormData->all();
     }
 
     public static function getAvailableData(): EventDataCollection
@@ -66,7 +69,7 @@ final class ContactFormEvent extends Event implements BusinessEventInterface, Ma
         return $this->salesChannelId;
     }
 
-    public function getContactFormData(): DataBag
+    public function getContactFormData(): array
     {
         return $this->contactFormData;
     }

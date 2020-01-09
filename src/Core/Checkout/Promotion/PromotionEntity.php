@@ -2,11 +2,14 @@
 
 namespace Shopware\Core\Checkout\Promotion;
 
+use Shopware\Core\Checkout\Cart\Rule\LineItemGroupRule;
 use Shopware\Core\Checkout\Customer\CustomerCollection;
 use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Customer\Rule\CustomerNumberRule;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscount\PromotionDiscountCollection;
+use Shopware\Core\Checkout\Promotion\Aggregate\PromotionIndividualCode\PromotionIndividualCodeCollection;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionSalesChannel\PromotionSalesChannelCollection;
+use Shopware\Core\Checkout\Promotion\Aggregate\PromotionSetGroup\PromotionSetGroupCollection;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionTranslation\PromotionTranslationCollection;
 use Shopware\Core\Content\Rule\RuleCollection;
 use Shopware\Core\Content\Rule\RuleEntity;
@@ -60,7 +63,12 @@ class PromotionEntity extends Entity
     /**
      * @var bool
      */
-    protected $useCodes;
+    protected $useCodes = false;
+
+    /**
+     * @var bool
+     */
+    protected $useSetGroups = false;
 
     /**
      * stores if the persona condition uses
@@ -70,6 +78,16 @@ class PromotionEntity extends Entity
      * @var bool
      */
     protected $customerRestriction = false;
+
+    /**
+     * @var bool
+     */
+    protected $useIndividualCodes;
+
+    /**
+     * @var string
+     */
+    protected $individualCodePattern;
 
     /**
      * @var PromotionSalesChannelCollection|null
@@ -85,6 +103,16 @@ class PromotionEntity extends Entity
      * @var PromotionDiscountCollection|null
      */
     protected $discounts;
+
+    /**
+     * @var PromotionIndividualCodeCollection|null
+     */
+    protected $individualCodes;
+
+    /**
+     * @var PromotionSetGroupCollection|null
+     */
+    protected $setgroups;
 
     /**
      * @var RuleCollection|null
@@ -214,6 +242,64 @@ class PromotionEntity extends Entity
         $this->useCodes = $useCodes;
     }
 
+    public function isUseSetGroups(): bool
+    {
+        return $this->useSetGroups;
+    }
+
+    public function setUseSetGroups(bool $useSetGroups): void
+    {
+        $this->useSetGroups = $useSetGroups;
+    }
+
+    public function getSetgroups(): ?PromotionSetGroupCollection
+    {
+        return $this->setgroups;
+    }
+
+    public function setSetgroups(PromotionSetGroupCollection $setgroups): void
+    {
+        $this->setgroups = $setgroups;
+    }
+
+    /**
+     * Gets if the promotion requires individual codes to be used
+     */
+    public function isUseIndividualCodes(): bool
+    {
+        return $this->useIndividualCodes;
+    }
+
+    /**
+     * Sets if the promotion requires individual codes to be used.
+     */
+    public function setUseIndividualCodes(bool $useCodes): void
+    {
+        $this->useIndividualCodes = $useCodes;
+    }
+
+    /**
+     * Gets the placeholder pattern that will be used
+     * to generate new individual codes.
+     *
+     * @return string the pattern for individual code generation
+     */
+    public function getIndividualCodePattern(): string
+    {
+        return $this->individualCodePattern;
+    }
+
+    /**
+     * Sets the placeholder pattern that will be used
+     * to generate new individual codes.
+     *
+     * @param string $pattern the pattern for individual code generation
+     */
+    public function setIndividualCodePattern(string $pattern): void
+    {
+        $this->individualCodePattern = $pattern;
+    }
+
     public function getDiscounts(): ?PromotionDiscountCollection
     {
         return $this->discounts;
@@ -222,6 +308,24 @@ class PromotionEntity extends Entity
     public function setDiscounts(PromotionDiscountCollection $discounts): void
     {
         $this->discounts = $discounts;
+    }
+
+    /**
+     * Gets all individual codes of the promotion,
+     * if existing.
+     */
+    public function getIndividualCodes(): ?PromotionIndividualCodeCollection
+    {
+        return $this->individualCodes;
+    }
+
+    /**
+     * Sets the list of individual codes
+     * for this promotion.
+     */
+    public function setIndividualCodes(PromotionIndividualCodeCollection $individualCodes): void
+    {
+        $this->individualCodes = $individualCodes;
     }
 
     /**
@@ -238,7 +342,7 @@ class PromotionEntity extends Entity
      * Sets a list of permitted sales channels for this promotion.
      * Only customers within these channels are allowed to use this promotion.
      */
-    public function setSalesChannels(?PromotionSalesChannelCollection $salesChannels): void
+    public function setSalesChannels(PromotionSalesChannelCollection $salesChannels): void
     {
         $this->salesChannels = $salesChannels;
     }
@@ -284,7 +388,7 @@ class PromotionEntity extends Entity
      * Sets what products are affected by the applied
      * order conditions for this promotion.
      */
-    public function setOrderRules(?RuleCollection $orderRules): void
+    public function setOrderRules(RuleCollection $orderRules): void
     {
         $this->orderRules = $orderRules;
     }
@@ -322,7 +426,7 @@ class PromotionEntity extends Entity
      * Sets what "personas" are allowed
      * to use this promotion.
      */
-    public function setPersonaRules(?RuleCollection $personaRules): void
+    public function setPersonaRules(RuleCollection $personaRules): void
     {
         $this->personaRules = $personaRules;
     }
@@ -341,7 +445,7 @@ class PromotionEntity extends Entity
      * Sets the customers that have explicit access to this promotion.
      * This should be configured within the persona settings of the promotion.
      */
-    public function setPersonaCustomers(?CustomerCollection $customers): void
+    public function setPersonaCustomers(CustomerCollection $customers): void
     {
         $this->personaCustomers = $customers;
     }
@@ -359,7 +463,7 @@ class PromotionEntity extends Entity
      * Sets what products are affected by the applied
      * cart conditions for this promotion.
      */
-    public function setCartRules(?RuleCollection $cartRules): void
+    public function setCartRules(RuleCollection $cartRules): void
     {
         $this->cartRules = $cartRules;
     }
@@ -431,7 +535,6 @@ class PromotionEntity extends Entity
             if ($this->getPersonaRules() !== null && count($this->getPersonaRules()->getElements()) > 0) {
                 $personaRuleOR = new OrRule();
 
-                /** @var RuleEntity $ruleEntity */
                 foreach ($this->getPersonaRules()->getElements() as $ruleEntity) {
                     $personaRuleOR->addRule($ruleEntity->getPayload());
                 }
@@ -443,7 +546,6 @@ class PromotionEntity extends Entity
         if ($this->getCartRules() !== null && count($this->getCartRules()->getElements()) > 0) {
             $cartOR = new OrRule([]);
 
-            /** @var RuleEntity $ruleEntity */
             foreach ($this->getCartRules()->getElements() as $ruleEntity) {
                 $cartOR->addRule($ruleEntity->getPayload());
             }
@@ -451,10 +553,32 @@ class PromotionEntity extends Entity
             $requirements->addRule($cartOR);
         }
 
+        // verify if we are in SetGroup mode and build
+        // a custom setgroup rule for all groups
+        if ($this->isUseSetGroups() !== null && $this->isUseSetGroups() && $this->getSetgroups() !== null && $this->getSetgroups()->count() > 0) {
+            $groupsRootRule = new OrRule();
+
+            foreach ($this->getSetgroups() as $group) {
+                $groupRule = new LineItemGroupRule();
+                $groupRule->assign(
+                    [
+                        'groupId' => $group->getId(),
+                        'packagerKey' => $group->getPackagerKey(),
+                        'value' => $group->getValue(),
+                        'sorterKey' => $group->getSorterKey(),
+                        'rules' => $group->getSetGroupRules(),
+                    ]
+                );
+
+                $groupsRootRule->addRule($groupRule);
+            }
+
+            $requirements->addRule($groupsRootRule);
+        }
+
         if ($this->getOrderRules() !== null && count($this->getOrderRules()->getElements()) > 0) {
             $orderOR = new OrRule([]);
 
-            /** @var RuleEntity $ruleEntity */
             foreach ($this->getOrderRules()->getElements() as $ruleEntity) {
                 $orderOR->addRule($ruleEntity->getPayload());
             }
@@ -481,7 +605,7 @@ class PromotionEntity extends Entity
 
     public function isOrderCountPerCustomerCountValid(string $customerId): bool
     {
-        $customerId = strtolower($customerId);
+        $customerId = mb_strtolower($customerId);
 
         return $this->getMaxRedemptionsPerCustomer() <= 0
             || $this->getOrdersPerCustomerCount() === null

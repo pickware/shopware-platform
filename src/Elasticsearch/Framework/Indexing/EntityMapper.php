@@ -15,7 +15,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\CreatedAtField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\DateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
-use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Extension;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FloatField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
@@ -28,6 +27,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationFiel
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ObjectField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ParentAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ParentFkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PasswordField;
@@ -39,7 +39,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslationsAssociationFi
 use Shopware\Core\Framework\DataAbstractionLayer\Field\UpdatedAtField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\WhitelistRuleField;
-use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
 
 class EntityMapper
 {
@@ -73,6 +72,7 @@ class EntityMapper
                 ];
             case $field instanceof ManyToOneAssociationField:
             case $field instanceof OneToManyAssociationField:
+            case $field instanceof OneToOneAssociationField:
                 return [
                     'type' => 'nested',
                     'properties' => $this->mapFields($field->getReferenceDefinition(), $context),
@@ -82,7 +82,6 @@ class EntityMapper
                 return null;
 
             case $field instanceof ListField:
-
             case $field instanceof BlacklistRuleField:
             case $field instanceof WhitelistRuleField:
                 return self::KEYWORD_FIELD;
@@ -101,21 +100,6 @@ class EntityMapper
             case $field instanceof IntField:
                 return ['type' => 'long'];
 
-            case $field instanceof JsonField:
-                if (empty($field->getPropertyMapping())) {
-                    return ['type' => 'object'];
-                }
-                $properties = [];
-                foreach ($field->getPropertyMapping() as $nested) {
-                    $properties[$nested->getPropertyName()] = $this->mapField($definition, $nested, $context);
-                }
-
-                return ['type' => 'object', 'properties' => $properties];
-
-            case $field instanceof LongTextField:
-            case $field instanceof LongTextWithHtmlField:
-                return ['type' => 'text'];
-
             case $field instanceof ObjectField:
                 return ['type' => 'object'];
 
@@ -132,6 +116,21 @@ class EntityMapper
                         'updatedAt' => self::DATE_FIELD,
                     ],
                 ];
+
+            case $field instanceof JsonField:
+                if (empty($field->getPropertyMapping())) {
+                    return ['type' => 'object'];
+                }
+                $properties = [];
+                foreach ($field->getPropertyMapping() as $nested) {
+                    $properties[$nested->getPropertyName()] = $this->mapField($definition, $nested, $context);
+                }
+
+                return ['type' => 'object', 'properties' => $properties];
+
+            case $field instanceof LongTextField:
+            case $field instanceof LongTextWithHtmlField:
+                return ['type' => 'text'];
 
             case $field instanceof TranslatedField:
                 $reference = EntityDefinitionQueryHelper::getTranslatedField($definition, $field);
@@ -160,24 +159,16 @@ class EntityMapper
     public function mapFields(EntityDefinition $definition, Context $context): array
     {
         $properties = [];
-
-        $extensions = [];
-
         $translated = [];
 
-        $fields = $definition->getFields()->filter(function (Field $field) {
+        $fields = $definition->getFields()->filter(static function (Field $field) {
             return !$field instanceof AssociationField;
         });
 
-        /** @var FieldCollection $fields */
         foreach ($fields as $field) {
             $fieldMapping = $this->mapField($definition, $field, $context);
 
             if ($fieldMapping === null) {
-                continue;
-            }
-            if ($field->is(Extension::class)) {
-                $extensions[$field->getPropertyName()] = $fieldMapping;
                 continue;
             }
 
@@ -192,13 +183,6 @@ class EntityMapper
             $properties['translated'] = [
                 'type' => 'object',
                 'properties' => $translated,
-            ];
-        }
-
-        if (!empty($properties)) {
-            $properties['extensions'] = [
-                'type' => 'nested',
-                'properties' => $extensions,
             ];
         }
 

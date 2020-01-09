@@ -15,7 +15,6 @@ class RequirementsValidatorTest extends TestCase
 
     public function testValidateRequirementsValid(): void
     {
-        static::markTestSkipped('NEXT-4442 - Test does not work if a different development version is checked out');
         $projectDir = $this->getContainer()->getParameter('kernel.project_dir');
         $path = __DIR__ . '/_fixture/SwagRequirementValidTest';
         $path = str_replace($projectDir, '', $path);
@@ -32,7 +31,6 @@ class RequirementsValidatorTest extends TestCase
 
     public function testValidateRequirementsSubpackageValid(): void
     {
-        static::markTestSkipped('NEXT-4442 - Test does not work if a different development version is checked out');
         $projectDir = $this->getContainer()->getParameter('kernel.project_dir');
         $path = __DIR__ . '/_fixture/SwagRequirementValidSubpackageTest';
         $path = str_replace($projectDir, '', $path);
@@ -65,7 +63,6 @@ class RequirementsValidatorTest extends TestCase
 
     public function testValidateRequirementsDoNotMatch(): void
     {
-        static::markTestSkipped('NEXT-4442 - Test does not work if a different development version is checked out');
         $projectDir = $this->getContainer()->getParameter('kernel.project_dir');
         $path = __DIR__ . '/_fixture/SwagRequirementInvalidTest';
         $path = str_replace($projectDir, '', $path);
@@ -73,21 +70,20 @@ class RequirementsValidatorTest extends TestCase
         $plugin = $this->createPlugin($path);
 
         $exception = null;
+
         try {
             $this->createValidator()->validateRequirements($plugin, Context::createDefaultContext(), 'test');
         } catch (RequirementStackException $exception) {
         }
 
-        $messages = [];
+        $packages = [];
         static::assertInstanceOf(RequirementStackException::class, $exception);
         foreach ($exception->getRequirements() as $requirement) {
-            $messages[] = $requirement->getMessage();
+            $packages[] = $requirement->getParameters()['requirement'];
         }
 
-        static::assertContains(
-            'Required plugin/package "shopware/platform ^12.34" does not match installed version 9999999-dev.',
-            $messages
-        );
+        static::assertContains('shopware/platform', $packages);
+        static::assertContains('test/not-installed', $packages);
     }
 
     public function testValidateRequirementsMissing(): void
@@ -99,6 +95,7 @@ class RequirementsValidatorTest extends TestCase
         $plugin = $this->createPlugin($path);
 
         $exception = null;
+
         try {
             $this->createValidator()->validateRequirements($plugin, Context::createDefaultContext(), 'test');
         } catch (RequirementStackException $exception) {
@@ -124,7 +121,7 @@ class RequirementsValidatorTest extends TestCase
         );
     }
 
-    private function createPlugin($path): PluginEntity
+    private function createPlugin(string $path): PluginEntity
     {
         $plugin = new PluginEntity();
         $plugin->setPath($path);

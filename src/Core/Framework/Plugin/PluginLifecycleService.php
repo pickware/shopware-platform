@@ -3,7 +3,7 @@
 namespace Shopware\Core\Framework\Plugin;
 
 use Doctrine\DBAL\Connection;
-use function Flag\next1797;
+use Psr\Cache\CacheItemPoolInterface;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
@@ -27,14 +27,20 @@ use Shopware\Core\Framework\Plugin\Event\PluginPreDeactivateEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPreInstallEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPreUninstallEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPreUpdateEvent;
+use Shopware\Core\Framework\Plugin\Exception\PluginBaseClassNotFoundException;
 use Shopware\Core\Framework\Plugin\Exception\PluginNotActivatedException;
 use Shopware\Core\Framework\Plugin\Exception\PluginNotInstalledException;
+use Shopware\Core\Framework\Plugin\KernelPluginLoader\KernelPluginLoader;
+use Shopware\Core\Framework\Plugin\KernelPluginLoader\StaticKernelPluginLoader;
 use Shopware\Core\Framework\Plugin\Requirement\Exception\RequirementStackException;
 use Shopware\Core\Framework\Plugin\Requirement\RequirementsValidator;
 use Shopware\Core\Framework\Plugin\Util\AssetService;
-use Symfony\Component\DependencyInjection\ContainerAwareTrait;
+use Shopware\Core\Kernel;
+use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\EventListener\StopWorkerOnRestartSignalListener;
+use function Flag\next1797;
 
 class PluginLifecycleService
 {
@@ -98,6 +104,16 @@ class PluginLifecycleService
      */
     private $shopwareVersion;
 
+    /**
+     * @var CacheItemPoolInterface
+     */
+    private $restartSignalCachePool;
+
+    /**
+     * @var SystemConfigService
+     */
+    private $systemConfigService;
+
     public function __construct(
         EntityRepositoryInterface $pluginRepo,
         EventDispatcherInterface $eventDispatcher,
@@ -110,7 +126,9 @@ class PluginLifecycleService
         AssetService $assetInstaller,
         CommandExecutor $executor,
         RequirementsValidator $requirementValidator,
-        string $shopwareVersion
+        CacheItemPoolInterface $restartSignalCachePool,
+        string $shopwareVersion,
+        SystemConfigService $systemConfigService
     ) {
         $this->pluginRepo = $pluginRepo;
         $this->eventDispatcher = $eventDispatcher;
@@ -123,7 +141,9 @@ class PluginLifecycleService
         $this->assetInstaller = $assetInstaller;
         $this->executor = $executor;
         $this->requirementValidator = $requirementValidator;
+        $this->systemConfigService = $systemConfigService;
         $this->shopwareVersion = $shopwareVersion;
+        $this->restartSignalCachePool = $restartSignalCachePool;
     }
 
     /**
@@ -168,6 +188,8 @@ class PluginLifecycleService
 
         $this->eventDispatcher->dispatch(new PluginPreInstallEvent($plugin, $installContext));
 
+        $this->systemConfigService->savePluginConfiguration($pluginBaseClass, true);
+
         $pluginBaseClass->install($installContext);
 
         $this->runMigrations($pluginBaseClass);
@@ -198,6 +220,10 @@ class PluginLifecycleService
             throw new PluginNotInstalledException($plugin->getName());
         }
 
+        if ($plugin->getActive()) {
+            $this->deactivatePlugin($plugin, $shopwareContext);
+        }
+
         $pluginBaseClass = $this->getPluginBaseClass($pluginBaseClassString);
 
         $uninstallContext = new UninstallContext(
@@ -209,6 +235,7 @@ class PluginLifecycleService
         );
 
         $this->eventDispatcher->dispatch(new PluginPreUninstallEvent($plugin, $uninstallContext));
+        $this->assetInstaller->removeAssetsOfBundle($pluginBaseClassString);
 
         $pluginBaseClass->uninstall($uninstallContext);
 
@@ -257,9 +284,11 @@ class PluginLifecycleService
 
         $this->eventDispatcher->dispatch(new PluginPreUpdateEvent($plugin, $updateContext));
 
+        $this->systemConfigService->savePluginConfiguration($pluginBaseClass);
+
         $pluginBaseClass->update($updateContext);
         if ($plugin->getInstalledAt() && $plugin->getActive()) {
-            $this->assetInstaller->copyAssetsFromBundle($pluginBaseClassString, $shopwareContext);
+            $this->assetInstaller->copyAssetsFromBundle($pluginBaseClassString);
         }
 
         $this->runMigrations($pluginBaseClass);
@@ -311,8 +340,20 @@ class PluginLifecycleService
 
         $this->eventDispatcher->dispatch(new PluginPreActivateEvent($plugin, $activateContext));
 
+        $plugin->setActive(true);
+
+        $this->rebuildContainerWithNewPluginState($plugin);
+
+        $pluginBaseClass = $this->getPluginInstance($pluginBaseClassString);
+        $activateContext = new ActivateContext(
+            $pluginBaseClass,
+            $shopwareContext,
+            $this->shopwareVersion,
+            $plugin->getVersion()
+        );
+
         $pluginBaseClass->activate($activateContext);
-        $this->assetInstaller->copyAssetsFromBundle($pluginBaseClassString, $shopwareContext);
+        $this->assetInstaller->copyAssetsFromBundle($pluginBaseClassString);
 
         $this->updatePluginData(
             [
@@ -321,7 +362,11 @@ class PluginLifecycleService
             ],
             $shopwareContext
         );
-        $plugin->setActive(true);
+
+        // stop in old cache dir
+        $cacheItem = $this->restartSignalCachePool->getItem(StopWorkerOnRestartSignalListener::RESTART_REQUESTED_TIMESTAMP_KEY);
+        $cacheItem->set(microtime(true));
+        $this->restartSignalCachePool->save($cacheItem);
 
         $this->eventDispatcher->dispatch(new PluginPostActivateEvent($plugin, $activateContext));
 
@@ -343,7 +388,7 @@ class PluginLifecycleService
             throw new PluginNotActivatedException($plugin->getName());
         }
 
-        $pluginBaseClass = $this->getPluginBaseClass($pluginBaseClassString);
+        $pluginBaseClass = $this->getPluginInstance($pluginBaseClassString);
 
         $deactivateContext = new DeactivateContext(
             $pluginBaseClass,
@@ -355,7 +400,10 @@ class PluginLifecycleService
         $this->eventDispatcher->dispatch(new PluginPreDeactivateEvent($plugin, $deactivateContext));
 
         $pluginBaseClass->deactivate($deactivateContext);
-        $this->assetInstaller->removeAssetsOfBundle($pluginBaseClassString, $shopwareContext);
+        $this->assetInstaller->removeAssetsOfBundle($pluginBaseClassString);
+
+        $plugin->setActive(false);
+        $this->rebuildContainerWithNewPluginState($plugin);
 
         $this->updatePluginData(
             [
@@ -364,7 +412,11 @@ class PluginLifecycleService
             ],
             $shopwareContext
         );
-        $plugin->setActive(false);
+
+        // signal worker stop in old cache dir
+        $cacheItem = $this->restartSignalCachePool->getItem(StopWorkerOnRestartSignalListener::RESTART_REQUESTED_TIMESTAMP_KEY);
+        $cacheItem->set(microtime(true));
+        $this->restartSignalCachePool->save($cacheItem);
 
         $this->eventDispatcher->dispatch(new PluginPostDeactivateEvent($plugin, $deactivateContext));
 
@@ -373,8 +425,12 @@ class PluginLifecycleService
 
     private function getPluginBaseClass(string $pluginBaseClassString): Plugin
     {
-        /** @var Plugin|ContainerAwareTrait $baseClass */
         $baseClass = $this->pluginCollection->get($pluginBaseClassString);
+
+        if ($baseClass === null) {
+            throw new PluginBaseClassNotFoundException($pluginBaseClassString);
+        }
+
         // set container because the plugin has not been initialized yet and therefore has no container set
         $baseClass->setContainer($this->container);
 
@@ -418,5 +474,57 @@ class PluginLifecycleService
     private function updatePluginData(array $pluginData, Context $context): void
     {
         $this->pluginRepo->update([$pluginData], $context);
+    }
+
+    private function rebuildContainerWithNewPluginState(PluginEntity $plugin): void
+    {
+        /** @var Kernel $kernel */
+        $kernel = $this->container->get('kernel');
+
+        /** @var KernelPluginLoader $pluginLoader */
+        $pluginLoader = $this->container->get(KernelPluginLoader::class);
+
+        $plugins = $pluginLoader->getPluginInfos();
+        foreach ($plugins as $i => $pluginData) {
+            if ($pluginData['baseClass'] === $plugin->getBaseClass()) {
+                $plugins[$i]['active'] = $plugin->getActive();
+            }
+        }
+
+        /*
+         * Reboot kernel with $plugin active=true.
+         *
+         * All other Requests wont have this plugin active until its updated in the db
+         */
+        $tmpStaticPluginLoader = new StaticKernelPluginLoader(
+            $pluginLoader->getClassLoader(),
+            $kernel->getContainer()->getParameter('kernel.plugin_dir'),
+            $plugins
+        );
+        $kernel->reboot(null, $tmpStaticPluginLoader);
+
+        // If symfony throws an exception when calling getContainer on an not booted kernel and catch it here
+        /** @var ContainerInterface|null $newContainer */
+        $newContainer = $kernel->getContainer();
+        if (!$newContainer) {
+            throw new \RuntimeException('Failed to reboot the kernel');
+        }
+
+        $this->container = $newContainer;
+        $this->eventDispatcher = $this->container->get('event_dispatcher');
+    }
+
+    private function getPluginInstance(string $pluginBaseClassString): Plugin
+    {
+        if ($this->container->has($pluginBaseClassString)) {
+            $containerPlugin = $this->container->get($pluginBaseClassString);
+            if (!$containerPlugin instanceof Plugin) {
+                throw new \RuntimeException($pluginBaseClassString . ' in the container should be an instance of ' . Plugin::class);
+            }
+
+            return $containerPlugin;
+        }
+
+        return $this->getPluginBaseClass($pluginBaseClassString);
     }
 }

@@ -35,7 +35,7 @@ class EntityCompilerPass implements CompilerPassInterface
             $service = $container->getDefinition($serviceId);
 
             if (!isset($tag[0]['entity'])) {
-                throw new \RuntimeException(sprintf('Malformed configuration found for "%s"', $serviceId));
+                throw new \RuntimeException(sprintf('Missing attribute "entity" on tag "shopware.entity.definition" for definition with id "%s"', $serviceId));
             }
 
             $service->addMethodCall('compile', [
@@ -49,6 +49,7 @@ class EntityCompilerPass implements CompilerPassInterface
             $service->setPublic(true);
 
             $repositoryId = $entity . '.repository';
+
             try {
                 $container->getDefinition($repositoryId);
             } catch (ServiceNotFoundException $exception) {
@@ -75,7 +76,7 @@ class EntityCompilerPass implements CompilerPassInterface
         $definitionRegistry->replaceArgument(2, $repositoryNameMap);
     }
 
-    private function makeFieldSerializersPublic(ContainerBuilder $container)
+    private function makeFieldSerializersPublic(ContainerBuilder $container): void
     {
         $servicesIds = array_keys($container->findTaggedServiceIds('shopware.field_serializer'));
 
@@ -84,7 +85,7 @@ class EntityCompilerPass implements CompilerPassInterface
         }
     }
 
-    private function makeFieldResolversPublic(ContainerBuilder $container)
+    private function makeFieldResolversPublic(ContainerBuilder $container): void
     {
         $servicesIds = array_keys($container->findTaggedServiceIds('shopware.field_resolver'));
 
@@ -93,7 +94,7 @@ class EntityCompilerPass implements CompilerPassInterface
         }
     }
 
-    private function makeFieldAccessorBuildersPublic(ContainerBuilder $container)
+    private function makeFieldAccessorBuildersPublic(ContainerBuilder $container): void
     {
         $servicesIds = array_keys($container->findTaggedServiceIds('shopware.field_accessor_builder'));
 

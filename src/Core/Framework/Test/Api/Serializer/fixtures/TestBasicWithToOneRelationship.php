@@ -18,6 +18,7 @@ class TestBasicWithToOneRelationship extends SerializationFixture
         $user->setPassword('password');
         $user->setUsername('user1');
         $user->setActive(true);
+        $user->setAdmin(true);
         $user->setEmail('user1@shop.de');
         $user->setCreatedAt(new \DateTime('2018-01-15T08:01:16+00:00'));
 
@@ -170,6 +171,12 @@ class TestBasicWithToOneRelationship extends SerializationFixture
                             'related' => sprintf('%s/media/548faa1f7846436c85944f4aea792d96/cms-blocks', $baseUrl),
                         ],
                     ],
+                    'cmsSections' => [
+                        'data' => [],
+                        'links' => [
+                            'related' => sprintf('%s/media/548faa1f7846436c85944f4aea792d96/cms-sections', $baseUrl),
+                        ],
+                    ],
                     'cmsPages' => [
                         'data' => [],
                         'links' => [
@@ -200,6 +207,7 @@ class TestBasicWithToOneRelationship extends SerializationFixture
                         'customFields' => null,
                         'createdAt' => '2018-01-15T08:01:16+00:00',
                         'updatedAt' => null,
+                        'admin' => true,
                     ],
                     'links' => [
                         'self' => sprintf('%s/user/6f51622eb3814c75ae0263cece27ce72', $baseUrl),
@@ -247,6 +255,12 @@ class TestBasicWithToOneRelationship extends SerializationFixture
                                 'related' => sprintf('%s/user/6f51622eb3814c75ae0263cece27ce72/recovery-user', $baseUrl),
                             ],
                         ],
+                        'aclRoles' => [
+                            'data' => [],
+                            'links' => [
+                                'related' => sprintf('%s/user/6f51622eb3814c75ae0263cece27ce72/acl-roles', $baseUrl),
+                            ],
+                        ],
                     ],
                     'meta' => null,
                 ],
@@ -292,6 +306,8 @@ class TestBasicWithToOneRelationship extends SerializationFixture
                 'createdAt' => '2018-01-15T08:01:16+00:00',
                 'updatedAt' => null,
                 'extensions' => [],
+                'admin' => true,
+                'aclRoles' => null,
             ],
             'translations' => null,
             'categories' => null,
@@ -313,6 +329,7 @@ class TestBasicWithToOneRelationship extends SerializationFixture
             'productConfiguratorSettings' => null,
             'orderLineItems' => null,
             'cmsBlocks' => null,
+            'cmsSections' => null,
             'cmsPages' => null,
             'documents' => null,
             '_uniqueIdentifier' => '548faa1f7846436c85944f4aea792d96',
@@ -345,6 +362,7 @@ class TestBasicWithToOneRelationship extends SerializationFixture
             $fixtures['data']['relationships']['productConfiguratorSettings'],
             $fixtures['data']['relationships']['orderLineItems'],
             $fixtures['data']['relationships']['cmsBlocks'],
+            $fixtures['data']['relationships']['cmsSections'],
             $fixtures['data']['relationships']['cmsPages'],
             $fixtures['data']['relationships']['documents'],
 
@@ -374,6 +392,7 @@ class TestBasicWithToOneRelationship extends SerializationFixture
             $fixtures['productConfiguratorSettings'],
             $fixtures['orderLineItems'],
             $fixtures['cmsBlocks'],
+            $fixtures['cmsSections'],
             $fixtures['cmsPages'],
             $fixtures['documents']
         );

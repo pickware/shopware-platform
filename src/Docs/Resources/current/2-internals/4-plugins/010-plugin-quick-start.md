@@ -157,8 +157,10 @@ For this tutorial, a simple configuration containing a single text field is used
 *PluginQuickStart/src/Resources/config/config.xml*
 
 This configuration would now create a new text field inside a panel with the title "Minimal configuration", depending on
-the language chosen.
-Also, the text field's technical name is `example` in this case, and so would be the label if you didn't provide a specific label for it.
+the language chosen. Also, the text field's technical name is `example` in this case, and so would be the label if you didn't provide a specific label for it.
+
+**The technical name is the identifier you'll use later on to retrieve the value the user provided.**  It's name can't contain any spaces.
+
 Those will be rendered into the administration settings.
 
 For a more detailed guide on how to setup the `config.xml` and which input types exist, head over to the detailed [plugin configuration](./070-plugin-config.md) guide.
@@ -273,12 +275,16 @@ An example of the `MyController` controller could look like this:
 
 namespace Swag\PluginQuickStart\Controller;
 
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Context;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class MyController extends AbstractController
 {
     /**
@@ -373,6 +379,7 @@ An example usage would be in your new controller.
 
 namespace Swag\PluginQuickStart\Controller;
 
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Swag\PluginQuickStart\Service\MyService;
 use Shopware\Core\Framework\Context;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -380,6 +387,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class MyController extends AbstractController
 {
     /**

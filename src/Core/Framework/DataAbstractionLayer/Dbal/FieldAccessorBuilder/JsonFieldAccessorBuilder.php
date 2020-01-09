@@ -61,7 +61,7 @@ class JsonFieldAccessorBuilder implements FieldAccessorBuilderInterface
             '$2$3',
             $path
         );
-        $subPath = substr($path, strlen($fieldName) + 1);
+        $subPath = mb_substr($path, mb_strlen($fieldName) + 1);
 
         foreach ($fields as $field) {
             if ($field->getPropertyName() !== $fieldName) {
@@ -87,7 +87,8 @@ class JsonFieldAccessorBuilder implements FieldAccessorBuilderInterface
         if ($field instanceof BoolField) {
             return sprintf(
                 'IF(JSON_UNQUOTE(%s) != "true" && JSON_UNQUOTE(%s) = 0, 0, 1)',
-                $jsonValueExpr, $jsonValueExpr
+                $jsonValueExpr,
+                $jsonValueExpr
             );
         }
 

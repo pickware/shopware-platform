@@ -2,14 +2,13 @@
 
 namespace Shopware\Core\Framework\Plugin\Command;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\ContainsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Core\Framework\Plugin\PluginCollection;
-use Shopware\Core\Framework\Plugin\PluginEntity;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -17,6 +16,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class PluginListCommand extends Command
 {
+    protected static $defaultName = 'plugin:list';
+
     /**
      * @var EntityRepositoryInterface
      */
@@ -33,7 +34,7 @@ class PluginListCommand extends Command
      */
     protected function configure(): void
     {
-        $this->setName('plugin:list')
+        $this
             ->setDescription('Show a list of available plugins.')
             ->addOption('filter', 'f', InputOption::VALUE_REQUIRED, 'Filter the plugin list to a given term');
     }
@@ -41,7 +42,7 @@ class PluginListCommand extends Command
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new ShopwareStyle($input, $output);
         $io->title('Shopware Plugin Service');
@@ -66,7 +67,6 @@ class PluginListCommand extends Command
         $pluginTable = [];
         $active = $installed = $upgradeable = 0;
 
-        /** @var PluginEntity $plugin */
         foreach ($plugins as $plugin) {
             $pluginActive = $plugin->getActive();
             $pluginInstalled = $plugin->getInstalledAt();
@@ -109,5 +109,7 @@ class PluginListCommand extends Command
                 $upgradeable
             )
         );
+
+        return 0;
     }
 }

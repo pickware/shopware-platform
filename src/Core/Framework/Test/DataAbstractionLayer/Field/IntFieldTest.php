@@ -2,7 +2,6 @@
 
 namespace Shopware\Core\Framework\Test\DataAbstractionLayer\Field;
 
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
@@ -24,6 +23,7 @@ class IntFieldTest extends TestCase
         $data = new KeyValuePair('count', null, false);
 
         $this->expectException(WriteConstraintViolationException::class);
+
         try {
             $serializer->encode(
                 $this->getIntField(),
@@ -32,8 +32,9 @@ class IntFieldTest extends TestCase
                 $this->getWriteParameterBagMock()
             )->current();
         } catch (WriteConstraintViolationException $e) {
-            static::assertSame('count', $e->getViolations()->get(0)->getPropertyPath());
+            static::assertSame('/count', $e->getViolations()->get(0)->getPropertyPath());
             static::assertSame('This value should not be blank.', $e->getViolations()->get(0)->getMessage());
+
             throw $e;
         }
     }
@@ -45,6 +46,7 @@ class IntFieldTest extends TestCase
         $data = new KeyValuePair('count', 'foo', false);
 
         $this->expectException(WriteConstraintViolationException::class);
+
         try {
             $serializer->encode(
                 $this->getIntField(),
@@ -53,8 +55,9 @@ class IntFieldTest extends TestCase
                 $this->getWriteParameterBagMock()
             )->current();
         } catch (WriteConstraintViolationException $e) {
-            static::assertSame('count', $e->getViolations()->get(0)->getPropertyPath());
+            static::assertSame('/count', $e->getViolations()->get(0)->getPropertyPath());
             static::assertSame('This value should be of type int.', $e->getViolations()->get(0)->getMessage());
+
             throw $e;
         }
     }
@@ -111,9 +114,6 @@ class IntFieldTest extends TestCase
         );
     }
 
-    /**
-     * @return WriteParameterBag|MockObject
-     */
     private function getWriteParameterBagMock(): WriteParameterBag
     {
         $mockBuilder = $this->getMockBuilder(WriteParameterBag::class);
@@ -127,7 +127,7 @@ class IntFieldTest extends TestCase
         return new EntityExistence(null, [], true, false, false, []);
     }
 
-    private function getIntField($required = true): IntField
+    private function getIntField(bool $required = true): IntField
     {
         $field = new IntField('count', 'count');
 

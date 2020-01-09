@@ -13,6 +13,8 @@ use Shopware\Core\Checkout\Payment\Exception\InvalidOrderException;
 use Shopware\Core\Checkout\Payment\Exception\SyncPaymentProcessException;
 use Shopware\Core\Checkout\Payment\Exception\UnknownPaymentMethodException;
 use Shopware\Core\Checkout\Payment\PaymentService;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Routing\Exception\MissingRequestParameterException;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Shopware\Core\Framework\Validation\Exception\ConstraintViolationException;
@@ -26,6 +28,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"storefront"})
+ */
 class CheckoutController extends StorefrontController
 {
     /**
@@ -63,6 +68,11 @@ class CheckoutController extends StorefrontController
      */
     private $offcanvasCartPageLoader;
 
+    /**
+     * @var EntityRepositoryInterface
+     */
+    private $orderRepository;
+
     public function __construct(
         CartService $cartService,
         CheckoutCartPageLoader $cartPageLoader,
@@ -70,7 +80,8 @@ class CheckoutController extends StorefrontController
         CheckoutFinishPageLoader $finishPageLoader,
         OrderService $orderService,
         PaymentService $paymentService,
-        OffcanvasCartPageLoader $offcanvasCartPageLoader
+        OffcanvasCartPageLoader $offcanvasCartPageLoader,
+        EntityRepositoryInterface $orderRepository
     ) {
         $this->cartService = $cartService;
         $this->cartPageLoader = $cartPageLoader;
@@ -79,6 +90,7 @@ class CheckoutController extends StorefrontController
         $this->orderService = $orderService;
         $this->paymentService = $paymentService;
         $this->offcanvasCartPageLoader = $offcanvasCartPageLoader;
+        $this->orderRepository = $orderRepository;
     }
 
     /**
@@ -88,7 +100,7 @@ class CheckoutController extends StorefrontController
     {
         $page = $this->cartPageLoader->load($request, $context);
 
-        return $this->renderStorefront('@Storefront/page/checkout/cart/index.html.twig', ['page' => $page]);
+        return $this->renderStorefront('@Storefront/storefront/page/checkout/cart/index.html.twig', ['page' => $page]);
     }
 
     /**
@@ -106,7 +118,7 @@ class CheckoutController extends StorefrontController
 
         $page = $this->confirmPageLoader->load($request, $context);
 
-        return $this->renderStorefront('@Storefront/page/checkout/confirm/index.html.twig', ['page' => $page]);
+        return $this->renderStorefront('@Storefront/storefront/page/checkout/confirm/index.html.twig', ['page' => $page]);
     }
 
     /**
@@ -124,21 +136,23 @@ class CheckoutController extends StorefrontController
 
         $page = $this->finishPageLoader->load($request, $context);
 
-        return $this->renderStorefront('@Storefront/page/checkout/finish/index.html.twig', ['page' => $page]);
+        return $this->renderStorefront('@Storefront/storefront/page/checkout/finish/index.html.twig', ['page' => $page]);
     }
 
     /**
      * @Route("/checkout/order", name="frontend.checkout.finish.order", options={"seo"="false"}, methods={"POST"})
      */
-    public function order(RequestDataBag $data, SalesChannelContext $context): Response
+    public function order(RequestDataBag $data, SalesChannelContext $context, Request $request): Response
     {
         if (!$context->getCustomer()) {
             return $this->redirectToRoute('frontend.checkout.register.page');
         }
 
         $formViolations = null;
+
         try {
             $orderId = $this->orderService->createOrder($data, $context);
+            $this->addAffiliateTracking($orderId, $request, $context);
             $finishUrl = $this->generateUrl('frontend.checkout.finish.page', [
                 'orderId' => $orderId,
             ]);
@@ -169,7 +183,7 @@ class CheckoutController extends StorefrontController
     {
         $page = $this->offcanvasCartPageLoader->load($request, $context);
 
-        return $this->renderStorefront('@Storefront/layout/header/actions/cart-widget.html.twig', ['page' => $page]);
+        return $this->renderStorefront('@Storefront/storefront/layout/header/actions/cart-widget.html.twig', ['page' => $page]);
     }
 
     /**
@@ -181,6 +195,17 @@ class CheckoutController extends StorefrontController
     {
         $page = $this->offcanvasCartPageLoader->load($request, $context);
 
-        return $this->renderStorefront('@Storefront/component/checkout/offcanvas-cart.html.twig', ['page' => $page]);
+        return $this->renderStorefront('@Storefront/storefront/component/checkout/offcanvas-cart.html.twig', ['page' => $page]);
+    }
+
+    private function addAffiliateTracking(string $orderId, Request $request, SalesChannelContext $context): void
+    {
+        if ($request->getSession()->get('affiliateCode') && $request->getSession()->get('campaignCode')) {
+            $this->orderRepository->update([[
+                'id' => $orderId,
+                'affiliateCode' => $request->getSession()->get('affiliateCode'),
+                'campaignCode' => $request->getSession()->get('campaignCode'),
+            ]], $context->getContext());
+        }
     }
 }

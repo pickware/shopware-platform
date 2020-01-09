@@ -50,7 +50,7 @@ It grants access to the criteria object before it has been used for a search, so
 ```php
 public function onProductCriteriaLoaded(ProductLoaderCriteriaEvent $event): void
 {
-    $event->getCriteria()->addAssociationPath('bundles.products.cover');
+    $event->getCriteria()->addAssociation('bundles.products.cover');
 }
 ```
 
@@ -107,16 +107,16 @@ Now copy this class and search for it in the [views directory](https://github.co
 which can be found here: `<platform root>/src/Storefront/Resources/views`
 Search for the css class `product-detail` in this directory with the tool of your choice, an IDE like PHPStorm is recommended.
 You'll find a few results, but only look for the element, which only contains this specific class and nothing else.
-This way you'll eventually find the file `<platform root>/src/Storefront/Resources/views/page/product-detail/index.html.twig`, which creates the main container
+This way you'll eventually find the file `<platform root>/src/Storefront/Resources/views/storefront/page/product-detail/index.html.twig`, which creates the main container
 for the detail page. That's it, you've found the right file and now know the path to it.
 
 Time for the next step, recreate this path in your plugin's `views` directory, so it looks like this:
-`<plugin root>/src/Resources/views/page/product-detail/index.html.twig`
+`<plugin root>/src/Resources/views/storefront/page/product-detail/index.html.twig`
 
 You've already got the template file, now make it extend from the original one.
 This is done using our custom Twig parser `sw_extends` to extend from the default file. It will also need the path to the original file.
 ```twig
-{% sw_extends '@Storefront/page/product-detail/index.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/index.html.twig' %}
 ```
 
 The `@Storefront` part points to the `views` directory of the Storefront bundle, the rest of the path should be known to you already.
@@ -127,7 +127,7 @@ This is also the block you're going to override now.
 Add this block to your own template.
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/index.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/index.html.twig' %}
 
 {% block page_product_detail_content %}
     <h2>Hello world</h2>
@@ -138,7 +138,7 @@ This would now completely replace the whole detail content with an 'Hello world'
 you can add the parent's content as well using `{{ parent() }}`:
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/index.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/index.html.twig' %}
 
 {% block page_product_detail_content %}
     <h2>Hello world</h2>
@@ -151,7 +151,7 @@ This would now render your 'Hello world' above the original content. Time to rep
 For this purpose, there's a class called `badge` to render a `div` like a badge. Additional to that, you can use `badge-primary` to highlight it even more.
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/index.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/index.html.twig' %}
 
 {% block page_product_detail_content %}
     <div class="badge badge-primary">Bundle</div>
@@ -165,7 +165,7 @@ have a least one bundle. The page templates also come with a `page` twig variabl
 there's a bundle association on the product entity.
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/index.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/index.html.twig' %}
 
 {# @var page \Shopware\Storefront\Page\Product\ProductPage #}
 {% block page_product_detail_content %}
@@ -190,26 +190,25 @@ You'd rather want them to be in a separate tab, next to the description.
 
 Each tab consists of two elements, one for showing the tab and the actual tab content.
 Go ahead and use the inspection tool of your browser's DevTools and inspect the 'Description' tab on the detail page. You'll find an element with the ID `description-tab`.
-When searching for this ID, you'll eventually find the file `<platform root>/src/Storefront/Resources/views/page/product-detail/tabs.html.twig`, which is the proper file to extend.
+When searching for this ID, you'll eventually find the file `<platform root>/src/Storefront/Resources/views/storefront/page/product-detail/tabs.html.twig`, which is the proper file to extend.
 Thankfully, it's in the same directory as the `index.html.twig`, so you've already got the equal directory structure in your plugin.
 Now create the file `tabs.html.twig` in your plugin and extend from the original file, just like you did before.
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/tabs.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/tabs.html.twig' %}
 ```
 
 In the original file, you'll find two main parts: One for listing all available tabs as `li` elements inside an `ul` element, and one for providing the tab's content.
 
 Start with adding your own tab by overriding the block `page_product_detail_tabs_navigation_description`, so you can add your own `li` tag to the `ul`.
 Copy the original file's tab content as well and replace every occurrence of "description" with "bundle" and replace `{{ "detail.tabsDescription"|trans }}` with `Bundles` for now.
-The icon to be used is the one you already used in your Administration module, so use `shopping-paper-bag-product` here.
 
 Also make sure to add the `{{ parent() }}` to not just override the description tab, but to add a new tab instead.
 This time you want the original content to be loaded first and your new tab afterwards.
 
 It should now look like this:
 ```twig
-{% sw_extends '@Storefront/page/product-detail/tabs.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/tabs.html.twig' %}
 
 {% block page_product_detail_tabs_navigation_description %}
     {{ parent() }}
@@ -223,12 +222,7 @@ It should now look like this:
                role="tab"
                aria-controls="bundle-tab-pane"
                aria-selected="false">
-                Bundles
-                <span class="nav-link-icon">
-                    {% sw_include '@Storefront/utilities/icon.html.twig' with {
-                        'name': 'shopping-paper-bag-product'
-                    } %}
-                </span>
+                <span>Bundles</span>
             </a>
         </li>
     {% endif %}
@@ -247,8 +241,6 @@ Instead, the really important attributes are `data-toggle`, `data-offcanvas-tab`
 - `href`: Links to the element, which contains the tab's contents and thus must be rendered
 
 Inside the `a` tag, you'll find the tab's label, 'Bundles' in this case. Translations will be added later, don't worry about this yet.
-Additional to that, there's an icon added, just as mentioned above.
-
 
 This would already render a bundle tab, but it has no content to show yet. Looking into the original `tabs.html.twig` file, there's a `div` container
 for the several tab content's. Copy the first block inside this block, which should be `page_product_detail_tabs_content_description`, and override it in your custom
@@ -258,7 +250,7 @@ at all, so add this condition again as well.
 Also, copy the original HTML in here again to manipulate it to your needs afterwards.
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/tabs.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/tabs.html.twig' %}
 
 {% block page_product_detail_tabs_navigation_description %}
     ...
@@ -271,7 +263,7 @@ Also, copy the original HTML in here again to manipulate it to your needs afterw
              id="description-tab-pane"
              role="tabpanel"
              aria-labelledby="description-tab">
-            {% sw_include '@Storefront/page/product-detail/description.html.twig' %}
+            {% sw_include '@Storefront/storefront/page/product-detail/description.html.twig' %}
         </div>
     {% endif %}
 {% endblock %}
@@ -337,7 +329,7 @@ For each product, you'll just include the default product box template and apply
     <div class="row">
         {% for product in bundle.products.elements %}
             <div class="col-4">
-                {% sw_include '@Storefront/component/product/card/box-standard.html.twig' with {'product': product} %}
+                {% sw_include '@Storefront/storefront/component/product/card/box-standard.html.twig' with {'product': product} %}
             </div>
         {% endfor %}
     </div>
@@ -349,6 +341,7 @@ it into a form element.
 This form has to add an line item to the cart by using the `frontend.checkout.line-item.add` API route for it. A line item is just a raw item in the cart, whatever that means.
 You need to recognize the `Bundle` line items later in the process, so also a `type` has to be submitted.
 Since you want your button to also open the off canvas cart, you have to add the `OffCanvasCart-Plugin` by adding the data attribute `data-add-to-cart` to your form element.
+To protect this form with CSRF-Protection you have to add `data-form-csrf-handler` data attribute to add the `Csrf-Plugin` and use the `sw_csrf` twig-function to generate a csrf-token for the given route name.
 
 Here's the example code, it will be explained afterwards
 ```twig
@@ -356,6 +349,7 @@ Here's the example code, it will be explained afterwards
     <form action="{{ path('frontend.checkout.line-item.add') }}"
         method="post"
         class="buy-widget js-add-to-cart"
+        data-form-csrf-handler="true"
         data-add-to-cart="true">
         <div class="form-row buy-widget-container">
             <button class="btn btn-primary btn-block buy-widget-submit" style="margin-top: 10px;">
@@ -367,6 +361,8 @@ Here's the example code, it will be explained afterwards
             <input type="hidden" name="lineItems[{{ bundle.id }}][quantity]" value="1">
             <input type="hidden" name="lineItems[{{ bundle.id }}][referencedId]" value="{{ bundle.id }}">
             <input type="hidden" name="redirectTo" value="frontend.cart.offcanvas"/>
+
+            {{ sw_csrf('frontend.checkout.line-item.add') }}
         </div>
     </form>
 </div>
@@ -392,19 +388,14 @@ template for the off canvas cart.
 Your `tabs.html.twig` file should now look like this:
 
 ```twig
-{% sw_extends '@Storefront/page/product-detail/tabs.html.twig' %}
+{% sw_extends '@Storefront/storefront/page/product-detail/tabs.html.twig' %}
 
 {% block page_product_detail_tabs_navigation_description %}
     {{ parent() }}
     {% if page.product.extension('bundles').elements|length > 0 %}
         <li class="nav-item">
             <a class="nav-link" id="bundle-tab" data-toggle="tab" data-offcanvas-tab="true" href="#bundle-tab-pane" role="tab" aria-controls="bundle-tab-pane" aria-selected="false">
-                Bundles
-                <span class="nav-link-icon">
-                    {% sw_include '@Storefront/layout/_utilities/icon.html.twig' with {
-                        'name': 'shopping-paper-bag-product'
-                    } %}
-                </span>
+                <span>Bundles</span>
             </a>
         </li>
     {% endif %}
@@ -425,7 +416,7 @@ Your `tabs.html.twig` file should now look like this:
                     <div class="row">
                         {% for product in bundle.products.elements %}
                             <div class="col-4">
-                                {% sw_include '@Storefront/component/product/widget/box-standard.html.twig' with {'product': product} %}
+                                {% sw_include '@Storefront/storefront/component/product/widget/box-standard.html.twig' with {'product': product} %}
                             </div>
                         {% endfor %}
                     </div>
@@ -466,7 +457,7 @@ It's not that much of a deal though, so don't worry.
 #### Adding SnippetFiles
 
 Adding snippets via plugins works by registering services via the DI container tag `shopware.snippet.file`.
-Those services implement the `Shopware\Core\Framework\Snippet\Files\SnippetFileInterface` interface, which needs five methods to be implemented:
+Those services implement the `Shopware\Core\System\Snippet\Files\SnippetFileInterface` interface, which needs five methods to be implemented:
 - `getName`: Return the name of the snippet file as a string here. Using this name, you can access the translations later. By default, you can return `storefront.en-GB` here.
 - `getPath`: Each SnippetFile class has to point to a `.json` file, which actually contains the translations. Return the path to this file here.
 - `getIso`: Return the ISO string of the supported locale here. This is important, because the `Translator` collects every snippet file with this locale and merges them to generate the snippet catalogue used by the storefront. 
@@ -484,7 +475,7 @@ Having implemented all methods mentioned above, your `SnippetFile_en_GB.php` sho
 
 namespace Swag\BundleExample\Resources\snippet\en_GB;
 
-use Shopware\Core\Framework\Snippet\Files\SnippetFileInterface;
+use Shopware\Core\System\Snippet\Files\SnippetFileInterface;
 
 class SnippetFile_en_GB implements SnippetFileInterface
 {

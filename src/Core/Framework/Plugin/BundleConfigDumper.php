@@ -10,7 +10,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Plugin;
 use Shopware\Core\Framework\Plugin\Event\PluginPostActivateEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPostDeactivateEvent;
-use Shopware\Core\Framework\Plugin\Event\PluginPostUninstallEvent;
 use Shopware\Core\Kernel;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Finder\Finder;
@@ -38,8 +37,7 @@ class BundleConfigDumper implements EventSubscriberInterface
     public static function getSubscribedEvents(): array
     {
         return [
-            PluginPostActivateEvent::class => 'postActivate',
-            PluginPostUninstallEvent::class => 'dump',
+            PluginPostActivateEvent::class => 'dump',
             PluginPostDeactivateEvent::class => 'dump',
         ];
     }
@@ -47,27 +45,6 @@ class BundleConfigDumper implements EventSubscriberInterface
     public function dump(): void
     {
         $config = $this->getConfig();
-
-        file_put_contents(
-            $this->kernel->getCacheDir() . '/../../plugins.json',
-            json_encode($config, JSON_PRETTY_PRINT)
-        );
-    }
-
-    public function postActivate(PluginPostActivateEvent $event): void
-    {
-        $className = $event->getPlugin()->getBaseClass();
-
-        /** @var Plugin $plugin */
-        $plugin = new $className(true, $this->kernel->getProjectDir() . '/' . $event->getPlugin()->getPath());
-
-        if (!$plugin instanceof Plugin) {
-            throw new \RuntimeException(
-                sprintf('Plugin class "%s" must extend "%s"', \get_class($plugin), Plugin::class)
-            );
-        }
-
-        $config = $this->getConfig($plugin);
 
         file_put_contents(
             $this->kernel->getCacheDir() . '/../../plugins.json',
@@ -88,6 +65,8 @@ class BundleConfigDumper implements EventSubscriberInterface
 
         $kernelBundles = array_merge($this->kernel->getBundles(), $additionalBundles);
 
+        $projectDir = $this->kernel->getContainer()->getParameter('kernel.project_dir');
+
         $bundles = [];
         foreach ($kernelBundles as $bundle) {
             // only include shopware bundles
@@ -100,18 +79,25 @@ class BundleConfigDumper implements EventSubscriberInterface
                 continue;
             }
 
+            $path = $bundle->getPath();
+            if (mb_strpos($bundle->getPath(), $projectDir) === 0) {
+                // make relative
+                $path = ltrim(mb_substr($path, mb_strlen($projectDir)), '/');
+            }
+
             $bundles[$bundle->getName()] = [
-                'basePath' => $bundle->getPath() . '/',
-                'views' => $bundle->getViewPaths(),
+                'basePath' => $path . '/',
+                'views' => ['Resources/views'],
+                'technicalName' => str_replace('_', '-', $bundle->getContainerPrefix()),
                 'administration' => [
-                    'path' => trim($bundle->getAdministrationEntryPath(), '/'),
-                    'entryFilePath' => $this->getEntryFile($bundle, $bundle->getAdministrationEntryPath()),
-                    'webpack' => $this->getWebpackConfig($bundle, $bundle->getAdministrationEntryPath()),
+                    'path' => 'Resources/app/administration/src',
+                    'entryFilePath' => $this->getEntryFile($bundle, 'Resources/app/administration/src'),
+                    'webpack' => $this->getWebpackConfig($bundle, 'Resources/app/administration'),
                 ],
                 'storefront' => [
-                    'path' => trim($bundle->getStorefrontEntryPath(), '/'),
-                    'entryFilePath' => $this->getEntryFile($bundle, $bundle->getStorefrontEntryPath()),
-                    'webpack' => $this->getWebpackConfig($bundle, $bundle->getStorefrontEntryPath()),
+                    'path' => 'Resources/app/storefront/src',
+                    'entryFilePath' => $this->getEntryFile($bundle, 'Resources/app/storefront/src'),
+                    'webpack' => $this->getWebpackConfig($bundle, 'Resources/app/storefront'),
                     'styleFiles' => $this->getStyleFiles($bundle),
                 ],
             ];
@@ -126,8 +112,8 @@ class BundleConfigDumper implements EventSubscriberInterface
         $absolutePath = $bundle->getPath() . '/' . $path;
 
         return file_exists($absolutePath . '/main.ts') ? $path . '/main.ts'
-            : file_exists($absolutePath . '/main.js') ? $path . '/main.js'
-            : null;
+            : (file_exists($absolutePath . '/main.js') ? $path . '/main.js'
+            : null);
     }
 
     private function getWebpackConfig(Bundle $bundle, string $componentPath): ?string
@@ -148,14 +134,14 @@ class BundleConfigDumper implements EventSubscriberInterface
         if ($this->kernel->getContainer()->has('Shopware\Storefront\Theme\StorefrontPluginRegistry')) {
             $registry = $this->kernel->getContainer()->get('Shopware\Storefront\Theme\StorefrontPluginRegistry');
 
-            $config = $registry->getByName($bundle->getName());
+            $config = $registry->getConfigurations()->getByTechnicalName($bundle->getName());
 
             if ($config) {
-                return $config->getStyleFiles();
+                return $config->getStyleFiles()->getFilepaths();
             }
         }
 
-        $path = $bundle->getPath() . DIRECTORY_SEPARATOR . $bundle->getStorefrontStylePath();
+        $path = $bundle->getPath() . DIRECTORY_SEPARATOR . 'Resources/app/storefront/src/scss';
         if (is_dir($path)) {
             $finder = new Finder();
             $finder->in($path)->files()->depth(0);

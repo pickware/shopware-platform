@@ -14,6 +14,10 @@
             <tag name="shopware.entity.definition" entity="order_address"/>
         </service>
 
+        <service id="Shopware\Core\Checkout\Order\OrderExceptionHandler">
+            <tag name="shopware.dal.exception_handler"/>
+        </service>
+
         <service id="Shopware\Core\Checkout\Order\Aggregate\OrderCustomer\OrderCustomerDefinition">
             <tag name="shopware.entity.definition" entity="order_customer"/>
         </service>
@@ -40,12 +44,14 @@
 
         <service id="Shopware\Core\Checkout\Order\SalesChannel\OrderService">
             <argument type="service" id="Shopware\Core\Framework\Validation\DataValidator"/>
-            <argument type="service" id="Shopware\Core\Checkout\Order\Validation\OrderValidationService"/>
+            <argument type="service" id="Shopware\Core\Checkout\Order\Validation\OrderValidationFactory"/>
             <argument type="service" id="event_dispatcher"/>
             <argument type="service" id="Shopware\Core\Checkout\Cart\SalesChannel\CartService"/>
         </service>
 
-        <service id="Shopware\Core\Checkout\Order\Validation\OrderValidationService">
+        <service id="Shopware\Core\Checkout\Order\Validation\OrderValidationFactory"/>
+        <service id="Shopware\Core\Checkout\Order\Validation\OrderValidationService" alias="Shopware\Core\Checkout\Order\Validation\OrderValidationFactory">
+            <deprecated>tag:v6.3.0: The "%alias_id%" service is deprecated and will be removed in 6.3.0. Use "Shopware\Core\Checkout\Order\Validation\OrderValidationFactory" instead</deprecated>
         </service>
 
         <service id="Shopware\Core\Checkout\Cart\Order\OrderPersister">
@@ -63,34 +69,34 @@
             <argument type="service" id="order_address.repository"/>
         </service>
 
-        <service id="Shopware\Core\Checkout\Order\Api\OrderActionController" public="true">
-            <argument type="service" id="order.repository"/>
-            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
-            <argument type="service" id="Shopware\Core\Checkout\Order\OrderDefinition"/>
-            <call method="setContainer">
-                <argument type="service" id="service_container" />
-            </call>
-        </service>
-
-        <service id="Shopware\Core\Checkout\Order\Api\OrderDeliveryActionController" public="true">
-            <argument type="service" id="order_delivery.repository"/>
-            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
-            <call method="setContainer">
-                <argument type="service" id="service_container" />
-            </call>
-        </service>
-
-        <service id="Shopware\Core\Checkout\Order\Api\OrderTransactionActionController" public="true">
-            <argument type="service" id="order_transaction.repository"/>
-            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
-            <call method="setContainer">
-                <argument type="service" id="service_container" />
-            </call>
-        </service>
-
         <service id="Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStateHandler">
-            <argument type="service" id="order_transaction.repository"/>
             <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
+        </service>
+
+        <!-- controller -->
+        <service id="Shopware\Core\Checkout\Order\Api\OrderActionController" public="true">
+            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="mail_template.repository"/>
+            <argument type="service" id="document.repository"/>
+            <argument type="service" id="Shopware\Core\Content\MailTemplate\Service\MailService"/>
+            <argument type="service" id="Shopware\Core\Checkout\Document\DocumentService"/>
+            <argument type="service" id="Shopware\Core\Framework\Api\Converter\ApiVersionConverter"/>
+            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineDefinition"/>
+            <call method="setContainer">
+                <argument type="service" id="service_container"/>
+            </call>
+        </service>
+
+        <!-- events -->
+        <service id="Shopware\Core\Checkout\Order\Listener\OrderStateChangeEventListener">
+            <argument type="service" id="order.repository"/>
+            <argument type="service" id="order_transaction.repository"/>
+            <argument type="service" id="order_delivery.repository"/>
+            <argument type="service" id="event_dispatcher"/>
+            <tag name="kernel.event_listener" event="state_machine.order.state_changed" method="onOrderStateChange"/>
+            <tag name="kernel.event_listener" event="state_machine.order_delivery.state_changed" method="onOrderDeliveryStateChange"/>
+            <tag name="kernel.event_listener" event="state_machine.order_transaction.state_changed" method="onOrderTransactionStateChange"/>
         </service>
     </services>
 </container>

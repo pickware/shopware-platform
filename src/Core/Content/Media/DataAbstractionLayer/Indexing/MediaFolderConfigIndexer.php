@@ -5,10 +5,10 @@ namespace Shopware\Core\Content\Media\DataAbstractionLayer\Indexing;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderDefinition;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderEntity;
-use Shopware\Core\Content\Media\Aggregate\MediaFolderConfiguration\MediaFolderConfigurationCollection;
-use Shopware\Core\Content\Media\Aggregate\MediaFolderConfigurationMediaThumbnailSize\MediaFolderConfigurationMediaThumbnailSizeDefinition;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
+use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
@@ -19,7 +19,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 
 class MediaFolderConfigIndexer implements IndexerInterface
 {
@@ -39,52 +38,80 @@ class MediaFolderConfigIndexer implements IndexerInterface
     private $cacheKeyGenerator;
 
     /**
-     * @var TagAwareAdapter
+     * @var CacheClearer
      */
     private $cache;
 
     /**
-     * @var EntityRepositoryInterface
+     * @var IteratorFactory
      */
-    private $folderConfigRepository;
+    private $iteratorFactory;
 
     public function __construct(
         Connection $connection,
+        IteratorFactory $iteratorFactory,
         EntityRepositoryInterface $folderRepository,
-        EntityRepositoryInterface $folderConfigRepository,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapter $cache
+        CacheClearer $cache
     ) {
         $this->connection = $connection;
         $this->folderRepository = $folderRepository;
-        $this->folderConfigRepository = $folderConfigRepository;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
         $this->cache = $cache;
+        $this->iteratorFactory = $iteratorFactory;
     }
 
     public function index(\DateTimeInterface $timestamp): void
     {
         $context = Context::createDefaultContext();
 
-        /** @var MediaFolderEntity $folder */
-        foreach ($this->fetchFoldersWithOwnConfig($context) as $folder) {
-            $this->updateChildren($folder->getId(), $folder->getConfigurationId(), $context);
-        }
+        $iterator = $this->iteratorFactory->createIterator($this->folderRepository->getDefinition());
+        $iterator->getQuery()->andWhere('use_parent_configuration = :useParent')
+            ->setParameter('useParent', false);
 
-        $this->updateSizesRoField(null, $context);
+        while ($ids = $iterator->fetch()) {
+            $folders = $this->folderRepository->search(new Criteria($ids), $context);
+
+            foreach ($folders as $folder) {
+                $this->updateChildren($folder->getId(), $folder->getConfigurationId(), $context);
+            }
+        }
     }
 
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $entityWrittenEvent = $event->getEventByDefinition(MediaFolderDefinition::class);
+        $entityWrittenEvent = $event->getEventByEntityName(MediaFolderDefinition::ENTITY_NAME);
         if ($entityWrittenEvent) {
             $this->updateConfigOnRefresh($entityWrittenEvent);
         }
+    }
 
-        if ($sizesEvent = $event->getEventByDefinition(MediaFolderConfigurationMediaThumbnailSizeDefinition::class)) {
-            $configIds = array_column($sizesEvent->getIds(), 'media_folder_configuration_id');
-            $this->updateSizesRoField($configIds, $event->getContext());
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+
+        $iterator = $this->iteratorFactory->createIterator($this->folderRepository->getDefinition(), $lastId);
+        $iterator->getQuery()
+            ->andWhere('use_parent_configuration = :useParent')
+            ->setParameter('useParent', false);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            return null;
         }
+
+        $folders = $this->folderRepository->search(new Criteria($ids), $context);
+
+        foreach ($folders as $folder) {
+            $this->updateChildren($folder->getId(), $folder->getConfigurationId(), $context);
+        }
+
+        return $iterator->getOffset();
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.MediaFolderConfigIndexer';
     }
 
     private function updateConfigOnRefresh(EntityWrittenEvent $event): void
@@ -92,7 +119,9 @@ class MediaFolderConfigIndexer implements IndexerInterface
         foreach ($event->getPayloads() as $update) {
             if (!(array_key_exists('parentId', $update) && $update['parentId'] !== null) && !array_key_exists('configurationId', $update)) {
                 continue;
-            } elseif (array_key_exists('parentId', $update) && !array_key_exists('configurationId', $update)) {
+            }
+
+            if (array_key_exists('parentId', $update) && !array_key_exists('configurationId', $update)) {
                 $folders = $this->folderRepository->search(new Criteria([$update['id'], $update['parentId']]), $event->getContext());
                 $child = $folders->get($update['id']);
                 $parent = $folders->get($update['parentId']);
@@ -102,9 +131,11 @@ class MediaFolderConfigIndexer implements IndexerInterface
                 }
 
                 $this->updateSelfAndChildren($update['id'], $parent->getConfigurationId(), $event->getContext());
-            } else {
-                $this->updateChildren($update['id'], $update['configurationId'], $event->getContext());
+
+                continue;
             }
+
+            $this->updateChildren($update['id'], $update['configurationId'], $event->getContext());
         }
     }
 
@@ -169,42 +200,5 @@ class MediaFolderConfigIndexer implements IndexerInterface
         }, $ids);
 
         $this->cache->invalidateTags($tags);
-    }
-
-    private function fetchFoldersWithOwnConfig(Context $context): EntityCollection
-    {
-        $criteria = new Criteria();
-        $criteria->addFilter(new EqualsFilter('media_folder.useParentConfiguration', false));
-
-        return $this->folderRepository->search($criteria, $context)->getEntities();
-    }
-
-    private function updateSizesRoField(?array $configIds, Context $context): void
-    {
-        $criteria = new Criteria();
-        $criteria->addAssociation('mediaThumbnailSizes');
-
-        if ($configIds !== null) {
-            $criteria->setIds($configIds);
-        }
-
-        $cacheIds = [];
-
-        /** @var MediaFolderConfigurationCollection $configs */
-        $configs = $this->folderConfigRepository->search($criteria, $context);
-        foreach ($configs as $config) {
-            $cacheIds[] = $this->cacheKeyGenerator
-                ->getEntityTag($config->getId(), $this->folderConfigRepository->getDefinition());
-
-            $this->connection->update(
-                $this->folderConfigRepository->getDefinition()->getEntityName(),
-                ['media_thumbnail_sizes_ro' => serialize($config->getMediaThumbnailSizes())],
-                ['id' => Uuid::fromHexToBytes($config->getId())]
-            );
-        }
-
-        if (count($cacheIds)) {
-            $this->cache->invalidateTags($cacheIds);
-        }
     }
 }

@@ -10,6 +10,7 @@ use Shopware\Core\Framework\Test\TestCaseBase\AdminFunctionalTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\PlatformRequest;
 use Symfony\Component\HttpFoundation\Response;
+use function Flag\next3722;
 
 class AuthControllerTest extends TestCase
 {
@@ -167,6 +168,7 @@ class AuthControllerTest extends TestCase
             'password' => password_hash($password, PASSWORD_BCRYPT),
             'locale_id' => Uuid::fromHexToBytes($this->getLocaleIdOfSystemLanguage()),
             'active' => 1,
+            'admin' => 1,
             'created_at' => (new \DateTime())->format(Defaults::STORAGE_DATE_TIME_FORMAT),
         ]);
 
@@ -236,6 +238,9 @@ class AuthControllerTest extends TestCase
 
     public function testIntegrationAuth(): void
     {
+        if (next3722()) {
+            static::markTestSkipped('Reactivate if Integrations can have their own acls');
+        }
         $client = $this->getBrowser();
         $client->setServerParameters([
             'CONTENT_TYPE' => 'application/json',

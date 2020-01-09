@@ -2,22 +2,30 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Write;
 
+use Shopware\Core\Framework\DataAbstractionLayer\EntityWriteResult;
+
 class DeleteResult
 {
     /**
-     * @var array
+     * @var EntityWriteResult[]
      */
     private $deleted;
 
     /**
-     * @var array
+     * @var EntityWriteResult[]
      */
     private $notFound;
 
-    public function __construct(array $deleted, array $notFound = [])
+    /**
+     * @var EntityWriteResult[]
+     */
+    private $updated = [];
+
+    public function __construct(array $deleted, array $notFound = [], array $updated = [])
     {
         $this->deleted = $deleted;
         $this->notFound = $notFound;
+        $this->updated = $updated;
     }
 
     public function getDeleted(): array
@@ -28,5 +36,15 @@ class DeleteResult
     public function getNotFound(): array
     {
         return $this->notFound;
+    }
+
+    public function addUpdated(array $updated): void
+    {
+        $this->updated = array_merge_recursive($this->updated, $updated);
+    }
+
+    public function getUpdated(): array
+    {
+        return $this->updated;
     }
 }

@@ -17,14 +17,13 @@ learn creating a plugin at first.
 ## Injecting into the administration
 
 The main entry point to extend the administration via plugin is the `main.js` file.
-It has to be placed into a `<plugin root>/src/Resources/admininistration` directory in order to be found by Shopware 6.
-*Note: This path can be changed by overriding the [getAdministrationEntryPath](./../2-internals/4-plugins/020-plugin-base-class.md#getAdministrationEntryPath) method of your plugin's base class.*
+It has to be placed into a `<plugin root>/src/Resources/app/administration/src` directory in order to be found by Shopware 6.
 
 ## Creating a new module
 
 Every module in the Shopware 6 core can be found in the `module` directory relative to the administration source directory.
 We recommend to copy this structure, so everybody being used to Shopware 6 core code will automatically get the hang of it as well.
-The path in your plugin would be: `<plugin root>/src/Resources/administration/module`
+The path in your plugin would be: `<plugin root>/src/Resources/app/administration/src/module`
 
 Inside of this `module` directory in the core code, you find a list of all available modules. Stick to that and
 create a new directory for each module of your plugin. In this case it is just one, so create a new directory
@@ -41,18 +40,10 @@ Your custom module's `index.js` will already be considered, so go ahead and open
 
 ### index.js
 
-First of all, you have to register your module using the `ModuleFactory`, which is available throughout our third party wrapper.
+First of all, you have to register your module using the `ModuleFactory`, which is available throughout our third party wrapper. This `Module` provides a method `register`, which expects a name and a configuration for your module.
 
 ```js
-import { Module } from 'src/core/shopware';
-```
-
-This `Module` provides a method `register`, which expects a name and a configuration for your module.
-
-```js
-import { Module } from 'src/core/shopware';
-
-Module.register('custom-module', {
+Shopware.Module.register('custom-module', {
     // Configuration here
 });
 ```
@@ -62,13 +53,15 @@ Also, the property `type` should have the value `plugin`. This can be used e.g. 
 
 Additional to those basic meta information, each module comes with a custom color and a custom icon.
 Those will be used in the whole module and all components related to it, even in the title of your browser's tab.
-A list of all available icons can be found [here](https://component-library.shopware.com/#/icons/).
+A list of all available icons can be found [here](https://component-library.shopware.com/icons/).
 
 ```js
-import { Module } from 'src/core/shopware';
 import './page/custom-module-overview';
 
-Module.register('custom-module', {
+import deDE from './snippet/de-DE.json';
+import enGB from './snippet/en-GB.json';
+
+Shopware.Module.register('custom-module', {
     type: 'plugin',
     name: 'Custom',
     title: 'Custom module',
@@ -81,9 +74,25 @@ Module.register('custom-module', {
 You've registered your module, but neither does it have a navigation entry, nor does it have any routes
 to open, once your navigation item is clicked.
 
+### Snippets
+
+First thing to do is registering new snippets. It is recommended to release plugins with snippets for multiple languages
+included, to either provide snippet translations or at least make them possible. You may already have noticed the import
+statements for `deDE` or `enGB` in the example above. These are your files, which only have to be registered as snippets
+in order to work properly. This can be achieved by putting the following snippets right below the first block of information
+and register those files to their designated locale code:
+
+```js
+snippets: {
+    'de-DE': deDE,
+    'en-GB': enGB
+},
+```
+
+
 ### Routes
 
-Let's start with the routes, because a navigation entry will need a route to link to.
+In order to get the navigation working, every navigation entry needs an individual route to link to.
 
 A module's routes are defined using the `routes` property, which expects an object containing multiple route configuration objects.
 Each route is defined by its name, which is set using the configuration object's key, a component to link to and a path.
@@ -118,10 +127,9 @@ In order to create a navigation entry, you have to provide a navigation configur
 It expects an array of navigation configuration objects.
 
 ```js
-import { Module } from 'src/core/shopware';
 import './page/custom-module-overview';
 
-Module.register('custom-module', {
+Shopware.Module.register('custom-module', {
     
     // Module configuration
     ...
@@ -153,15 +161,21 @@ navigation: [{
 
 This is how your module should look like now:
 ```js
-import { Module } from 'src/core/shopware';
+import deDE from './snippet/de-DE.json';
+import enGB from './snippet/en-GB.json';
 
-Module.register('custom-module', {
+Shopware.Module.register('custom-module', {
     type: 'plugin',
     name: 'Custom',
     title: 'Custom module',
     description: 'Description for your custom module',
     color: '#62ff80',
     icon: 'default-object-lab-flask',
+
+    snippets: {
+        'de-DE': deDE,
+        'en-GB': enGB
+    },
 
     routes: {
         overview: {

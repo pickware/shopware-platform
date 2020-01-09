@@ -27,61 +27,58 @@ class DeleteTest extends TestCase
     {
         $this->writer = $this->getContainer()->get(EntityWriter::class);
 
-        $this->getContainer()->set(DeleteCascadeParentDefinition::class, new DeleteCascadeParentDefinition());
-        $this->getContainer()->set(DeleteCascadeManyToOneDefinition::class, new DeleteCascadeManyToOneDefinition());
-        $this->getContainer()->set(DeleteCascadeChildDefinition::class, new DeleteCascadeChildDefinition());
-
         $registry = $this->getContainer()->get(DefinitionInstanceRegistry::class);
-        $this->getContainer()->get(DeleteCascadeParentDefinition::class)->compile($registry);
-        $this->getContainer()->get(DeleteCascadeManyToOneDefinition::class)->compile($registry);
-        $this->getContainer()->get(DeleteCascadeChildDefinition::class)->compile($registry);
 
-        $this->getContainer()->get(Connection::class)->executeUpdate('
-DROP TABLE IF EXISTS delete_cascade_child;
-DROP TABLE IF EXISTS delete_cascade_parent;
-DROP TABLE IF EXISTS delete_cascade_many_to_one;
+        $registry->register(new DeleteCascadeParentDefinition());
+        $registry->register(new DeleteCascadeManyToOneDefinition());
+        $registry->register(new DeleteCascadeChildDefinition());
 
-CREATE TABLE `delete_cascade_parent` (
-  `id` binary(16) NOT NULL,
-  `delete_cascade_many_to_one_id` binary(16) NOT NULL,
-  `name` varchar(255) NOT NULL,
-  `version_id` binary(16) NOT NULL,
-  `created_at` DATETIME(3) NOT NULL,
-  `updated_at` DATETIME(3) NULL,
-  PRIMARY KEY `primary` (`id`, `version_id`)
-);
-
-CREATE TABLE `delete_cascade_child` (
-  `id` binary(16) NOT NULL,
-  `delete_cascade_parent_id` binary(16) NOT NULL,
-  `delete_cascade_parent_version_id` binary(16) NOT NULL,
-  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `created_at` DATETIME(3) NOT NULL,
-  `updated_at` DATETIME(3) NULL,
-  KEY `delete_cascade_parent_id` (`delete_cascade_parent_id`,`delete_cascade_parent_version_id`),
-  CONSTRAINT `delete_cascade_child_ibfk_1` FOREIGN KEY (`delete_cascade_parent_id`, `delete_cascade_parent_version_id`) REFERENCES `delete_cascade_parent` (`id`, `version_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE `delete_cascade_many_to_one` (
-  `id` binary(16) NOT NULL,
-  `name` varchar(255) NOT NULL,
-  `created_at` DATETIME(3) NOT NULL,
-  `updated_at` DATETIME(3) NULL,
-  PRIMARY KEY `primary` (`id`)
-);
-
-ALTER TABLE `delete_cascade_parent`
-ADD FOREIGN KEY (`delete_cascade_many_to_one_id`) REFERENCES `delete_cascade_many_to_one` (`id`) ON DELETE CASCADE;
-
-        ');
+        $this->getContainer()->get(Connection::class)->executeUpdate(
+            'DROP TABLE IF EXISTS delete_cascade_child;
+             DROP TABLE IF EXISTS delete_cascade_parent;
+             DROP TABLE IF EXISTS delete_cascade_many_to_one;
+             
+             CREATE TABLE `delete_cascade_parent` (
+               `id` binary(16) NOT NULL,
+               `delete_cascade_many_to_one_id` binary(16) NOT NULL,
+               `name` varchar(255) NOT NULL,
+               `version_id` binary(16) NOT NULL,
+               `created_at` DATETIME(3) NOT NULL,
+               `updated_at` DATETIME(3) NULL,
+               PRIMARY KEY `primary` (`id`, `version_id`)
+             );
+             
+             CREATE TABLE `delete_cascade_child` (
+               `id` binary(16) NOT NULL,
+               `delete_cascade_parent_id` binary(16) NOT NULL,
+               `delete_cascade_parent_version_id` binary(16) NOT NULL,
+               `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+               `created_at` DATETIME(3) NOT NULL,
+               `updated_at` DATETIME(3) NULL,
+               KEY `delete_cascade_parent_id` (`delete_cascade_parent_id`,`delete_cascade_parent_version_id`),
+               CONSTRAINT `delete_cascade_child_ibfk_1` FOREIGN KEY (`delete_cascade_parent_id`, `delete_cascade_parent_version_id`)
+                   REFERENCES `delete_cascade_parent` (`id`, `version_id`) ON DELETE CASCADE
+             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+             
+             CREATE TABLE `delete_cascade_many_to_one` (
+               `id` binary(16) NOT NULL,
+               `name` varchar(255) NOT NULL,
+               `created_at` DATETIME(3) NOT NULL,
+               `updated_at` DATETIME(3) NULL,
+               PRIMARY KEY `primary` (`id`)
+             );
+             
+             ALTER TABLE `delete_cascade_parent`
+             ADD FOREIGN KEY (`delete_cascade_many_to_one_id`) REFERENCES `delete_cascade_many_to_one` (`id`) ON DELETE CASCADE;'
+        );
     }
 
     public function tearDown(): void
     {
-        $this->getContainer()->get(Connection::class)->exec('
-            DROP TABLE IF EXISTS delete_cascade_child;
-            DROP TABLE IF EXISTS delete_cascade_parent;
-            DROP TABLE IF EXISTS delete_cascade_many_to_one;'
+        $this->getContainer()->get(Connection::class)->exec(
+            'DROP TABLE IF EXISTS delete_cascade_child;
+             DROP TABLE IF EXISTS delete_cascade_parent;
+             DROP TABLE IF EXISTS delete_cascade_many_to_one;'
         );
     }
 

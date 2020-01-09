@@ -54,9 +54,9 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
             ['REQUEST_URI' => $request->attributes->get(RequestTransformer::SALES_CHANNEL_RESOLVED_URI)]
         );
 
-        $clone = $request->duplicate(null, null, null, null, null, $server);
+        $localClone = $request->duplicate(null, null, null, null, null, $server);
 
-        return $this->decorated->matchRequest($clone);
+        return $this->decorated->matchRequest($localClone);
     }
 
     public function setContext(RequestContext $context)
@@ -78,7 +78,7 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
     {
         $basePath = $this->getBasePath();
         if ($referenceType === self::PATH_INFO) {
-            $route = $this->decorated->generate($name);
+            $route = $this->decorated->generate($name, $parameters, self::ABSOLUTE_PATH);
 
             return $this->removePrefix($route, $basePath);
         }
@@ -101,14 +101,15 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
                 $schemaAuthority = $schema . '//' . $this->getContext()->getHost();
 
                 if ($this->getContext()->getHttpPort() !== 80) {
-                    $schemaAuthority = $schemaAuthority . ':' . $this->getContext()->getHttpPort();
+                    $schemaAuthority .= ':' . $this->getContext()->getHttpPort();
                 } elseif ($this->getContext()->getHttpsPort() !== 443) {
-                    $schemaAuthority = $schemaAuthority . ':' . $this->getContext()->getHttpsPort();
+                    $schemaAuthority .= ':' . $this->getContext()->getHttpsPort();
                 }
                 $generated = $this->decorated->generate($name, $parameters);
                 $pathInfo = $this->removePrefix($generated, $basePath);
 
                 $rewrite = $schemaAuthority . rtrim($basePath, '/') . rtrim($salesChannelBaseUrl, '/') . $pathInfo;
+
                 break;
 
             case self::RELATIVE_PATH:
@@ -121,6 +122,7 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
                 // url contains the base path and the base url
                     // base url /shopware/public/de
                 $rewrite = ltrim($salesChannelBaseUrl, '/') . $generated;
+
                 break;
 
             case self::ABSOLUTE_PATH:
@@ -131,6 +133,7 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
                 );
 
                 $rewrite = $basePath . rtrim($salesChannelBaseUrl, '/') . $generated;
+
                 break;
         }
 
@@ -144,11 +147,11 @@ class Router implements RouterInterface, RequestMatcherInterface, WarmableInterf
 
     private function removePrefix(string $subject, string $prefix): string
     {
-        if (!$prefix || strpos($subject, $prefix) !== 0) {
+        if (!$prefix || mb_strpos($subject, $prefix) !== 0) {
             return $subject;
         }
 
-        return substr($subject, strlen($prefix));
+        return mb_substr($subject, mb_strlen($prefix));
     }
 
     private function getSalesChannelBaseUrl(): string

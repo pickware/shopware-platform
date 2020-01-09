@@ -14,7 +14,9 @@ class UserValidationServiceTest extends TestCase
     use IntegrationTestBehaviour;
 
     private $userRepository;
+
     private $localeRepository;
+
     private $userValidationService;
 
     public function setUp(): void
@@ -29,8 +31,8 @@ class UserValidationServiceTest extends TestCase
         $userId = Uuid::randomHex();
 
         $context = Context::createDefaultContext();
-        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getData();
-        $firstLocale = array_pop($localeIds)['id'];
+        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getIds();
+        $firstLocale = array_pop($localeIds);
 
         $this->userRepository->create([
             [
@@ -54,8 +56,9 @@ class UserValidationServiceTest extends TestCase
         $userId = Uuid::randomHex();
 
         $context = Context::createDefaultContext();
-        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getData();
-        $firstLocale = array_pop($localeIds)['id'];
+        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getIds();
+
+        $firstLocale = array_pop($localeIds);
 
         $this->userRepository->create([
             [
@@ -78,8 +81,8 @@ class UserValidationServiceTest extends TestCase
         $userId = Uuid::randomHex();
 
         $context = Context::createDefaultContext();
-        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getData();
-        $firstLocale = array_pop($localeIds)['id'];
+        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getIds();
+        $firstLocale = array_pop($localeIds);
 
         $this->userRepository->create([
             [
@@ -103,8 +106,8 @@ class UserValidationServiceTest extends TestCase
         $userId = Uuid::randomHex();
 
         $context = Context::createDefaultContext();
-        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getData();
-        $firstLocale = array_pop($localeIds)['id'];
+        $localeIds = $this->localeRepository->searchIds(new Criteria(), $context)->getIds();
+        $firstLocale = array_pop($localeIds);
 
         $this->userRepository->create([
             [

@@ -8,10 +8,10 @@ use Shopware\Core\Content\Media\MediaDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Content\Rule\RuleDefinition;
 use Shopware\Core\Framework\Api\Exception\UnsupportedEncoderInputException;
-use Shopware\Core\Framework\Api\Serializer\JsonApiEncoder;
 use Shopware\Core\Framework\Api\Serializer\JsonEntityEncoder;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Test\Api\Serializer\fixtures\SerializationFixture;
 use Shopware\Core\Framework\Test\Api\Serializer\fixtures\TestBasicStruct;
 use Shopware\Core\Framework\Test\Api\Serializer\fixtures\TestBasicWithExtension;
@@ -34,16 +34,6 @@ class JsonSalesChannelEntityEncoderTest extends TestCase
     use KernelTestBehaviour;
     use DataAbstractionLayerFieldTestBehaviour;
 
-    /**
-     * @var JsonApiEncoder
-     */
-    private $encoder;
-
-    protected function setUp(): void
-    {
-        $this->encoder = new JsonEntityEncoder($this->getContainer()->get('serializer'));
-    }
-
     public function emptyInputProvider(): array
     {
         return [
@@ -63,28 +53,32 @@ class JsonSalesChannelEntityEncoderTest extends TestCase
     {
         $this->expectException(UnsupportedEncoderInputException::class);
 
-        $this->encoder->encode($this->getContainer()->get(ProductDefinition::class), $input, SerializationFixture::SALES_CHANNEL_API_BASE_URL);
+        $encoder = $this->getContainer()->get(JsonEntityEncoder::class);
+        $encoder->encode(new Criteria(), $this->getContainer()->get(ProductDefinition::class), $input, SerializationFixture::SALES_CHANNEL_API_BASE_URL, SerializationFixture::API_VERSION);
     }
 
     public function complexStructsProvider(): array
     {
         return [
-            [$this->getContainer()->get(MediaDefinition::class), new TestBasicStruct()],
-            [$this->getContainer()->get(UserDefinition::class), new TestBasicWithToManyRelationships()],
-            [$this->getContainer()->get(MediaDefinition::class), new TestBasicWithToOneRelationship()],
-            [$this->getContainer()->get(MediaFolderDefinition::class), new TestCollectionWithSelfReference()],
-            [$this->getContainer()->get(MediaDefinition::class), new TestCollectionWithToOneRelationship()],
-            [$this->getContainer()->get(RuleDefinition::class), new TestInternalFieldsAreFiltered()],
-            [$this->getContainer()->get(UserDefinition::class), new TestMainResourceShouldNotBeInIncluded()],
+            [MediaDefinition::class, new TestBasicStruct()],
+            [UserDefinition::class, new TestBasicWithToManyRelationships()],
+            [MediaDefinition::class, new TestBasicWithToOneRelationship()],
+            [MediaFolderDefinition::class, new TestCollectionWithSelfReference()],
+            [MediaDefinition::class, new TestCollectionWithToOneRelationship()],
+            [RuleDefinition::class, new TestInternalFieldsAreFiltered()],
+            [UserDefinition::class, new TestMainResourceShouldNotBeInIncluded()],
         ];
     }
 
     /**
      * @dataProvider complexStructsProvider
      */
-    public function testEncodeComplexStructs(EntityDefinition $definition, SerializationFixture $fixture): void
+    public function testEncodeComplexStructs(string $definitionClass, SerializationFixture $fixture): void
     {
-        $actual = $this->encoder->encode($definition, $fixture->getInput(), SerializationFixture::SALES_CHANNEL_API_BASE_URL);
+        /** @var EntityDefinition $definition */
+        $definition = $this->getContainer()->get($definitionClass);
+        $encoder = $this->getContainer()->get(JsonEntityEncoder::class);
+        $actual = $encoder->encode(new Criteria(), $definition, $fixture->getInput(), SerializationFixture::SALES_CHANNEL_API_BASE_URL, SerializationFixture::API_VERSION);
 
         static::assertEquals($fixture->getSalesChannelJsonFixtures(), $actual);
     }
@@ -103,7 +97,27 @@ class JsonSalesChannelEntityEncoderTest extends TestCase
         $extendableDefinition->compile($this->getContainer()->get(DefinitionInstanceRegistry::class));
         $fixture = new TestBasicWithExtension();
 
-        $actual = $this->encoder->encode($extendableDefinition, $fixture->getInput(), SerializationFixture::SALES_CHANNEL_API_BASE_URL);
+        $encoder = $this->getContainer()->get(JsonEntityEncoder::class);
+        $actual = $encoder->encode(new Criteria(), $extendableDefinition, $fixture->getInput(), SerializationFixture::SALES_CHANNEL_API_BASE_URL, SerializationFixture::API_VERSION);
+
+        static::assertEquals($fixture->getSalesChannelJsonFixtures(), $actual);
+    }
+
+    /**
+     * Not possible with dataprovider
+     * as we have to manipulate the container, but the dataprovider run before all tests
+     */
+    public function testEncodeStructWithToManyExtension(): void
+    {
+        $this->registerDefinition(ExtendableDefinition::class, ExtendedDefinition::class);
+        $extendableDefinition = new ExtendableDefinition();
+        $extendableDefinition->addExtension(new AssociationExtension());
+
+        $extendableDefinition->compile($this->getContainer()->get(DefinitionInstanceRegistry::class));
+        $fixture = new TestBasicWithExtension();
+
+        $encoder = $this->getContainer()->get(JsonEntityEncoder::class);
+        $actual = $encoder->encode(new Criteria(), $extendableDefinition, $fixture->getInput(), SerializationFixture::SALES_CHANNEL_API_BASE_URL, SerializationFixture::API_VERSION);
 
         static::assertEquals($fixture->getSalesChannelJsonFixtures(), $actual);
     }

@@ -3,6 +3,7 @@
 namespace Shopware\Core\Framework;
 
 use Composer\Autoload\ClassLoader;
+use Shopware\Core\Framework\Parameter\AdditionalBundleParameters;
 use Shopware\Core\Framework\Plugin\Context\ActivateContext;
 use Shopware\Core\Framework\Plugin\Context\DeactivateContext;
 use Shopware\Core\Framework\Plugin\Context\InstallContext;
@@ -22,10 +23,15 @@ abstract class Plugin extends Bundle
      */
     private $basePath;
 
-    final public function __construct(bool $active, string $basePath)
+    final public function __construct(bool $active, string $basePath, ?string $projectDir = null)
     {
         $this->active = $active;
         $this->basePath = $basePath;
+
+        if ($projectDir && mb_strpos($this->basePath, '/') !== 0) {
+            $this->basePath = $projectDir . '/' . $this->basePath;
+        }
+
         $this->path = $this->computePluginClassPath();
     }
 
@@ -72,9 +78,19 @@ abstract class Plugin extends Bundle
     }
 
     /**
+     * @deprecated tag:v6.3.0 Use self::getAdditionalBundles instead
+     *
      * @return Bundle[]
      */
     public function getExtraBundles(ClassLoader $classLoader): array
+    {
+        return [];
+    }
+
+    /**
+     * @return Bundle[]
+     */
+    public function getAdditionalBundles(AdditionalBundleParameters $parameters): array
     {
         return [];
     }

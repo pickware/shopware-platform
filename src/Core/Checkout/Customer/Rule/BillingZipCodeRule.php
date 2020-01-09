@@ -45,13 +45,13 @@ class BillingZipCodeRule extends Rule
 
         switch ($this->operator) {
             case self::OPERATOR_EQ:
-                return \in_array(strtolower($zipCode), $this->zipCodes, true);
+                return \in_array(mb_strtolower($zipCode), $this->zipCodes, true);
 
             case self::OPERATOR_NEQ:
-                return !\in_array(strtolower($zipCode), $this->zipCodes, true);
+                return !\in_array(mb_strtolower($zipCode), $this->zipCodes, true);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -59,7 +59,7 @@ class BillingZipCodeRule extends Rule
     {
         return [
             'zipCodes' => [new NotBlank(), new ArrayOfType('string')],
-            'operator' => [new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
         ];
     }
 

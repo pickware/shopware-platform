@@ -4,6 +4,7 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing\Indexer;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
@@ -18,7 +19,6 @@ use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class ChildCountIndexer implements IndexerInterface
@@ -44,9 +44,10 @@ class ChildCountIndexer implements IndexerInterface
     private $cacheKeyGenerator;
 
     /**
-     * @var TagAwareAdapter
+     * @var CacheClearer
      */
     private $cache;
+
     /**
      * @var IteratorFactory
      */
@@ -57,7 +58,7 @@ class ChildCountIndexer implements IndexerInterface
         EventDispatcherInterface $eventDispatcher,
         DefinitionInstanceRegistry $definitionRegistry,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapter $cache,
+        CacheClearer $cache,
         IteratorFactory $iteratorFactory
     ) {
         $this->connection = $connection;
@@ -101,16 +102,66 @@ class ChildCountIndexer implements IndexerInterface
         }
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+
+        $dataOffset = null;
+        $definitionOffset = 0;
+
+        if ($lastId) {
+            $dataOffset = $lastId['dataOffset'];
+            $definitionOffset = $lastId['definitionOffset'];
+        }
+
+        $definitions = array_values(array_filter(
+            $this->definitionRegistry->getDefinitions(),
+            function (EntityDefinition $definition) {
+                return $definition->isChildrenAware() && $definition->isChildCountAware();
+            }
+        ));
+
+        if (!isset($definitions[$definitionOffset])) {
+            return null;
+        }
+
+        $definition = $definitions[$definitionOffset];
+
+        $iterator = $this->iteratorFactory->createIterator($definition, $dataOffset);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            ++$definitionOffset;
+
+            return [
+                'dataOffset' => null,
+                'definitionOffset' => $definitionOffset,
+            ];
+        }
+
+        $this->updateChildCount($definition, $ids, $definition->isVersionAware(), $context);
+
+        return [
+            'dataOffset' => $iterator->getOffset(),
+            'definitionOffset' => $definitionOffset,
+        ];
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
         /** @var EntityWrittenEvent $nested */
         foreach ($event->getEvents() as $nested) {
-            $definition = $nested->getDefinition();
+            $definition = $this->definitionRegistry->getByEntityName($nested->getEntityName());
 
             if ($definition->isChildrenAware() && $definition->isChildCountAware()) {
                 $this->update($nested, $nested->getIds(), $nested->getContext());
             }
         }
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.ChildCountIndexer';
     }
 
     private function update(EntityWrittenEvent $event, array $ids, Context $context): void
@@ -123,12 +174,13 @@ class ChildCountIndexer implements IndexerInterface
             return Uuid::fromBytesToHex($existence->getState()['parent_id']);
         }, $event->getExistences());
 
-        $entityName = $event->getDefinition()->getEntityName();
+        $entityName = $event->getEntityName();
+        $definition = $this->definitionRegistry->getByEntityName($entityName);
 
-        $parentIds = $this->fetchParentIds($entityName, $ids, $event->getDefinition()->isVersionAware(), $context);
+        $parentIds = $this->fetchParentIds($entityName, $ids, $definition->isVersionAware(), $context);
         $parentIds = array_keys(array_flip(array_filter(array_merge($entityParents, $parentIds))));
 
-        $this->updateChildCount($event->getDefinition(), $parentIds, $event->getDefinition()->isVersionAware(), $context);
+        $this->updateChildCount($definition, $parentIds, $definition->isVersionAware(), $context);
     }
 
     private function updateChildCount(EntityDefinition $definition, array $parentIds, bool $versionAware, Context $context): void

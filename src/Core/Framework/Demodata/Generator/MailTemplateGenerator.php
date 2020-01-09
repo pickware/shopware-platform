@@ -55,9 +55,8 @@ class MailTemplateGenerator implements DemodataGeneratorInterface
 
     private function createMailTemplate(
         DemodataContext $context,
-        $count = 500
+        int $count = 500
     ): void {
-        $mediaFolderId = null;
         $context->getConsole()->progressStart($count);
 
         $criteria = new Criteria();
@@ -66,10 +65,8 @@ class MailTemplateGenerator implements DemodataGeneratorInterface
         $mailTypeIds = $this->mailTemplateTypeRepository->search($criteria, $context->getContext())->getIds();
 
         $payload = [];
-        foreach ($mailTypeIds as $mailTypeId => $id) {
-            $mailTemplate = $this->createSimpleMailTemplate($context, $mailTypeId);
-
-            $payload[] = $mailTemplate;
+        foreach ($mailTypeIds as $mailTypeId => $_id) {
+            $payload[] = $this->createSimpleMailTemplate($context, $mailTypeId);
 
             if (\count($payload) >= 10) {
                 $context->getConsole()->progressAdvance(\count($payload));
@@ -98,7 +95,7 @@ class MailTemplateGenerator implements DemodataGeneratorInterface
         $mailTemplate = [
             'id' => Uuid::randomHex(),
             'description' => $faker->text,
-            'isDefault' => false,
+            'isSystemDefault' => false,
             'senderName' => $faker->name(),
             'subject' => $faker->text(100),
             'contentHtml' => $this->generateRandomHTML(

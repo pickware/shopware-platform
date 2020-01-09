@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer;
 
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\ChangeSet;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
 
 /**
@@ -9,35 +10,56 @@ use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
  */
 class EntityWriteResult
 {
+    public const OPERATION_INSERT = 'insert';
+    public const OPERATION_UPDATE = 'update';
+    public const OPERATION_DELETE = 'delete';
+
     /**
      * @var array|string
      */
-    private $primaryKey;
+    protected $primaryKey;
 
     /**
      * @var array
      */
-    private $payload;
+    protected $payload;
 
     /**
      * @var EntityExistence|null
      */
-    private $existence;
+    protected $existence;
 
     /**
-     * @var EntityDefinition
+     * @var string
      */
-    private $definition;
+    protected $entityName;
+
+    /**
+     * @var string
+     */
+    protected $operation;
+
+    /**
+     * @var ChangeSet|null
+     */
+    protected $changeSet;
 
     /**
      * @param array|string $primaryKey
      */
-    public function __construct($primaryKey, array $payload, EntityDefinition $definition, ?EntityExistence $existence)
+    public function __construct($primaryKey, array $payload, string $entityName, string $operation, ?EntityExistence $existence = null, ?ChangeSet $changeSet = null)
     {
         $this->primaryKey = $primaryKey;
         $this->payload = $payload;
         $this->existence = $existence;
-        $this->definition = $definition;
+
+        $this->entityName = $entityName;
+        $this->operation = mb_strtolower($operation);
+
+        if (!in_array($this->operation, [self::OPERATION_DELETE, self::OPERATION_INSERT, self::OPERATION_UPDATE], true)) {
+            throw new \RuntimeException(sprintf('Unexpected write result operation %s', $operation));
+        }
+        $this->changeSet = $changeSet;
     }
 
     /**
@@ -58,8 +80,23 @@ class EntityWriteResult
         return $this->existence;
     }
 
-    public function getDefinition(): EntityDefinition
+    public function getEntityName(): string
     {
-        return $this->definition;
+        return $this->entityName;
+    }
+
+    public function getOperation(): string
+    {
+        return $this->operation;
+    }
+
+    public function getChangeSet(): ?ChangeSet
+    {
+        return $this->changeSet;
+    }
+
+    public function hasPayload(string $property): bool
+    {
+        return array_key_exists($property, $this->getPayload());
     }
 }

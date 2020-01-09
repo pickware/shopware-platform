@@ -4,7 +4,8 @@ namespace Shopware\Core\Checkout\Test\Cart\Promotion\Unit\Cart\Builder;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Shopware\Core\Checkout\Cart\LineItem\LineItem;
+use Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException;
+use Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException;
 use Shopware\Core\Checkout\Cart\Price\Struct\AbsolutePriceDefinition;
 use Shopware\Core\Checkout\Cart\Price\Struct\PercentagePriceDefinition;
 use Shopware\Core\Checkout\Cart\Rule\LineItemUnitPriceRule;
@@ -13,6 +14,7 @@ use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscountPrice\PromotionD
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscountPrice\PromotionDiscountPriceEntity;
 use Shopware\Core\Checkout\Promotion\Cart\PromotionItemBuilder;
 use Shopware\Core\Checkout\Promotion\Cart\PromotionProcessor;
+use Shopware\Core\Checkout\Promotion\Exception\UnknownPromotionDiscountTypeException;
 use Shopware\Core\Checkout\Promotion\PromotionEntity;
 use Shopware\Core\Content\Rule\RuleCollection;
 use Shopware\Core\Content\Rule\RuleEntity;
@@ -24,39 +26,41 @@ use Shopware\Core\System\SalesChannel\SalesChannelContext;
 
 class PromotionItemBuilderTest extends TestCase
 {
-    /** @var PromotionEntity */
-    private $promotion = null;
+    /**
+     * @var PromotionEntity
+     */
+    private $promotion;
 
-    /** @var MockObject */
-    private $salesChannelContext = null;
-
-    /** @var MockObject */
-    private $context = null;
+    /**
+     * @var MockObject
+     */
+    private $salesChannelContext;
 
     public function setUp(): void
     {
         $this->promotion = new PromotionEntity();
         $this->promotion->setId('PR-1');
         $this->promotion->setUseCodes(false);
+        $this->promotion->setUseSetGroups(false);
 
         $this->salesChannelContext = $this->getMockBuilder(SalesChannelContext::class)->disableOriginalConstructor()->getMock();
-        $this->context = $this->getMockBuilder(Context::class)->disableOriginalConstructor()->getMock();
-        $this->context->method('getCurrencyPrecision')->willReturn(3);
+        $context = $this->getMockBuilder(Context::class)->disableOriginalConstructor()->getMock();
+        $context->method('getCurrencyPrecision')->willReturn(3);
 
-        $this->salesChannelContext->method('getContext')->willReturn($this->context);
+        $this->salesChannelContext->method('getContext')->willReturn($context);
     }
 
     /**
      * This test verifies that the immutable LineItem Type from
      * the constructor is correctly used in the LineItem.
      *
-     * @test
      * @group promotions
      *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
+     * @throws InvalidPayloadException
+     * @throws InvalidQuantityException
+     * @throws UnknownPromotionDiscountTypeException
      */
-    public function testLineItemType()
+    public function testLineItemType(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -66,7 +70,7 @@ class PromotionItemBuilderTest extends TestCase
         $discount->setValue(50);
         $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, 1, 'C1');
 
         static::assertEquals(PromotionProcessor::LINE_ITEM_TYPE, $item->getType());
     }
@@ -78,13 +82,13 @@ class PromotionItemBuilderTest extends TestCase
      * id for the key, then we get duplicate key entries which leads to
      * errors like "line item not stackable".
      *
-     * @test
      * @group promotions
      *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
+     * @throws InvalidPayloadException
+     * @throws InvalidQuantityException
+     * @throws UnknownPromotionDiscountTypeException
      */
-    public function testLineItemKey()
+    public function testLineItemKey(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -94,9 +98,34 @@ class PromotionItemBuilderTest extends TestCase
         $discount->setValue(50);
         $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, 1, 'C1');
 
         static::assertEquals('D5', $item->getId());
+    }
+
+    /**
+     * This test verifies that our custom provided code is really
+     * used in our referenceId. This is because we cannot simply use the
+     * code from the promotion, because it might not be this one but one
+     * of its thousand individual codes...thus its provided as separate argument
+     *
+     * @group promotions
+     *
+     * @throws InvalidPayloadException
+     * @throws InvalidQuantityException
+     * @throws UnknownPromotionDiscountTypeException
+     */
+    public function testLineItemReferenceId(): void
+    {
+        $discount = new PromotionDiscountEntity();
+        $discount->setId('D5');
+        $discount->setType(PromotionDiscountEntity::TYPE_PERCENTAGE);
+        $discount->setValue(50);
+        $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
+
+        $item = (new PromotionItemBuilder())->buildDiscountLineItem('individual-123', $this->promotion, $discount, 1, 'C1');
+
+        static::assertEquals('individual-123', $item->getReferencedId());
     }
 
     /**
@@ -104,13 +133,13 @@ class PromotionItemBuilderTest extends TestCase
      * definition if our promotion is based on percentage values.
      * Also, we must not have a filter rule for this, if our eligible item ID list is empty.
      *
-     * @test
      * @group promotions
      *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
+     * @throws InvalidPayloadException
+     * @throws InvalidQuantityException
+     * @throws UnknownPromotionDiscountTypeException
      */
-    public function testPriceTypePercentage()
+    public function testPriceTypePercentage(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -121,8 +150,7 @@ class PromotionItemBuilderTest extends TestCase
         $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
 
         $precision = $this->salesChannelContext->getContext()->getCurrencyPrecision();
-
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, $precision, 'C1');
 
         $expectedPriceDefinition = new PercentagePriceDefinition(-10, $precision, null);
 
@@ -134,13 +162,13 @@ class PromotionItemBuilderTest extends TestCase
      * definition if our promotion is based on absolute values.
      * Also, we must not have a filter rule for this, if our eligible item ID list is empty.
      *
-     * @test
      * @group promotions
      *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
+     * @throws InvalidPayloadException
+     * @throws InvalidQuantityException
+     * @throws UnknownPromotionDiscountTypeException
      */
-    public function testPriceTypeAbsolute()
+    public function testPriceTypeAbsolute(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -152,8 +180,7 @@ class PromotionItemBuilderTest extends TestCase
 
         /** @var int $precision */
         $precision = $this->salesChannelContext->getContext()->getCurrencyPrecision();
-
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, $precision, 'C1');
 
         $expectedPriceDefinition = new AbsolutePriceDefinition(-50, $precision, null);
 
@@ -164,10 +191,9 @@ class PromotionItemBuilderTest extends TestCase
      * This test verifies that the correct discount filter
      * is set in the discountItemBuilder
      *
-     * @test
      * @group promotions
      */
-    public function testDiscountTargetFilter()
+    public function testDiscountTargetFilter(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -194,7 +220,7 @@ class PromotionItemBuilderTest extends TestCase
         $expectedRule = new OrRule();
         $expectedRule->addRule($discountFilter);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, 1, 'C1');
 
         static::assertEquals($expectedRule, $item->getPriceDefinition()->getFilter());
     }
@@ -203,10 +229,9 @@ class PromotionItemBuilderTest extends TestCase
      * This test verifies that the correct discount filter
      * is set in the discountItemBuilder
      *
-     * @test
      * @group promotions
      */
-    public function testDiscountTargetFilterIfDiscountRulesShouldBeIgnored()
+    public function testDiscountTargetFilterIfDiscountRulesShouldBeIgnored(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -230,7 +255,7 @@ class PromotionItemBuilderTest extends TestCase
         $ruleCollection->add($discountRuleEntity);
         $discount->setDiscountRules($ruleCollection);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, 1, 'C1');
 
         static::assertNull($item->getPriceDefinition()->getFilter());
     }
@@ -239,10 +264,9 @@ class PromotionItemBuilderTest extends TestCase
      * This test verifies that the correct discount filter
      * is set in the discountItemBuilder if discount rules are empty
      *
-     * @test
      * @group promotions
      */
-    public function testDiscountTargetFilterIfDiscountRulesAreEmpty()
+    public function testDiscountTargetFilterIfDiscountRulesAreEmpty(): void
     {
         $builder = new PromotionItemBuilder();
 
@@ -256,7 +280,7 @@ class PromotionItemBuilderTest extends TestCase
         $ruleCollection = new RuleCollection();
         $discount->setDiscountRules($ruleCollection);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
+        $item = $builder->buildDiscountLineItem('', $this->promotion, $discount, 1, 'C1');
 
         static::assertNull($item->getPriceDefinition()->getFilter());
     }
@@ -265,12 +289,11 @@ class PromotionItemBuilderTest extends TestCase
      * This test verifies that the correct currency price value is applied to
      * discount
      *
-     * @test
      * @group promotions
      */
-    public function testDiscountCurrencyCustomPrices()
+    public function testDiscountCurrencyCustomPrices(): void
     {
-        $builder = new PromotionItemBuilder('My-TYPE');
+        $builder = new PromotionItemBuilder();
 
         $standardDiscountValue = 50;
         $currencyDiscountValue = 10;
@@ -282,7 +305,7 @@ class PromotionItemBuilderTest extends TestCase
         $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
 
         $currency = new CurrencyEntity();
-        $currency->setId('currency');
+        $currency->setId('C1');
 
         $advancedPrice = new PromotionDiscountPriceEntity();
         $advancedPrice->setUniqueIdentifier(Uuid::randomHex());
@@ -297,12 +320,12 @@ class PromotionItemBuilderTest extends TestCase
 
         $this->salesChannelContext->method('getCurrency')->willReturn($currency);
 
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
-
-        $expectedPrice = -1 * $currencyDiscountValue;
-
         /** @var int $precision */
         $precision = $this->salesChannelContext->getContext()->getCurrencyPrecision();
+
+        $item = $builder->buildDiscountLineItem('code', $this->promotion, $discount, $precision, 'C1');
+
+        $expectedPrice = -1 * $currencyDiscountValue;
 
         $expectedPriceDefinition = new AbsolutePriceDefinition($expectedPrice, $precision, null);
 
@@ -310,146 +333,7 @@ class PromotionItemBuilderTest extends TestCase
     }
 
     /**
-     * This test verifies that we have a correct payload
-     * including our max value from our discount, when building
-     * a new line item for our cart.
-     *
-     * @test
-     * @group promotions
-     *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
-     * @throws \Shopware\Core\Checkout\Promotion\Exception\UnknownPromotionDiscountTypeException
-     */
-    public function testPercentagePayloadWithoutAdvancedPrices()
-    {
-        $discount = new PromotionDiscountEntity();
-        $discount->setId('P123');
-        $discount->setType(PromotionDiscountEntity::TYPE_PERCENTAGE);
-        $discount->setValue(50);
-        $discount->setMaxValue(23.0);
-        $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
-
-        $builder = new PromotionItemBuilder();
-
-        /** @var LineItem $item */
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
-
-        $expected = [
-            'promotionId' => 'PR-1',
-            'discountType' => 'percentage',
-            'value' => 50,
-            'maxValue' => 23,
-            'discountId' => 'P123',
-            'discountScope' => 'cart',
-        ];
-
-        static::assertEquals($expected, $item->getPayload());
-    }
-
-    /**
-     * This test verifies that we have our max value from
-     * the currency in our payload and not the one from
-     * our discount entity.
-     *
-     * @test
-     * @group promotions
-     *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
-     * @throws \Shopware\Core\Checkout\Promotion\Exception\UnknownPromotionDiscountTypeException
-     */
-    public function testPercentagePayloadMaxValueWithAdvancedPrices()
-    {
-        $discount = new PromotionDiscountEntity();
-        $discount->setId('D5');
-        $discount->setType(PromotionDiscountEntity::TYPE_PERCENTAGE);
-        $discount->setValue(40);
-        $discount->setMaxValue(30.0);
-        $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
-
-        $currency = new CurrencyEntity();
-        $currency->setId('currency');
-        $this->salesChannelContext->method('getCurrency')->willReturn($currency);
-
-        $advancedPrice = new PromotionDiscountPriceEntity();
-        $advancedPrice->setUniqueIdentifier(Uuid::randomHex());
-        $advancedPrice->setCurrency($currency);
-        $advancedPrice->setCurrencyId($currency->getId());
-        $advancedPrice->setPrice(20);
-        $discount->setPromotionDiscountPrices(new PromotionDiscountPriceCollection([$advancedPrice]));
-
-        $builder = new PromotionItemBuilder('My-TYPE');
-
-        /** @var LineItem $item */
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
-
-        static::assertEquals(20, $item->getPayload()['maxValue']);
-    }
-
-    /**
-     * This test verifies that we have our max value for
-     * absolute discounts is null. This feature is not available
-     * for absolute disocunts - only percentage discounts.
-     *
-     * @test
-     * @group promotions
-     *
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidPayloadException
-     * @throws \Shopware\Core\Checkout\Cart\Exception\InvalidQuantityException
-     * @throws \Shopware\Core\Checkout\Promotion\Exception\UnknownPromotionDiscountTypeException
-     */
-    public function testAbsolutePayloadMaxValueIsNull()
-    {
-        $discount = new PromotionDiscountEntity();
-        $discount->setId('D5');
-        $discount->setType(PromotionDiscountEntity::TYPE_ABSOLUTE);
-        $discount->setValue(40);
-        $discount->setMaxValue(30.0);
-        $discount->setScope(PromotionDiscountEntity::SCOPE_CART);
-
-        $builder = new PromotionItemBuilder('My-TYPE');
-
-        /** @var LineItem $item */
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
-
-        static::assertEquals('', $item->getPayload()['maxValue']);
-    }
-
-    /**
-     * This test verifies that the correct payload in the lineItem
-     * by the discountItemBuilder
-     *
-     * @test
-     * @group promotions
-     */
-    public function testDiscountPayloadValues()
-    {
-        $builder = new PromotionItemBuilder();
-
-        $discount = new PromotionDiscountEntity();
-        $discount->setId('D5');
-        $discount->setType(PromotionDiscountEntity::TYPE_ABSOLUTE);
-        $discount->setValue(50);
-        $discount->setConsiderAdvancedRules(false);
-        $discount->setScope(PromotionDiscountEntity::SCOPE_DELIVERY);
-
-        $item = $builder->buildDiscountLineItem($this->promotion, $discount, $this->salesChannelContext);
-
-        static::assertTrue($item->hasPayloadValue('promotionId'), 'We are expecting the promotionId as payload value');
-        static::assertTrue($item->hasPayloadValue('discountId'), 'We are expecting the discountId as payload value');
-        static::assertTrue($item->hasPayloadValue('discountType'), 'We are expecting the discountType as payload value');
-        static::assertTrue($item->hasPayloadValue('discountScope'), 'We are expecting the discount scope as payload value');
-        static::assertEquals($this->promotion->getId(), $item->getPayloadValue('promotionId'), 'Wrong value in payload key promotionId');
-        static::assertEquals($discount->getId(), $item->getPayloadValue('discountId'), 'Wrong value in payload key discountId');
-        static::assertEquals($discount->getType(), $item->getPayloadValue('discountType'), 'Wrong value in payload key discountType');
-        static::assertEquals($discount->getScope(), $item->getPayloadValue('discountScope'), 'Wrong value in payload key scope');
-    }
-
-    /**
      * just get a ruleEntity with ID R1
-     *
-     * @return RuleEntity
      */
     private function getFakeRule(int $amount, string $operator): LineItemUnitPriceRule
     {

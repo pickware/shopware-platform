@@ -10,7 +10,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\UpdatedAtField;
-use Shopware\Core\Framework\Language\LanguageDefinition;
+use Shopware\Core\System\Language\LanguageDefinition;
 
 abstract class EntityTranslationDefinition extends EntityDefinition
 {
@@ -29,7 +29,8 @@ abstract class EntityTranslationDefinition extends EntityDefinition
         return $this->getFields()
                 ->filterByFlag(Required::class)
                 ->filter(function (Field $field) {
-                    return !($field instanceof FkField
+                    return !(
+                        $field instanceof FkField
                         || $field instanceof CreatedAtField
                         || $field instanceof UpdatedAtField
                     );

@@ -9,6 +9,7 @@ use Shopware\Core\Checkout\Payment\PaymentMethodCollection;
 use Shopware\Core\Checkout\Shipping\ShippingMethodCollection;
 use Shopware\Core\Content\Category\CategoryCollection;
 use Shopware\Core\Content\Cms\Aggregate\CmsBlock\CmsBlockCollection;
+use Shopware\Core\Content\Cms\Aggregate\CmsSection\CmsSectionCollection;
 use Shopware\Core\Content\MailTemplate\Aggregate\MailTemplateMedia\MailTemplateMediaCollection;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderEntity;
 use Shopware\Core\Content\Media\Aggregate\MediaThumbnail\MediaThumbnailCollection;
@@ -201,6 +202,11 @@ class MediaEntity extends Entity
      * @var CmsBlockCollection|null
      */
     protected $cmsBlocks;
+
+    /**
+     * @var CmsSectionCollection|null
+     */
+    protected $cmsSections;
 
     /**
      * @var CmsBlockCollection|null
@@ -501,7 +507,7 @@ class MediaEntity extends Entity
         return $this->documentBaseConfigs;
     }
 
-    public function setDocumentBaseConfigs(?DocumentBaseConfigCollection $documentBaseConfigs): void
+    public function setDocumentBaseConfigs(DocumentBaseConfigCollection $documentBaseConfigs): void
     {
         $this->documentBaseConfigs = $documentBaseConfigs;
     }
@@ -511,7 +517,7 @@ class MediaEntity extends Entity
         return $this->shippingMethods;
     }
 
-    public function setShippingMethods(?ShippingMethodCollection $shippingMethods): void
+    public function setShippingMethods(ShippingMethodCollection $shippingMethods): void
     {
         $this->shippingMethods = $shippingMethods;
     }
@@ -564,6 +570,16 @@ class MediaEntity extends Entity
         $this->cmsBlocks = $cmsBlocks;
     }
 
+    public function getCmsSections(): ?CmsSectionCollection
+    {
+        return $this->cmsSections;
+    }
+
+    public function setCmsSections(CmsSectionCollection $cmsSections): void
+    {
+        $this->cmsSections = $cmsSections;
+    }
+
     public function getCmsPages(): ?CmsBlockCollection
     {
         return $this->cmsPages;
@@ -589,7 +605,7 @@ class MediaEntity extends Entity
         return $this->documents;
     }
 
-    public function setDocuments(?DocumentCollection $documents): void
+    public function setDocuments(DocumentCollection $documents): void
     {
         $this->documents = $documents;
     }

@@ -9,4 +9,6 @@ trait IntegrationTestBehaviour
     use FilesystemBehaviour;
     use CacheTestBehaviour;
     use BasicTestDataBehaviour;
+    use SessionTestBehaviour;
+    use RequestStackTestBehaviour;
 }

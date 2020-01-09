@@ -4,7 +4,7 @@ namespace Shopware\Storefront\Page\Product\Configurator;
 
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\Uuid\Uuid;
 
 class AvailableCombinationLoader
@@ -45,7 +45,7 @@ class AvailableCombinationLoader
 
         $available = [];
 
-        foreach ($combinations as $key => $combination) {
+        foreach ($combinations as $combination) {
             $combination['options'] = json_decode($combination['options'], true);
 
             $available[] = $combination;

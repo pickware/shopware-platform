@@ -57,7 +57,6 @@ class ProductPageConfiguratorLoader
 
         $current = $this->buildCurrentOptions($product, $groups);
 
-        /** @var PropertyGroupEntity $group */
         foreach ($groups as $group) {
             $options = $group->getOptions();
             if ($group->getOptions() === null) {
@@ -68,6 +67,7 @@ class ProductPageConfiguratorLoader
                 $combinable = $this->isCombinable($option, $current, $combinations);
                 if ($combinable === null) {
                     $group->getOptions()->remove($option->getId());
+
                     continue;
                 }
 
@@ -84,12 +84,12 @@ class ProductPageConfiguratorLoader
     private function loadSettings(SalesChannelProductEntity $product, SalesChannelContext $context): ?array
     {
         $criteria = (new Criteria())->addFilter(
-            new EqualsFilter('product_configurator_setting.productId', $product->getParentId() ?? $product->getId())
+            new EqualsFilter('productId', $product->getParentId() ?? $product->getId())
         );
 
-        $criteria->addAssociationPath('option.group')
-            ->addAssociationPath('option.media')
-            ->addAssociation('product_configurator_setting.media');
+        $criteria->addAssociation('option.group')
+            ->addAssociation('option.media')
+            ->addAssociation('media');
 
         $settings = $this->configuratorRepository
             ->search($criteria, $context->getContext())

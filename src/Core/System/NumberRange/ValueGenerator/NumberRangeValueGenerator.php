@@ -37,6 +37,7 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
      * @var EventDispatcherInterface
      */
     private $eventDispatcher;
+
     /**
      * @var NumberRangeDefinition
      */
@@ -54,7 +55,7 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
         $this->numberRangeDefinition = $numberRangeDefinition;
     }
 
-    public function getValue(string $type, Context $context, ?string $salesChannelId, ?bool $preview = false): string
+    public function getValue(string $type, Context $context, ?string $salesChannelId, bool $preview = false): string
     {
         $this->readConfiguration($type, $context, $salesChannelId);
 
@@ -62,7 +63,7 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
 
         $generatedValue = $this->generate($parsedPattern, $preview);
 
-        return $this->endEvent($generatedValue);
+        return $this->endEvent($generatedValue, $type, $context, $salesChannelId, $preview);
     }
 
     public function previewPattern(string $definition, string $pattern, int $start): string
@@ -74,10 +75,13 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
         return $this->generate($parsedPattern, true);
     }
 
-    protected function parsePattern($pattern): ?array
+    protected function parsePattern(?string $pattern): ?array
     {
         return preg_split(
-            '/([}{])/', $pattern, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+            '/([}{])/',
+            $pattern,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
         ) ?? null;
     }
 
@@ -89,13 +93,15 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
                 MultiFilter::CONNECTION_OR,
                 [
                     new MultiFilter(
-                        MultiFilter::CONNECTION_AND, [
+                        MultiFilter::CONNECTION_AND,
+                        [
                             new EqualsFilter('number_range.numberRangeSalesChannels.salesChannelId', $salesChannelId),
                             new EqualsFilter('number_range.type.technicalName', $definition),
                         ]
                     ),
                     new MultiFilter(
-                        MultiFilter::CONNECTION_AND, [
+                        MultiFilter::CONNECTION_AND,
+                        [
                             new EqualsFilter('number_range.type.global', 1),
                             new EqualsFilter('number_range.type.technicalName', $definition),
                         ]
@@ -106,7 +112,9 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
         $criteria->setLimit(1);
 
         $configurationCollection = $this->entityReader->read(
-            $this->numberRangeDefinition, $criteria, $context
+            $this->numberRangeDefinition,
+            $criteria,
+            $context
         );
 
         if ($configurationCollection->count() === 1) {
@@ -116,7 +124,8 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
             $criteria = new Criteria();
             $criteria->addFilter(
                 new MultiFilter(
-                    MultiFilter::CONNECTION_AND, [
+                    MultiFilter::CONNECTION_AND,
+                    [
                         new EqualsFilter('number_range.global', 1),
                         new EqualsFilter('number_range.type.technicalName', $definition),
                     ]
@@ -125,7 +134,9 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
             $criteria->setLimit(1);
 
             $configurationCollection = $this->entityReader->read(
-                $this->numberRangeDefinition, $criteria, $context
+                $this->numberRangeDefinition,
+                $criteria,
+                $context
             );
 
             if ($configurationCollection->count() === 1) {
@@ -151,11 +162,11 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
         $this->configuration->setStart($start);
     }
 
-    protected function endEvent($generatedValue): string
+    protected function endEvent(string $generatedValue, string $type, Context $context, ?string $salesChannelId, bool $preview): string
     {
         /** @var NumberRangeGeneratedEvent $generatedEvent */
         $generatedEvent = $this->eventDispatcher->dispatch(
-            new NumberRangeGeneratedEvent($generatedValue),
+            new NumberRangeGeneratedEvent($generatedValue, $type, $context, $salesChannelId, $preview),
             NumberRangeEvents::NUMBER_RANGE_GENERATED
         );
 
@@ -169,10 +180,12 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
         foreach ($parsedPattern as $patternPart) {
             if ($patternPart === '}') {
                 $startPattern = false;
+
                 continue;
             }
             if ($patternPart === '{') {
                 $startPattern = true;
+
                 continue;
             }
             if ($startPattern === true) {
@@ -186,6 +199,7 @@ class NumberRangeValueGenerator implements NumberRangeValueGeneratorInterface
                     $generated .= $patternPart;
                 }
                 $startPattern = false;
+
                 continue;
             }
             $generated .= $patternPart;

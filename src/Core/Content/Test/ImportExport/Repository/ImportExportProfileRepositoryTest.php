@@ -77,6 +77,7 @@ class ImportExportProfileRepositoryTest extends TestCase
         foreach ($requiredProperties as $property) {
             $entry = array_shift($data);
             unset($entry[$property]);
+
             try {
                 $this->repository->create([$entry], $this->context);
                 static::fail(sprintf("Create without required property '%s'", $property));
@@ -139,7 +140,11 @@ class ImportExportProfileRepositoryTest extends TestCase
                 }
             }
 
-            static::assertEquals($requiredProperties, $foundViolations);
+            $missingPropertyPaths = array_map(function ($property) {
+                return '/' . $property;
+            }, $requiredProperties);
+
+            static::assertEquals($missingPropertyPaths, $foundViolations);
         }
     }
 

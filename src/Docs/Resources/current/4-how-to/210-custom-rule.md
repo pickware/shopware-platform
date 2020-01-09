@@ -108,16 +108,15 @@ In the next step, you'll find a brief example of how the administration template
 ## Showing your rule in the administration
 
 You want to let the administration know of your new rule now.
-To achieve this, you have to call the `addCondition` method of the [RuleConditionService](https://github.com/shopware/platform/blob/master/src/Administration/Resources/administration/src/app/service/rule-condition.service.js), by decorating the said service.
+To achieve this, you have to call the `addCondition` method of the [RuleConditionService](https://github.com/shopware/platform/blob/master/src/Administration/Resources/app/administration/src/app/service/rule-condition.service.js), by decorating the said service.
 
-For this purpose, you create a new directory called `<plugin root>/src/Resources/administration/src/decorator` and in there a new file.
+For this purpose, you create a new directory called `<plugin root>/src/Resources/app/administration/src/decorator` and in there a new file.
 The file's name is up to you, in this example it will be called `rule-condition-service-decoration.js`.
 
 ```js
-import { Application } from 'src/core/shopware';
 import '../core/component/swag-lunar-eclipse';
 
-Application.addServiceProviderDecorator('ruleConditionDataProviderService', (ruleConditionService) => {
+Shopware.Application.addServiceProviderDecorator('ruleConditionDataProviderService', (ruleConditionService) => {
     ruleConditionService.addCondition('lunar_eclipse', {
         component: 'swag-lunar-eclipse',
         label: 'Is lunar eclipse today',
@@ -129,7 +128,7 @@ Application.addServiceProviderDecorator('ruleConditionDataProviderService', (rul
 
 ```
 
-As you can see, this is decorating the `RuleConditionService` by using its name `ruleConditionDataProviderService`, which is defined [here](https://github.com/shopware/platform/blob/master/src/Administration/Resources/administration/src/app/main.js#L47).
+As you can see, this is decorating the `RuleConditionService` by using its name `ruleConditionDataProviderService`, which is defined [here](https://github.com/shopware/platform/blob/master/src/Administration/Resources/app/administration/src/app/main.js#L47).
 The decoration then adds a new condition called 'lunar_eclipse'. Make sure to match the name you've used in the `getName` method in PHP.
 It comes with a custom component `swag-lunar-eclipse`, which you have to create later on, as well as an label.
 Also note the second line, which already imports your not yet existing component.
@@ -137,8 +136,7 @@ Also note the second line, which already imports your not yet existing component
 But this code is not executed yet, because it was never included or executed.
 
 Your main entry point for this purpose is your plugin's `main.js` file.
-It has to be placed into the `<plugin root>/src/Resources/admininistration` directory in order to be automatically found by Shopware 6.
-*Note: This path can be changed by overriding the [getAdministrationEntryPath()](../2-internals/4-plugins/020-plugin-base-class.md#getAdministrationEntryPath()) method of your plugin's base class.*
+It has to be placed into the `<plugin root>/src/Resources/app/administration/src` directory in order to be automatically found by Shopware 6.
 
 In there you'll simply have to import the decoration file mentioned above:
 
@@ -150,17 +148,16 @@ import './src/decorator/rule-condition-service-decoration';
 
 While you've registered your rule to the administration now, you're still lacking the actual component `swag-lunar-eclipse`.
 As previously mentioned, you've already defined a path for it in your service decoration: `core/component/swag-lunar-eclipse`.
-Thus, create the following directory `<plugin root>/src/Resources/administration/src/core/component/swag-lunar-eclipse`.
+Thus, create the following directory `<plugin root>/src/Resources/app/administration/src/core/component/swag-lunar-eclipse`.
 
 Each component has to come with a file called `index.js`, defining your new component.
 Here's an example of what this component could look like, with an explanation coming afterwards:
 
 ```js
-import { Component } from 'src/core/shopware';
 import LocalStore from 'src/core/data/LocalStore';
 import template from './swag-lunar-eclipse.html.twig';
 
-Component.extend('swag-lunar-eclipse', 'sw-condition-base', {
+Shopware.Component.extend('swag-lunar-eclipse', 'sw-condition-base', {
     template,
 
     computed: {

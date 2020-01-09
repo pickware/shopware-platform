@@ -11,12 +11,12 @@ abstract class ShopwareHttpException extends \Exception implements ShopwareExcep
      */
     protected $parameters = [];
 
-    public function __construct(string $message, array $parameters = [])
+    public function __construct(string $message, array $parameters = [], $e = null)
     {
         $this->parameters = $parameters;
         $message = $this->parse($message, $parameters);
 
-        parent::__construct($message);
+        parent::__construct($message, 0, $e);
     }
 
     public function getStatusCode(): int
@@ -25,6 +25,16 @@ abstract class ShopwareHttpException extends \Exception implements ShopwareExcep
     }
 
     public function getErrors(bool $withTrace = false): \Generator
+    {
+        yield $this->getCommonErrorData($withTrace);
+    }
+
+    public function getParameters(): array
+    {
+        return $this->parameters;
+    }
+
+    protected function getCommonErrorData(bool $withTrace = false): array
     {
         $error = [
             'status' => (string) $this->getStatusCode(),
@@ -40,12 +50,7 @@ abstract class ShopwareHttpException extends \Exception implements ShopwareExcep
             $error['trace'] = $this->getTrace();
         }
 
-        yield $error;
-    }
-
-    public function getParameters(): array
-    {
-        return $this->parameters;
+        return $error;
     }
 
     protected function parse(string $message, array $parameters = []): string

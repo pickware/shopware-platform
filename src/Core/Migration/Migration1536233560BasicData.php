@@ -18,16 +18,16 @@ use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\DebitPayment;
 use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\InvoicePayment;
 use Shopware\Core\Checkout\Payment\Cart\PaymentHandler\PrePayment;
 use Shopware\Core\Content\Category\CategoryDefinition;
-use Shopware\Core\Content\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\Content\MailTemplate\MailTemplateActions;
 use Shopware\Core\Content\MailTemplate\MailTemplateTypes;
 use Shopware\Core\Content\Newsletter\NewsletterEvents;
 use Shopware\Core\Content\Newsletter\NewsletterSubscriptionServiceInterface;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Api\Util\AccessKeyHelper;
-use Shopware\Core\Framework\Doctrine\MultiInsertQueryQueue;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\Migration\MigrationStep;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\DeliveryTime\DeliveryTimeEntity;
 
 class Migration1536233560BasicData extends MigrationStep
 {
@@ -35,6 +35,7 @@ class Migration1536233560BasicData extends MigrationStep
      * @var array
      */
     private $mailTypes;
+
     /**
      * @var string
      */
@@ -87,7 +88,6 @@ class Migration1536233560BasicData extends MigrationStep
 
     public function updateDestructive(Connection $connection): void
     {
-        // implement update destructive
     }
 
     private function getDeDeLanguageId(): string
@@ -215,7 +215,7 @@ class Migration1536233560BasicData extends MigrationStep
             ];
         };
 
-        $languageEN = function (string $countryId, string $name) {
+        $languageEN = static function (string $countryId, string $name) {
             return [
                 'language_id' => Uuid::fromHexToBytes(Defaults::LANGUAGE_SYSTEM),
                 'name' => $name,
@@ -983,7 +983,7 @@ class Migration1536233560BasicData extends MigrationStep
 
     private function createDefaultFolder(Connection $connection, string $defaultFolderId, string $entity): void
     {
-        $connection->transactional(function (Connection $connection) use ($defaultFolderId, $entity) {
+        $connection->transactional(function (Connection $connection) use ($defaultFolderId, $entity): void {
             $configurationId = Uuid::randomBytes();
             $folderId = Uuid::randomBytes();
             $folderName = $this->getMediaFolderName($entity);
@@ -1015,9 +1015,10 @@ class Migration1536233560BasicData extends MigrationStep
 
     private function getMediaFolderName(string $entity): string
     {
-        $capitalizedEntityParts = array_map(function ($part) {
-            return ucfirst($part);
-        },
+        $capitalizedEntityParts = array_map(
+            static function ($part) {
+                return ucfirst($part);
+            },
             explode('_', $entity)
         );
 
@@ -1451,7 +1452,7 @@ class Migration1536233560BasicData extends MigrationStep
         $connection->insert('document_type_translation', ['document_type_id' => $creditNoteId, 'language_id' => Uuid::fromHexToBytes(Defaults::LANGUAGE_SYSTEM), 'name' => 'Credit note', 'created_at' => (new \DateTime())->format(Defaults::STORAGE_DATE_TIME_FORMAT)]);
     }
 
-    private function createNewsletterMailTemplate(Connection $connection)
+    private function createNewsletterMailTemplate(Connection $connection): void
     {
         $registerMailId = Uuid::randomBytes();
         $confirmMailId = Uuid::randomBytes();
@@ -1532,7 +1533,7 @@ class Migration1536233560BasicData extends MigrationStep
         );
     }
 
-    private function getRegisterTemplate_HTML_EN()
+    private function getRegisterTemplate_HTML_EN(): string
     {
         return '<h3>Hello {{ firstName }} {{ lastName }}</h3>
                 <p>thank you very much for your registration.</p>
@@ -1540,7 +1541,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getRegisterTemplate_PLAIN_EN()
+    private function getRegisterTemplate_PLAIN_EN(): string
     {
         return 'Hello {{ firstName }} {{ lastName }}
             
@@ -1550,7 +1551,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getRegisterTemplate_HTML_DE()
+    private function getRegisterTemplate_HTML_DE(): string
     {
         return '<h3>Hallo {{ firstName }} {{ lastName }}</h3>
                 <p>vielen Dank für Ihre Anmeldung.</p>
@@ -1558,7 +1559,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getRegisterTemplate_PLAIN_DE()
+    private function getRegisterTemplate_PLAIN_DE(): string
     {
         return 'Hallo {{ firstName }} {{ lastName }}
             
@@ -1568,7 +1569,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getOptInTemplate_HTML_EN()
+    private function getOptInTemplate_HTML_EN(): string
     {
         return '<h3>Hello {{ firstName }} {{ lastName }}</h3>
                 <p>Thank you for your interest in our newsletter!</p>
@@ -1577,7 +1578,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getOptInTemplate_PLAIN_EN()
+    private function getOptInTemplate_PLAIN_EN(): string
     {
         return 'Hello {{ firstName }} {{ lastName }}
         
@@ -1589,7 +1590,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getOptInTemplate_HTML_DE()
+    private function getOptInTemplate_HTML_DE(): string
     {
         return '<h3>Hallo {{ firstName }} {{ lastName }}</h3>
                 <p>Schön, dass Sie sich für unseren Newsletter interessieren!</p>
@@ -1598,7 +1599,7 @@ class Migration1536233560BasicData extends MigrationStep
         ';
     }
 
-    private function getOptInTemplate_PLAIN_DE()
+    private function getOptInTemplate_PLAIN_DE(): string
     {
         return 'Hallo {{ firstName }} {{ lastName }}
         
@@ -1670,7 +1671,7 @@ class Migration1536233560BasicData extends MigrationStep
                 'nameDe' => 'Lagerbestandshinweis',
                 'availableEntities' => ['product' => 'product', 'salesChannel' => 'sales_channel'],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_DELIVERY_STATE_RETURNED_PARTIALLY => [
+            'state_enter.order_delivery.state.returned_partially' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Open',
                 'nameDe' => 'Eintritt Bestellstatus: Offen',
@@ -1681,7 +1682,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_DELIVERY_STATE_SHIPPED_PARTIALLY => [
+            'state_enter.order_delivery.state.shipped_partially' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Shipped (partially)',
                 'nameDe' => 'Eintritt Bestellstatus: Teilweise versandt',
@@ -1692,7 +1693,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_DELIVERY_STATE_RETURNED => [
+            'state_enter.order_delivery.state.returned' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Returned',
                 'nameDe' => 'Eintritt Bestellstatus: Retour',
@@ -1703,7 +1704,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_DELIVERY_STATE_SHIPPED => [
+            'state_enter.order_delivery.state.shipped' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Shipped',
                 'nameDe' => 'Eintritt Bestellstatus: Versandt',
@@ -1714,7 +1715,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_DELIVERY_STATE_CANCELLED => [
+            'state_enter.order_delivery.state.cancelled' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Cancelled',
                 'nameDe' => 'Eintritt Bestellstatus: Abgebrochen',
@@ -1725,7 +1726,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_REMINDED => [
+            'state_enter.order_transaction.state.reminded' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Reminded',
                 'nameDe' => 'Eintritt Zahlungsstatus: Erinnert',
@@ -1736,7 +1737,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_REFUNDED_PARTIALLY => [
+            'state_enter.order_transaction.state.refunded_partially' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Refunded (partially)',
                 'nameDe' => 'Eintritt Zahlungsstatus: Teilweise erstattet',
@@ -1747,7 +1748,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_CANCELLED => [
+            'state_enter.order_transaction.state.cancelled' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Cancelled',
                 'nameDe' => 'Eintritt Zahlungsstatus: Abgebrochen',
@@ -1758,7 +1759,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_PAID => [
+            'state_enter.order_transaction.state.paid' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Paid',
                 'nameDe' => 'Eintritt Zahlungsstatus: Bezahlt',
@@ -1769,7 +1770,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_REFUNDED => [
+            'state_enter.order_transaction.state.refunded' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Refunded',
                 'nameDe' => 'Eintritt Zahlungsstatus: Erstattet',
@@ -1780,7 +1781,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_PAID_PARTIALLY => [
+            'state_enter.order_transaction.state.paid_partially' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Paid (partially)',
                 'nameDe' => 'Eintritt Zahlungsstatus: Teilweise bezahlt',
@@ -1791,7 +1792,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_TRANSACTION_STATE_OPEN => [
+            'state_enter.order_transaction.state.open' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter payment state: Open',
                 'nameDe' => 'Eintritt Zahlungsstatus: Offen',
@@ -1802,7 +1803,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_STATE_OPEN => [
+            'state_enter.order.state.open' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Open',
                 'nameDe' => 'Eintritt Bestellstatus: Offen',
@@ -1813,7 +1814,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_STATE_IN_PROGRESS => [
+            'state_enter.order.state.in_progress' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: In progress',
                 'nameDe' => 'Eintritt Bestellstatus: In Bearbeitung',
@@ -1824,7 +1825,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_STATE_CANCELLED => [
+            'state_enter.order.state.cancelled' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Cancelled',
                 'nameDe' => 'Eintritt Bestellstatus: Abgebrochen',
@@ -1835,7 +1836,7 @@ class Migration1536233560BasicData extends MigrationStep
                     'salesChannel' => 'sales_channel',
                 ],
             ],
-            MailTemplateTypes::MAILTYPE_STATE_ENTER_ORDER_STATE_COMPLETED => [
+            'state_enter.order.state.completed' => [
                 'id' => Uuid::randomHex(),
                 'name' => 'Enter order state: Done',
                 'nameDe' => 'Eintritt Bestellstatus: Abgeschlossen',
@@ -1849,7 +1850,7 @@ class Migration1536233560BasicData extends MigrationStep
         ];
     }
 
-    private function createMailTemplateTypes(Connection $connection)
+    private function createMailTemplateTypes(Connection $connection): void
     {
         $definitionMailTypes = $this->getMailTypeMapping();
 
@@ -1892,7 +1893,7 @@ class Migration1536233560BasicData extends MigrationStep
         }
     }
 
-    private function createDocumentConfiguration(Connection $connection)
+    private function createDocumentConfiguration(Connection $connection): void
     {
         $stornoId = Uuid::randomBytes();
 
@@ -2053,7 +2054,7 @@ class Migration1536233560BasicData extends MigrationStep
             );
         }
 
-        foreach ($definitionNumberRanges as $typeName => $numberRange) {
+        foreach ($definitionNumberRanges as $numberRange) {
             $connection->insert(
                 'number_range',
                 [
@@ -2086,7 +2087,7 @@ class Migration1536233560BasicData extends MigrationStep
         }
     }
 
-    private function createMailEvents(Connection $connection)
+    private function createMailEvents(Connection $connection): void
     {
         $orderCofirmationTemplateId = Uuid::randomBytes();
 
@@ -2107,7 +2108,7 @@ class Migration1536233560BasicData extends MigrationStep
                 'language_id' => Uuid::fromHexToBytes(Defaults::LANGUAGE_SYSTEM),
                 'subject' => 'Order confirmation',
                 'description' => '',
-                'sender_name' => 'Shop',
+                'sender_name' => '{{ salesChannel.name }}',
                 'content_html' => $this->getHtmlTemplateEn(),
                 'content_plain' => $this->getPlainTemplateEn(),
                 'created_at' => date(Defaults::STORAGE_DATE_TIME_FORMAT),
@@ -2121,7 +2122,7 @@ class Migration1536233560BasicData extends MigrationStep
                 'language_id' => Uuid::fromHexToBytes($this->getDeDeLanguageId()),
                 'subject' => 'Bestellbestätigung',
                 'description' => '',
-                'sender_name' => 'Shop',
+                'sender_name' => '{{ salesChannel.name }}',
                 'content_html' => $this->getHtmlTemplateDe(),
                 'content_plain' => $this->getPlainTemplateDe(),
                 'created_at' => date(Defaults::STORAGE_DATE_TIME_FORMAT),
@@ -2914,7 +2915,7 @@ Für Rückfragen stehen wir Ihnen jederzeit gerne zur Verfügung.
             );
         }
 
-        foreach ($definitionNumberRanges as $typeName => $numberRange) {
+        foreach ($definitionNumberRanges as $numberRange) {
             $connection->insert(
                 'number_range',
                 [

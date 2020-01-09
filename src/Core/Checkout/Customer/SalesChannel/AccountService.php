@@ -4,39 +4,50 @@ namespace Shopware\Core\Checkout\Customer\SalesChannel;
 
 use Composer\Semver\Constraint\ConstraintInterface;
 use Shopware\Core\Checkout\Cart\Exception\CustomerNotLoggedInException;
+use Shopware\Core\Checkout\Customer\Aggregate\CustomerRecovery\CustomerRecoveryEntity;
 use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Customer\CustomerEvents;
+use Shopware\Core\Checkout\Customer\Event\CustomerAccountRecoverRequestEvent;
+use Shopware\Core\Checkout\Customer\Event\CustomerBeforeLoginEvent;
 use Shopware\Core\Checkout\Customer\Event\CustomerChangedPaymentMethodEvent;
 use Shopware\Core\Checkout\Customer\Event\CustomerLoginEvent;
 use Shopware\Core\Checkout\Customer\Event\CustomerLogoutEvent;
 use Shopware\Core\Checkout\Customer\Exception\AddressNotFoundException;
 use Shopware\Core\Checkout\Customer\Exception\BadCredentialsException;
+use Shopware\Core\Checkout\Customer\Exception\CustomerNotFoundByHashException;
 use Shopware\Core\Checkout\Customer\Exception\CustomerNotFoundException;
+use Shopware\Core\Checkout\Customer\Exception\CustomerRecoveryHashExpiredException;
+use Shopware\Core\Checkout\Customer\Exception\InactiveCustomerException;
 use Shopware\Core\Checkout\Customer\Password\LegacyPasswordVerifier;
 use Shopware\Core\Checkout\Customer\Validation\Constraint\CustomerEmailUnique;
 use Shopware\Core\Checkout\Customer\Validation\Constraint\CustomerPasswordMatches;
-use Shopware\Core\Checkout\Customer\Validation\CustomerProfileValidationService;
 use Shopware\Core\Checkout\Payment\Exception\UnknownPaymentMethodException;
 use Shopware\Core\Checkout\Payment\PaymentMethodEntity;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Event\DataMappingEvent;
+use Shopware\Core\Framework\Util\Random;
 use Shopware\Core\Framework\Uuid\Exception\InvalidUuidException;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Framework\Validation\BuildValidationEvent;
 use Shopware\Core\Framework\Validation\DataBag\DataBag;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Shopware\Core\Framework\Validation\DataValidationDefinition;
+use Shopware\Core\Framework\Validation\DataValidationFactoryInterface;
 use Shopware\Core\Framework\Validation\DataValidator;
 use Shopware\Core\Framework\Validation\Exception\ConstraintViolationException;
+use Shopware\Core\Framework\Validation\ValidationServiceInterface;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextPersister;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
+use Symfony\Component\Routing\RouterInterface;
 use Symfony\Component\Validator\Constraints\Email;
 use Symfony\Component\Validator\Constraints\EqualTo;
 use Symfony\Component\Validator\Constraints\Length;
@@ -55,6 +66,11 @@ class AccountService
      * @var EntityRepositoryInterface
      */
     private $customerRepository;
+
+    /**
+     * @var EntityRepositoryInterface
+     */
+    private $customerRecoveryRepository;
 
     /**
      * @var SalesChannelContextPersister
@@ -77,9 +93,9 @@ class AccountService
     private $legacyPasswordVerifier;
 
     /**
-     * @var CustomerProfileValidationService
+     * @var ValidationServiceInterface|DataValidationFactoryInterface
      */
-    private $customerProfileValidationService;
+    private $customerProfileValidationFactory;
 
     /**
      * @var EntityRepositoryInterface
@@ -91,26 +107,38 @@ class AccountService
      */
     private $systemConfigService;
 
+    /**
+     * @var RouterInterface
+     */
+    private $router;
+
+    /**
+     * @param ValidationServiceInterface|DataValidationFactoryInterface $customerProfileValidationBuilder
+     */
     public function __construct(
         EntityRepositoryInterface $customerAddressRepository,
         EntityRepositoryInterface $customerRepository,
+        EntityRepositoryInterface $customerRecoveryRepository,
         SalesChannelContextPersister $contextPersister,
         EventDispatcherInterface $eventDispatcher,
         DataValidator $validator,
-        CustomerProfileValidationService $customerProfileValidationService,
+        $customerProfileValidationBuilder,
         LegacyPasswordVerifier $legacyPasswordVerifier,
         EntityRepositoryInterface $paymentMethodRepository,
-        SystemConfigService $systemConfigService
+        SystemConfigService $systemConfigService,
+        RouterInterface $router
     ) {
         $this->customerAddressRepository = $customerAddressRepository;
         $this->customerRepository = $customerRepository;
+        $this->customerRecoveryRepository = $customerRecoveryRepository;
         $this->contextPersister = $contextPersister;
         $this->eventDispatcher = $eventDispatcher;
         $this->validator = $validator;
         $this->legacyPasswordVerifier = $legacyPasswordVerifier;
-        $this->customerProfileValidationService = $customerProfileValidationService;
+        $this->customerProfileValidationFactory = $customerProfileValidationBuilder;
         $this->paymentMethodRepository = $paymentMethodRepository;
         $this->systemConfigService = $systemConfigService;
+        $this->router = $router;
     }
 
     /**
@@ -151,8 +179,11 @@ class AccountService
 
     public function saveProfile(DataBag $data, SalesChannelContext $context): void
     {
-        /** @var DataValidationDefinition $validation */
-        $validation = $this->customerProfileValidationService->buildUpdateValidation($context->getContext());
+        if ($this->customerProfileValidationFactory instanceof DataValidationFactoryInterface) {
+            $validation = $this->customerProfileValidationFactory->update($context);
+        } else {
+            $validation = $this->customerProfileValidationFactory->buildUpdateValidation($context->getContext());
+        }
 
         $this->dispatchValidationEvent($validation, $context->getContext());
 
@@ -202,6 +233,109 @@ class AccountService
     }
 
     /**
+     * @throws CustomerNotFoundException
+     * @throws InconsistentCriteriaIdsException
+     */
+    public function generateAccountRecovery(DataBag $data, SalesChannelContext $context): void
+    {
+        $this->validateRecoverEmail($data, $context);
+
+        try {
+            $customer = $this->getCustomerByEmail($data->get('email'), $context);
+        } catch (CustomerNotFoundException $exception) {
+            throw new CustomerNotFoundException($exception->getMessage());
+        }
+
+        $customerId = $customer->getId();
+
+        $customerIdCriteria = new Criteria();
+        $customerIdCriteria->addFilter(new EqualsFilter('customerId', $customerId));
+        $customerIdCriteria->addAssociation('customer');
+
+        $repoContext = $context->getContext();
+
+        if ($existingRecovery = $this->getCustomerRecovery($customerIdCriteria, $repoContext)) {
+            $this->deleteRecoveryForCustomer($existingRecovery, $repoContext);
+        }
+
+        $recoveryData = [
+            'customerId' => $customerId,
+            'hash' => Random::getAlphanumericString(32),
+        ];
+
+        $this->customerRecoveryRepository->create([$recoveryData], $repoContext);
+
+        $customerRecovery = $this->getCustomerRecovery($customerIdCriteria, $repoContext);
+
+        if (!$customerRecovery) {
+            return;
+        }
+
+        $hash = $customerRecovery->getHash();
+        $recoverUrl = $this->router->generate('frontend.account.recover.password.page', ['hash' => $hash], UrlGeneratorInterface::ABSOLUTE_URL);
+
+        $event = new CustomerAccountRecoverRequestEvent($context, $customerRecovery, $recoverUrl);
+        $this->eventDispatcher->dispatch($event, CustomerAccountRecoverRequestEvent::EVENT_NAME);
+    }
+
+    /**
+     * @throws InconsistentCriteriaIdsException
+     * @throws ConstraintViolationException
+     * @throws CustomerNotFoundByHashException
+     * @throws CustomerRecoveryHashExpiredException
+     */
+    public function resetPassword(DataBag $data, SalesChannelContext $context): bool
+    {
+        $this->validateResetPassword($data, $context);
+
+        $hash = $data->get('hash');
+
+        if (!$this->checkHash($hash, $context->getContext())) {
+            throw new CustomerRecoveryHashExpiredException($hash);
+        }
+
+        $customerHashCriteria = new Criteria();
+        $customerHashCriteria->addFilter(new EqualsFilter('hash', $hash));
+        $customerHashCriteria->addAssociation('customer');
+
+        $customerRecovery = $this->getCustomerRecovery($customerHashCriteria, $context->getContext());
+
+        if (!$customerRecovery) {
+            throw new CustomerNotFoundByHashException($hash);
+        }
+
+        $customer = $customerRecovery->getCustomer();
+
+        if (!$customer) {
+            throw new CustomerNotFoundByHashException($hash);
+        }
+
+        $customerData = [
+            'id' => $customer->getId(),
+            'password' => $data->get('newPassword'),
+        ];
+
+        $this->customerRepository->update([$customerData], $context->getContext());
+        $this->deleteRecoveryForCustomer($customerRecovery, $context->getContext());
+
+        return true;
+    }
+
+    public function checkHash(string $hash, Context $context): bool
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(
+            new EqualsFilter('hash', $hash)
+        );
+
+        $recovery = $this->getCustomerRecovery($criteria, $context);
+
+        $validDateTime = (new \DateTime())->sub(new \DateInterval('PT2H'));
+
+        return $recovery && $validDateTime < $recovery->getCreatedAt();
+    }
+
+    /**
      * @throws CustomerNotLoggedInException
      * @throws InvalidUuidException
      * @throws AddressNotFoundException
@@ -245,6 +379,9 @@ class AccountService
             throw new BadCredentialsException();
         }
 
+        $event = new CustomerBeforeLoginEvent($context, $email);
+        $this->eventDispatcher->dispatch($event);
+
         try {
             $customer = $this->getCustomerByEmail($email, $context, $includeGuest);
         } catch (CustomerNotFoundException | BadCredentialsException $exception) {
@@ -261,7 +398,7 @@ class AccountService
             ]
         );
 
-        $event = new CustomerLoginEvent($context->getContext(), $customer, $newToken, $context->getSalesChannel()->getId());
+        $event = new CustomerLoginEvent($context, $customer, $newToken);
         $this->eventDispatcher->dispatch($event);
 
         return $newToken;
@@ -270,12 +407,16 @@ class AccountService
     /**
      * @throws BadCredentialsException
      * @throws UnauthorizedHttpException
+     * @throws InactiveCustomerException
      */
     public function loginWithPassword(DataBag $data, SalesChannelContext $context): string
     {
         if (empty($data->get('username')) || empty($data->get('password'))) {
             throw new BadCredentialsException();
         }
+
+        $event = new CustomerBeforeLoginEvent($context, $data->get('username'));
+        $this->eventDispatcher->dispatch($event);
 
         try {
             $customer = $this->getCustomerByLogin(
@@ -285,6 +426,10 @@ class AccountService
             );
         } catch (CustomerNotFoundException | BadCredentialsException $exception) {
             throw new UnauthorizedHttpException('json', $exception->getMessage());
+        }
+
+        if (!$customer->getActive()) {
+            throw new InactiveCustomerException($customer->getId());
         }
 
         $newToken = $this->contextPersister->replace($context->getToken());
@@ -304,7 +449,7 @@ class AccountService
             ],
         ], $context->getContext());
 
-        $event = new CustomerLoginEvent($context->getContext(), $customer, $newToken, $context->getSalesChannel()->getId());
+        $event = new CustomerLoginEvent($context, $customer, $newToken);
         $this->eventDispatcher->dispatch($event);
 
         return $newToken;
@@ -321,7 +466,7 @@ class AccountService
             ]
         );
 
-        $event = new CustomerLogoutEvent($context->getContext(), $context->getCustomer(), $context->getSalesChannel()->getId());
+        $event = new CustomerLogoutEvent($context, $context->getCustomer());
         $this->eventDispatcher->dispatch($event);
     }
 
@@ -350,13 +495,14 @@ class AccountService
             ],
         ], $context->getContext());
 
-        $event = new CustomerChangedPaymentMethodEvent($context->getContext(), $customer, $requestDataBag, $context->getSalesChannel()->getId());
+        $event = new CustomerChangedPaymentMethodEvent($context, $customer, $requestDataBag);
         $this->eventDispatcher->dispatch($event);
     }
 
     /**
      * @throws CustomerNotFoundException
      * @throws BadCredentialsException
+     * @throws InactiveCustomerException
      */
     public function getCustomerByLogin(string $email, string $password, SalesChannelContext $context): CustomerEntity
     {
@@ -379,6 +525,38 @@ class AccountService
         return $customer;
     }
 
+    public function getCustomerRecovery(Criteria $criteria, Context $context): ?CustomerRecoveryEntity
+    {
+        return $this->customerRecoveryRepository->search($criteria, $context)->first();
+    }
+
+    /**
+     * @throws ConstraintViolationException
+     */
+    private function validateResetPassword(DataBag $data, SalesChannelContext $context): void
+    {
+        $definition = new DataValidationDefinition('customer.password.update');
+
+        $minPasswordLength = $this->systemConfigService->get('core.loginRegistration.passwordMinLength', $context->getSalesChannel()->getId());
+
+        $definition->add('newPassword', new NotBlank(), new Length(['min' => $minPasswordLength]), new EqualTo(['propertyPath' => 'newPasswordConfirm']));
+
+        $this->dispatchValidationEvent($definition, $context->getContext());
+
+        $this->validator->validate($data->all(), $definition);
+
+        $this->tryValidateEqualtoConstraint($data->all(), 'newPassword', $definition);
+    }
+
+    private function deleteRecoveryForCustomer(CustomerRecoveryEntity $existingRecovery, Context $context): void
+    {
+        $recoveryData = [
+            'id' => $existingRecovery->getId(),
+        ];
+
+        $this->customerRecoveryRepository->delete([$recoveryData], $context);
+    }
+
     private function validateEmail(DataBag $data, SalesChannelContext $context): void
     {
         $validation = new DataValidationDefinition('customer.email.update');
@@ -391,6 +569,23 @@ class AccountService
                 new CustomerEmailUnique(['context' => $context->getContext()])
             )
             ->add('password', new CustomerPasswordMatches(['context' => $context]));
+
+        $this->dispatchValidationEvent($validation, $context->getContext());
+
+        $this->validator->validate($data->all(), $validation);
+
+        $this->tryValidateEqualtoConstraint($data->all(), 'email', $validation);
+    }
+
+    private function validateRecoverEmail(DataBag $data, SalesChannelContext $context): void
+    {
+        $validation = new DataValidationDefinition('customer.email.recover');
+
+        $validation
+            ->add(
+                'email',
+                new Email()
+            );
 
         $this->dispatchValidationEvent($validation, $context->getContext());
 
@@ -474,7 +669,6 @@ class AccountService
      */
     private function tryValidateEqualtoConstraint(array $data, string $field, DataValidationDefinition $validation): void
     {
-        /** @var array $validations */
         $validations = $validation->getProperties();
 
         if (!array_key_exists($field, $validations)) {
@@ -491,6 +685,7 @@ class AccountService
         foreach ($fieldValidations as $emailValidation) {
             if ($emailValidation instanceof EqualTo) {
                 $equalityValidation = $emailValidation;
+
                 break;
             }
         }
@@ -517,10 +712,9 @@ class AccountService
      */
     private function validatePasswordFields(DataBag $data, SalesChannelContext $context): void
     {
-        /** @var DataValidationDefinition $definition */
         $definition = new DataValidationDefinition('customer.password.update');
 
-        $minPasswordLength = $this->systemConfigService->get('core.loginRegistration.passwordMinLength');
+        $minPasswordLength = $this->systemConfigService->get('core.loginRegistration.passwordMinLength', $context->getSalesChannel()->getId());
 
         $definition
             ->add('newPassword', new NotBlank(), new Length(['min' => $minPasswordLength]), new EqualTo(['propertyPath' => 'newPasswordConfirm']))

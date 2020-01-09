@@ -6,7 +6,6 @@ use Shopware\Core\Content\Newsletter\Aggregate\NewsletterRecipient\NewsletterRec
 use Shopware\Core\Content\Newsletter\Aggregate\NewsletterRecipient\NewsletterRecipientEntity;
 use Shopware\Core\Content\Newsletter\NewsletterEvents;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Event\BusinessEventInterface;
 use Shopware\Core\Framework\Event\EventData\EntityType;
 use Shopware\Core\Framework\Event\EventData\EventDataCollection;
 use Shopware\Core\Framework\Event\EventData\MailRecipientStruct;
@@ -14,7 +13,7 @@ use Shopware\Core\Framework\Event\MailActionInterface;
 use Shopware\Core\Framework\Struct\JsonSerializableTrait;
 use Symfony\Contracts\EventDispatcher\Event;
 
-class NewsletterConfirmEvent extends Event implements BusinessEventInterface, MailActionInterface
+class NewsletterConfirmEvent extends Event implements MailActionInterface
 {
     use JsonSerializableTrait;
 
@@ -28,7 +27,7 @@ class NewsletterConfirmEvent extends Event implements BusinessEventInterface, Ma
     /**
      * @var NewsletterRecipientEntity
      */
-    private $recipientEntity;
+    private $newsletterRecipient;
 
     /**
      * @var MailRecipientStruct|null
@@ -40,10 +39,10 @@ class NewsletterConfirmEvent extends Event implements BusinessEventInterface, Ma
      */
     private $salesChannelId;
 
-    public function __construct(Context $context, NewsletterRecipientEntity $recipientEntity, string $salesChannelId)
+    public function __construct(Context $context, NewsletterRecipientEntity $newsletterRecipient, string $salesChannelId)
     {
         $this->context = $context;
-        $this->recipientEntity = $recipientEntity;
+        $this->newsletterRecipient = $newsletterRecipient;
         $this->salesChannelId = $salesChannelId;
     }
 
@@ -63,9 +62,9 @@ class NewsletterConfirmEvent extends Event implements BusinessEventInterface, Ma
             ->add('newsletterRecipient', new EntityType(NewsletterRecipientDefinition::class));
     }
 
-    public function getRecipientEntity(): NewsletterRecipientEntity
+    public function getNewsletterRecipient(): NewsletterRecipientEntity
     {
-        return $this->recipientEntity;
+        return $this->newsletterRecipient;
     }
 
     public function getMailStruct(): MailRecipientStruct
@@ -76,7 +75,7 @@ class NewsletterConfirmEvent extends Event implements BusinessEventInterface, Ma
 
         return new MailRecipientStruct(
             [
-                $this->recipientEntity->getEmail() => $this->recipientEntity->getFirstName() . ' ' . $this->recipientEntity->getLastName(),
+                $this->newsletterRecipient->getEmail() => $this->newsletterRecipient->getFirstName() . ' ' . $this->newsletterRecipient->getLastName(),
             ]
         );
     }

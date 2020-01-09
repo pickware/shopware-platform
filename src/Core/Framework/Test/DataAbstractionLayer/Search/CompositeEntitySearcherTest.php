@@ -9,11 +9,12 @@ use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\CompositeEntitySearcher;
+use Shopware\Core\Framework\Struct\ArrayEntity;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\PlatformRequest;
 
 class CompositeEntitySearcherTest extends TestCase
 {
@@ -23,11 +24,6 @@ class CompositeEntitySearcherTest extends TestCase
      * @var EntityRepositoryInterface
      */
     private $productRepository;
-
-    /**
-     * @var Connection
-     */
-    private $connection;
 
     /**
      * @var CompositeEntitySearcher
@@ -46,31 +42,17 @@ class CompositeEntitySearcherTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = $this->getContainer()->get(Connection::class);
-
         $this->productRepository = $this->getContainer()->get('product.repository');
         $this->search = $this->getContainer()->get(CompositeEntitySearcher::class);
 
-        $this->userId = Uuid::randomHex();
-
-        $origin = new AdminApiSource($this->userId);
-        $this->context = Context::createDefaultContext($origin);
-
-        $repo = $this->getContainer()->get('user.repository');
-        $repo->upsert([
-            [
-                'id' => $this->userId,
-                'firstName' => 'test-user',
-                'lastName' => 'test',
-                'localeId' => $this->getLocaleIdOfSystemLanguage(),
-                'username' => 'test-user',
-                'email' => Uuid::randomHex() . '@example.com',
-                'password' => 'shopware',
-            ],
-        ], $this->context);
+        /** @var Connection $connection */
+        $connection = $this->getContainer()->get(Connection::class);
+        $userId = (string) $connection->executeQuery('SELECT id FROM `user` WHERE username = "admin"')->fetchColumn();
+        $this->userId = Uuid::fromBytesToHex($userId);
+        $this->context = Context::createDefaultContext();
     }
 
-    public function testDefinitionsAreUnique()
+    public function testDefinitionsAreUnique(): void
     {
         $closure = \Closure::fromCallable(function (): array {
             return iterator_to_array($this->definitions);
@@ -82,7 +64,7 @@ class CompositeEntitySearcherTest extends TestCase
             $uniqueDefinitions[$definition->getEntityName()] = $definition;
         }
 
-        static::assertSame(count($uniqueDefinitions), count($closure()));
+        static::assertCount(\count($uniqueDefinitions), $closure());
     }
 
     public function testProductRanking(): void
@@ -99,9 +81,9 @@ class CompositeEntitySearcherTest extends TestCase
             ['id' => Uuid::randomHex(), 'productNumber' => Uuid::randomHex(), 'stock' => 1, 'name' => 'notmatch', 'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 10, 'net' => 9, 'linked' => false]], 'tax' => ['name' => 'notmatch', 'taxRate' => 5], 'manufacturer' => ['name' => 'notmatch']],
         ], $this->context);
 
-        $result = $this->search->search("${filterId}_test ${filterId}_product", 20, $this->context, $this->userId);
+        $result = $this->search->search("${filterId}_test ${filterId}_product", 20, $this->context, PlatformRequest::API_VERSION);
 
-        $productResult = @current(array_filter($result, function ($item) {
+        $productResult = current(array_filter($result, function ($item) {
             return $item['entity'] === $this->getContainer()->get(ProductDefinition::class)->getEntityName();
         }));
 
@@ -115,8 +97,13 @@ class CompositeEntitySearcherTest extends TestCase
         static::assertInstanceOf(ProductEntity::class, $first);
         static::assertInstanceOf(ProductEntity::class, $last);
 
-        $firstScore = $first->getExtension('search')->get('_score');
-        $secondScore = $last->getExtension('search')->get('_score');
+        /** @var ArrayEntity $firstSearchExtension */
+        $firstSearchExtension = $first->getExtension('search');
+        $firstScore = $firstSearchExtension->get('_score');
+
+        /** @var ArrayEntity $secondSearchExtension */
+        $secondSearchExtension = $first->getExtension('search');
+        $secondScore = $secondSearchExtension->get('_score');
 
         static::assertSame($secondScore, $firstScore);
     }

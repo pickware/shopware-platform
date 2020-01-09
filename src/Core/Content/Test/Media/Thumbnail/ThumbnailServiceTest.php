@@ -5,6 +5,8 @@ namespace Shopware\Core\Content\Test\Media\Thumbnail;
 use League\Flysystem\FileNotFoundException;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Media\Aggregate\MediaThumbnail\MediaThumbnailEntity;
+use Shopware\Core\Content\Media\Aggregate\MediaThumbnailSize\MediaThumbnailSizeCollection;
+use Shopware\Core\Content\Media\Aggregate\MediaThumbnailSize\MediaThumbnailSizeEntity;
 use Shopware\Core\Content\Media\Exception\FileTypeNotSupportedException;
 use Shopware\Core\Content\Media\MediaEntity;
 use Shopware\Core\Content\Media\MediaType\DocumentType;
@@ -79,7 +81,7 @@ class ThumbnailServiceTest extends TestCase
         $searchCriteria = new Criteria();
         $searchCriteria->setLimit(1);
         $searchCriteria->addFilter(new EqualsFilter('media.id', $media->getId()));
-        $searchCriteria->addAssociationPath('mediaFolder.configuration.mediaThumbnailSizes');
+        $searchCriteria->addAssociation('mediaFolder.configuration.mediaThumbnailSizes');
 
         $mediaResult = $this->mediaRepository->search($searchCriteria, $this->context);
 
@@ -95,8 +97,7 @@ class ThumbnailServiceTest extends TestCase
         foreach ($thumbnails as $thumbnail) {
             $thumbnailPath = $this->urlGenerator->getRelativeThumbnailUrl(
                 $media,
-                $thumbnail->getWidth(),
-                $thumbnail->getHeight()
+                $thumbnail
             );
             $filtered = $updatedMedia->getMediaFolder()
                 ->getConfiguration()
@@ -136,6 +137,58 @@ class ThumbnailServiceTest extends TestCase
         );
     }
 
+    public function testItUsesOriginalImageIfItsSmallerThanGeneratedThumbnail(): void
+    {
+        $this->setFixtureContext($this->context);
+        $media = $this->getJpgWithFolder();
+
+        $criteria = new Criteria([$media->getId()]);
+        $criteria->addAssociation('mediaFolder.configuration.mediaThumbnailSizes');
+        /** @var MediaEntity $media */
+        $media = $this->mediaRepository->search($criteria, $this->context)->get($media->getId());
+
+        $media->getMediaFolder()->getConfiguration()->setMediaThumbnailSizes(
+            new MediaThumbnailSizeCollection([
+                (new MediaThumbnailSizeEntity())->assign([
+                    'id' => Uuid::randomHex(),
+                    'width' => 1530,
+                    'height' => 1530,
+                ]),
+            ])
+        );
+        $media->getMediaFolder()->getConfiguration()->setThumbnailQuality(100);
+
+        $filePath = $this->urlGenerator->getRelativeMediaUrl($media);
+        $this->getPublicFilesystem()->putStream($filePath, fopen(__DIR__ . '/../fixtures/shopware_optimized.jpg', 'rb'));
+
+        $this->thumbnailService->updateThumbnails(
+            $media,
+            $this->context
+        );
+
+        $this->runWorker();
+
+        /** @var MediaEntity $updatedMedia */
+        $updatedMedia = $this->mediaRepository->search(new Criteria([$media->getId()]), $this->context)->get($media->getId());
+
+        $thumbnails = $updatedMedia->getThumbnails();
+        static::assertEquals(
+            1,
+            $thumbnails->count()
+        );
+
+        $thumbnailPath = $this->urlGenerator->getRelativeThumbnailUrl(
+            $media,
+            $thumbnails->first()
+        );
+
+        static::assertTrue($this->getPublicFilesystem()->has($thumbnailPath));
+
+        $originalSize = $this->getPublicFilesystem()->getSize($filePath);
+        $thumbnailSize = $this->getPublicFilesystem()->getSize($thumbnailPath);
+        static::assertLessThanOrEqual($originalSize, $thumbnailSize);
+    }
+
     public function testItUsesFolderConfigGenerateThumbnails(): void
     {
         $this->setFixtureContext($this->context);
@@ -164,27 +217,28 @@ class ThumbnailServiceTest extends TestCase
         $mediaId = Uuid::randomHex();
         $mediaExtension = 'png';
 
-        $this->mediaRepository->create([
+        $this->mediaRepository->create(
             [
-                'id' => $mediaId,
-                'name' => 'media without thumbnails',
-                'fileExtension' => $mediaExtension,
-                'mimeType' => 'image/png',
-                'fileName' => $mediaId . '-' . (new \DateTime())->getTimestamp(),
-                'thumbnails' => [
-                    [
-                        'width' => 100,
-                        'height' => 100,
-                        'highDpi' => false,
-                    ],
-                    [
-                        'width' => 300,
-                        'height' => 300,
-                        'highDpi' => true,
+                [
+                    'id' => $mediaId,
+                    'name' => 'media without thumbnails',
+                    'fileExtension' => $mediaExtension,
+                    'mimeType' => 'image/png',
+                    'fileName' => $mediaId . '-' . (new \DateTime())->getTimestamp(),
+                    'thumbnails' => [
+                        [
+                            'width' => 100,
+                            'height' => 100,
+                            'highDpi' => false,
+                        ],
+                        [
+                            'width' => 300,
+                            'height' => 300,
+                            'highDpi' => true,
+                        ],
                     ],
                 ],
             ],
-        ],
             $this->context
         );
 
@@ -200,8 +254,7 @@ class ThumbnailServiceTest extends TestCase
         foreach ($media->getThumbnails() as $thumbnail) {
             $thumbnailUrl = $this->urlGenerator->getRelativeThumbnailUrl(
                 $media,
-                $thumbnail->getWidth(),
-                $thumbnail->getHeight()
+                $thumbnail
             );
             $this->getPublicFilesystem()->put($thumbnailUrl, 'test content');
             $thumbnailUrls[] = $thumbnailUrl;
@@ -277,7 +330,7 @@ class ThumbnailServiceTest extends TestCase
 
         $criteria = new Criteria([$media->getId()]);
         $criteria->addAssociation('thumbnails');
-        $criteria->addAssociationPath('mediaFolder.configuration.mediaThumbnailSizes');
+        $criteria->addAssociation('mediaFolder.configuration.mediaThumbnailSizes');
 
         $media = $this->mediaRepository->search($criteria, $this->context)->get($media->getId());
 
@@ -306,7 +359,7 @@ class ThumbnailServiceTest extends TestCase
 
         /** @var MediaThumbnailEntity $thumbnail */
         foreach ($filteredThumbnails as $thumbnail) {
-            $path = $this->urlGenerator->getRelativeThumbnailUrl($media, $thumbnail->getWidth(), $thumbnail->getHeight());
+            $path = $this->urlGenerator->getRelativeThumbnailUrl($media, $thumbnail);
             static::assertTrue(
                 $this->getPublicFilesystem()->has($path),
                 'Thumbnail: ' . $path . ' does not exist'

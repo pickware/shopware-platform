@@ -17,8 +17,7 @@ learn creating a plugin at first.
 ## Injecting into the administration
 
 The main entry point to extend the administration via plugin is the `main.js` file.
-It has to be placed into a `<plugin root>/src/Resources/admininistration` directory in order to be found by Shopware 6.
-*Note: This path can be changed by overriding the [getAdministrationEntryPath](./../2-internals/4-plugins/020-plugin-base-class.md#getAdministrationEntryPath) method of your plugin's base class.*
+It has to be placed into a `<plugin root>/src/Resources/app/administration/src` directory in order to be found by Shopware 6.
 
 ## Creating a custom component
 
@@ -30,17 +29,17 @@ by several other components, such as an element that prints 'Hello world' everyw
 
 In order to properly structure your plugin's code and to be similar to the core structure, you have to answer this question first.
 If it's going to be used as page for a module, it should be placed here:
-`<plugin-root>/src/Resources/administration/module/<your module's name>/page/<your component name>`
+`<plugin-root>/src/Resources/app/administration/src/module/<your module's name>/page/<your component name>`
 
 Otherwise, if it's going to be a general component to be used by other components, the following will be the proper path.
 For this example, this scenario is used.
-`<plugin-root>/src/Resources/administration/app/component/<name of your plugin>/<name of your component>`
+`<plugin-root>/src/Resources/app/administration/app/src/component/<name of your plugin>/<name of your component>`
 
 Those are **not** a hard requirement, but rather a recommendation. This way, third party developers having a glance at your code will
 get used to it real quick, because you sticked to Shopware 6's core conventions.
 
 Since the latter example is being used, this is the path being created in the plugin now:
-`<plugin-root>/src/Resources/administration/app/component/custom-component/hello-world`
+`<plugin-root>/src/Resources/app/administration/app/src/component/custom-component/hello-world`
 
 ### Main.js
 
@@ -57,17 +56,10 @@ import './app/component/custom-component/hello-world';
 Head back to the `index.js` file, this one will be the most important for your component.
 
 First of all, you have to register your component using the `ComponentFactory`, which is available throughout our third party wrapper.
+This `Component` object provides a method `register`, which expects a name and a configuration for your component.
 
 ```js
-import { Component } from 'src/core/shopware';
-```
-
-This `Component` provides a method `register`, which expects a name and a configuration for your component.
-
-```js
-import { Component } from 'src/core/shopware';
-
-Component.register('hello-world', {
+Shopware.Component.register('hello-world', {
     // Configuration here
 });
 ```
@@ -76,9 +68,7 @@ A component's template is being defined by using the `template` property. For th
 An example for a bigger template will also be provided later on this page.
 
 ```js
-import { Component } from 'src/core/shopware';
-
-Component.register('hello-world', {
+Shopware.Component.register('hello-world', {
     template: '<h2>Hello world!</h2>'
 });
 ```
@@ -93,20 +83,18 @@ For this example `hello-world.html.twig` is used.
 
 Now simply import this file in your component's JS file and use the variable for your property.
 ```js
-import { Component } from 'src/core/shopware';
 import template from 'hello-world.html.twig';
 
-Component.register('hello-world', {
+Shopware.Component.register('hello-world', {
     template: template
 });
 ```
 
 In the core code, you will find another syntax for the same result though:
 ```js
-import { Component } from 'src/core/shopware';
 import template from 'hello-world.html.twig';
 
-Component.register('hello-world', {
+Shopware.Component.register('hello-world', {
     template
 });
 ```

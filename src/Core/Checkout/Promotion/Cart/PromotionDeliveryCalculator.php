@@ -33,14 +33,18 @@ use Shopware\Core\System\SalesChannel\SalesChannelContext;
  */
 class PromotionDeliveryCalculator
 {
+    use PromotionCartInformationTrait;
+
     /**
      * @var QuantityPriceCalculator
      */
     private $quantityPriceCalculator;
+
     /**
      * @var PercentagePriceCalculator
      */
     private $percentagePriceCalculator;
+
     /**
      * @var PromotionItemBuilder
      */
@@ -66,7 +70,7 @@ class PromotionDeliveryCalculator
      * @throws \Shopware\Core\Checkout\Cart\Exception\MixedLineItemTypeException
      * @throws \Shopware\Core\Checkout\Cart\Exception\PayloadKeyNotFoundException
      */
-    public function calculate(LineItemCollection $discountLineItems, Cart $toCalculate, SalesChannelContext $context): void
+    public function calculate(LineItemCollection $discountLineItems, Cart $original, Cart $toCalculate, SalesChannelContext $context): void
     {
         $notDiscountedDeliveriesValue = $toCalculate->getDeliveries()->getShippingCosts()->sum()->getTotalPrice();
 
@@ -88,15 +92,19 @@ class PromotionDeliveryCalculator
             }
 
             if (!$this->isRequirementValid($discountItem, $toCalculate, $context)) {
+                $this->addDeleteNoticeToCart($original, $toCalculate, $discountItem);
+
                 continue;
             }
 
-            /** @var bool $deliveryItemAdded */
             $deliveryItemAdded = $this->calculateDeliveryPromotion($toCalculate, $discountItem, $context, $notDiscountedDeliveriesValue);
 
             if ($deliveryItemAdded) {
                 // ensure that a lineItem will be added to cart if a discount has been added
                 $this->addFakeLineitem($toCalculate, $discountItem, $context);
+                $this->addAddedNoticeToCart($original, $toCalculate, $discountItem);
+            } else {
+                $this->addDeleteNoticeToCart($original, $toCalculate, $discountItem);
             }
         }
     }
@@ -120,7 +128,7 @@ class PromotionDeliveryCalculator
                 return false;
             }
 
-            if ($discountLineItem->getPayloadValue('discountType') === PromotionDiscountEntity::TYPE_FIXED) {
+            if ($discountLineItem->getPayloadValue('discountType') === PromotionDiscountEntity::TYPE_FIXED_UNIT) {
                 return true;
             }
 
@@ -144,10 +152,10 @@ class PromotionDeliveryCalculator
             $priceDefB = $discountB->getPriceDefinition();
 
             if (!$priceDefA instanceof AbsolutePriceDefinition) {
-                throw new InvalidPriceDefinitionException($discountA);
+                throw new InvalidPriceDefinitionException($discountA->getLabel(), $discountA->getReferencedId());
             }
             if (!$priceDefB instanceof AbsolutePriceDefinition) {
-                throw new InvalidPriceDefinitionException($discountB);
+                throw new InvalidPriceDefinitionException($discountB->getLabel(), $discountB->getReferencedId());
             }
 
             if ($priceDefA->getPrice() === $priceDefB->getPrice()) {
@@ -201,7 +209,7 @@ class PromotionDeliveryCalculator
         switch ($discountType) {
             case PromotionDiscountEntity::TYPE_ABSOLUTE:
                 if (!$originalPriceDefinition instanceof AbsolutePriceDefinition) {
-                    throw new InvalidPriceDefinitionException($discountLineItem);
+                    throw new InvalidPriceDefinitionException($discountLineItem->getLabel(), $discountLineItem->getReferencedId());
                 }
 
                 $discountAdded = $this->calculateAbsolute($deliveries, $originalPriceDefinition, $context);
@@ -209,7 +217,7 @@ class PromotionDeliveryCalculator
                 break;
             case PromotionDiscountEntity::TYPE_PERCENTAGE:
                 if (!$originalPriceDefinition instanceof PercentagePriceDefinition) {
-                    throw new InvalidPriceDefinitionException($discountLineItem);
+                    throw new InvalidPriceDefinitionException($discountLineItem->getLabel(), $discountLineItem->getReferencedId());
                 }
 
                 $discountMaxValue = '';
@@ -221,9 +229,9 @@ class PromotionDeliveryCalculator
                 $discountAdded = $this->calculatePercentage($deliveries, $originalPriceDefinition, $context, $discountMaxValue);
 
                 break;
-            case PromotionDiscountEntity::TYPE_FIXED:
+            case PromotionDiscountEntity::TYPE_FIXED_UNIT:
                 if (!$originalPriceDefinition instanceof AbsolutePriceDefinition) {
-                    throw new InvalidPriceDefinitionException($discountLineItem);
+                    throw new InvalidPriceDefinitionException($discountLineItem->getLabel(), $discountLineItem->getReferencedId());
                 }
 
                 $discountAdded = $this->calculateFixedDiscount($deliveries, $originalPriceDefinition, $context, $notDiscountedShippingCosts);
@@ -302,7 +310,7 @@ class PromotionDeliveryCalculator
         // we may only discount the available shipping costs (these may be reduced by another discount before)
         $maxReducedPrice = $deliveries->getShippingCosts()->sum()->getTotalPrice();
 
-        if (strlen($maxValue) > 0) {
+        if (mb_strlen($maxValue) > 0) {
             $castedMaxValue = (float) $maxValue;
 
             if ($castedMaxValue < $maxReducedPrice) {
@@ -347,7 +355,6 @@ class PromotionDeliveryCalculator
             return $deliveryAdded;
         }
 
-        /** @var float $dynamicDiscountPriceValue */
         $dynamicDiscountPriceValue = $notDiscountedShippingCosts - $fixedPrice;
 
         if ($maxReducedPrice < $dynamicDiscountPriceValue) {

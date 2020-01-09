@@ -4,6 +4,7 @@ namespace Shopware\Core\Content\MailTemplate\Aggregate\MailTemplateType;
 
 use Shopware\Core\Content\MailTemplate\Aggregate\MailTemplateSalesChannel\MailTemplateSalesChannelCollection;
 use Shopware\Core\Content\MailTemplate\Aggregate\MailTemplateTypeTranslation\MailTemplateTypeTranslationCollection;
+use Shopware\Core\Content\MailTemplate\MailTemplateCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
 
@@ -32,7 +33,7 @@ class MailTemplateTypeEntity extends Entity
     protected $translations;
 
     /**
-     * @var MailTemplateTypeCollection|null
+     * @var MailTemplateCollection|null
      */
     protected $mailTemplates;
 
@@ -91,17 +92,17 @@ class MailTemplateTypeEntity extends Entity
         $this->availableEntities = $availableEntities;
     }
 
-    public function setTranslations(?MailTemplateTypeTranslationCollection $translations): void
+    public function setTranslations(MailTemplateTypeTranslationCollection $translations): void
     {
         $this->translations = $translations;
     }
 
-    public function getMailTemplates(): ?MailTemplateTypeCollection
+    public function getMailTemplates(): ?MailTemplateCollection
     {
         return $this->mailTemplates;
     }
 
-    public function setMailTemplates(?MailTemplateTypeCollection $mailTemplates): void
+    public function setMailTemplates(MailTemplateCollection $mailTemplates): void
     {
         $this->mailTemplates = $mailTemplates;
     }
@@ -116,32 +117,12 @@ class MailTemplateTypeEntity extends Entity
         $this->customFields = $customFields;
     }
 
-    public function getCreatedAt(): \DateTimeInterface
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTimeInterface $createdAt): void
-    {
-        $this->createdAt = $createdAt;
-    }
-
-    public function getUpdatedAt(): \DateTimeInterface
-    {
-        return $this->updatedAt;
-    }
-
-    public function setUpdatedAt(\DateTimeInterface $updatedAt): void
-    {
-        $this->updatedAt = $updatedAt;
-    }
-
     public function getSalesChannels(): ?MailTemplateSalesChannelCollection
     {
         return $this->salesChannels;
     }
 
-    public function setSalesChannels(?MailTemplateSalesChannelCollection $salesChannels): void
+    public function setSalesChannels(MailTemplateSalesChannelCollection $salesChannels): void
     {
         $this->salesChannels = $salesChannels;
     }

@@ -5,7 +5,7 @@ namespace Shopware\Core\Checkout\Promotion\DataAbstractionLayer\Indexing;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
 use Shopware\Core\Checkout\Promotion\PromotionDefinition;
-use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityDeletedEvent;
@@ -15,7 +15,6 @@ use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class PromotionExclusionIndexer implements IndexerInterface
@@ -39,16 +38,18 @@ class PromotionExclusionIndexer implements IndexerInterface
      * @var PromotionDefinition
      */
     private $promotionDefinition;
+
     /**
-     * @var TagAwareAdapterInterface
+     * @var CacheClearer
      */
     private $cache;
+
     /**
      * @var EntityCacheKeyGenerator
      */
     private $cacheKeyGenerator;
 
-    public function __construct(TagAwareAdapterInterface $cache, Connection $connection, EventDispatcherInterface $eventDispatcher, IteratorFactory $iteratorFactory, PromotionDefinition $promotionDefinition, EntityCacheKeyGenerator $cacheKeyGenerator)
+    public function __construct(CacheClearer $cache, Connection $connection, EventDispatcherInterface $eventDispatcher, IteratorFactory $iteratorFactory, PromotionDefinition $promotionDefinition, EntityCacheKeyGenerator $cacheKeyGenerator)
     {
         $this->connection = $connection;
         $this->eventDispatcher = $eventDispatcher;
@@ -60,8 +61,6 @@ class PromotionExclusionIndexer implements IndexerInterface
 
     public function index(\DateTimeInterface $timestamp): void
     {
-        $context = Context::createDefaultContext();
-
         $iterator = $this->iteratorFactory->createIterator($this->promotionDefinition);
 
         if ($iterator->fetchCount() === 0) {
@@ -74,7 +73,7 @@ class PromotionExclusionIndexer implements IndexerInterface
         );
 
         while ($ids = $iterator->fetch()) {
-            $this->update($ids, $context);
+            $this->update($ids);
 
             $this->eventDispatcher->dispatch(
                 new ProgressAdvancedEvent(\count($ids)),
@@ -88,9 +87,23 @@ class PromotionExclusionIndexer implements IndexerInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $iterator = $this->iteratorFactory->createIterator($this->promotionDefinition, $lastId);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            return null;
+        }
+
+        $this->update($ids);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $nested = $event->getEventByDefinition(PromotionDefinition::class);
+        $nested = $event->getEventByEntityName(PromotionDefinition::ENTITY_NAME);
 
         if ($nested === null) {
             return;
@@ -99,8 +112,13 @@ class PromotionExclusionIndexer implements IndexerInterface
         if ($nested instanceof EntityDeletedEvent) {
             $this->delete($nested->getIds());
         } else {
-            $this->update($nested->getIds(), $event->getContext());
+            $this->update($nested->getIds());
         }
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.PromotionExclusionIndexer';
     }
 
     /**
@@ -126,7 +144,7 @@ class PromotionExclusionIndexer implements IndexerInterface
      * function is called when a promotion is saved.
      * the exclusions of promotions will be checked and are written/deleted if necessary
      */
-    private function update(array $ids, Context $context): void
+    private function update(array $ids): void
     {
         // if there are no ids, we don't have to do anything
         if (empty($ids)) {
@@ -137,7 +155,6 @@ class PromotionExclusionIndexer implements IndexerInterface
 
         foreach ($ids as $id) {
             // get exclusions for this id and prepare it as hex array
-            /** @var array $exclusions */
             $exclusions = $this->getExclusionIds($id);
 
             $this->addTags($tags, [$id]);
@@ -171,6 +188,7 @@ class PromotionExclusionIndexer implements IndexerInterface
             if (count($results) === count($promotionExclusions)) {
                 // if there is no corrupted data we will add id to all excluded promotions too
                 $this->addToJSON($id, $promotionExclusions);
+
                 continue;
             }
 
@@ -317,19 +335,6 @@ class PromotionExclusionIndexer implements IndexerInterface
         }
 
         return $results;
-
-        $query = $this->connection->createQueryBuilder();
-        $query->select([
-            'HEX(id)',
-        ]);
-        $query->from($this->promotionDefinition::ENTITY_NAME);
-        $query->andWhere('id IN (:ids)');
-
-        $query->setParameter('ids', $bytes, Connection::PARAM_STR_ARRAY);
-
-        $rows = $query->execute()->fetchAll();
-
-        return $rows;
     }
 
     /**

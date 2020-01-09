@@ -72,7 +72,7 @@ class LineItemWithQuantityRule extends Rule
                     return $quantity !== $this->quantity;
 
                 default:
-                    throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                    throw new UnsupportedOperatorException($this->operator, self::class);
             }
         }
 
@@ -85,6 +85,7 @@ class LineItemWithQuantityRule extends Rule
             'id' => [new NotBlank(), new Uuid()],
             'quantity' => [new NotBlank(), new Type('int')],
             'operator' => [
+                new NotBlank(),
                 new Choice(
                     [
                         self::OPERATOR_EQ,

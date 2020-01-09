@@ -2,34 +2,21 @@
 
 namespace Shopware\Core\System\Test\SystemConfig;
 
-use Composer\Autoload\ClassLoader;
 use PHPUnit\Framework\TestCase;
-use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
 use Shopware\Core\System\SystemConfig\Exception\BundleConfigNotFoundException;
 use Shopware\Core\System\SystemConfig\Exception\BundleNotFoundException;
 use Shopware\Core\System\SystemConfig\Service\ConfigurationService;
 use Shopware\Core\System\SystemConfig\Util\ConfigReader;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use SwagExampleTest\SwagExampleTest;
+use SwagInvalidTest\SwagInvalidTest;
+use Symfony\Component\HttpKernel\Bundle\BundleInterface;
 
 class ConfigurationServiceTest extends TestCase
 {
-    use DatabaseTransactionBehaviour;
-
-    /**
-     * @var ContainerInterface
-     */
-    private $container;
-
     /**
      * @var ConfigurationService
      */
     private $configurationService;
-
-    /**
-     * @var Context
-     */
-    private $context;
 
     protected function setUp(): void
     {
@@ -46,28 +33,17 @@ class ConfigurationServiceTest extends TestCase
     {
         $this->expectException(BundleConfigNotFoundException::class);
         $this->configurationService->getConfiguration(
-            \SwagInvalidTest\SwagInvalidTest::PLUGIN_NAME
+            SwagInvalidTest::PLUGIN_NAME
         );
     }
 
     public function testGetConfigurationFromBundleWithoutExistingValues(): void
     {
         $actualConfig = $this->configurationService->getConfiguration(
-            \SwagExampleTest\SwagExampleTest::PLUGIN_NAME
+            SwagExampleTest::PLUGIN_NAME
         );
 
         static::assertSame($this->getConfigWithoutValues(), $actualConfig);
-    }
-
-    protected function getContainer(): ContainerInterface
-    {
-        if ($this->container === null) {
-            $kernel = new TestKernel('system_config_test', true, new ClassLoader());
-            $kernel->boot();
-            $this->container = $kernel->getContainer();
-        }
-
-        return $this->container;
     }
 
     private function getConfigWithoutValues(): array
@@ -130,6 +106,20 @@ class ConfigurationServiceTest extends TestCase
 
     private function getConfigurationService(): ConfigurationService
     {
-        return new ConfigurationService($this->getContainer()->get('kernel'), new ConfigReader());
+        return new ConfigurationService($this->getTestPlugins(), new ConfigReader());
+    }
+
+    /**
+     * @return BundleInterface[]
+     */
+    private function getTestPlugins(): array
+    {
+        require_once __DIR__ . '/_fixtures/SwagExampleTest/SwagExampleTest.php';
+        require_once __DIR__ . '/_fixtures/SwagInvalidTest/SwagInvalidTest.php';
+
+        return [
+            new SwagExampleTest(true, __DIR__ . '/_fixtures/SwagExampleTest'),
+            new SwagInvalidTest(true, __DIR__ . '/_fixtures/SwagInvalidTest/SwagInvalidTest.php'),
+        ];
     }
 }

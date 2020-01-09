@@ -3,16 +3,17 @@
 namespace Shopware\Storefront\Test\Framework\Seo\Api;
 
 use Doctrine\DBAL\Connection;
-use function Flag\skipTestNext741;
 use PHPUnit\Framework\TestCase;
+use Shopware\Core\Content\Category\CategoryDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
+use Shopware\Core\Content\Seo\Exception\SeoUrlRouteNotFoundException;
+use Shopware\Core\Content\Seo\SeoUrlTemplate\SeoUrlTemplateEntity;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Test\Seo\StorefrontSalesChannelTestHelper;
 use Shopware\Core\Framework\Test\TestCaseBase\AdminFunctionalTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Shopware\Storefront\Framework\Seo\Exception\SeoUrlRouteNotFoundException;
+use Shopware\Storefront\Framework\Seo\SeoUrlRoute\NavigationPageSeoUrlRoute;
 use Shopware\Storefront\Framework\Seo\SeoUrlRoute\ProductPageSeoUrlRoute;
-use Shopware\Storefront\Framework\Seo\SeoUrlTemplate\SeoUrlTemplateEntity;
-use Shopware\Storefront\Test\Framework\Seo\StorefrontSalesChannelTestHelper;
 
 class SeoActionControllerTest extends TestCase
 {
@@ -38,6 +39,7 @@ class SeoActionControllerTest extends TestCase
 
     public function testValidateInvalid(): void
     {
+        $this->createTestProduct();
         $template = new SeoUrlTemplateEntity();
         $template->setRouteName('frontend.detail.page');
         $template->setTemplate('{{ product.name }');
@@ -54,11 +56,12 @@ class SeoActionControllerTest extends TestCase
 
     public function testValidateValid(): void
     {
+        $this->createTestProduct();
         $template = new SeoUrlTemplateEntity();
         $template->setRouteName('frontend.detail.page');
         $template->setTemplate('{{ product.name }}');
         $template->setEntityName($this->getContainer()->get(ProductDefinition::class)->getEntityName());
-        $template->setSalesChannelId(Defaults::SALES_CHANNEL);
+        $template->setSalesChannelId(null);
 
         $this->getBrowser()->request('POST', '/api/v1/_action/seo-url-template/validate', $template->jsonSerialize());
         $response = $this->getBrowser()->getResponse();
@@ -106,26 +109,7 @@ class SeoActionControllerTest extends TestCase
 
     public function testPreview(): void
     {
-        $product = [
-            'id' => Uuid::randomHex(),
-            'productNumber' => Uuid::randomHex(),
-            'name' => 'foo bar',
-            'price' => [
-                [
-                    'currencyId' => Defaults::CURRENCY,
-                    'gross' => 10,
-                    'net' => 20,
-                    'linked' => false,
-                ],
-            ],
-            'manufacturer' => [
-                'id' => Uuid::randomHex(),
-                'name' => 'test',
-            ],
-            'tax' => ['name' => 'test', 'taxRate' => 15],
-            'stock' => 0,
-        ];
-        $this->getBrowser()->request('POST', '/api/v1/product', $product);
+        $this->createTestProduct();
 
         $data = [
             'routeName' => ProductPageSeoUrlRoute::ROUTE_NAME,
@@ -140,7 +124,34 @@ class SeoActionControllerTest extends TestCase
 
         $data = json_decode($response->getContent(), true);
 
-        static::assertEquals('foo-bar', $data[0]['seoPathInfo']);
+        static::assertEquals('test', $data[0]['seoPathInfo']);
+    }
+
+    public function testPreviewWithSalesChannel(): void
+    {
+        $salesChannelId = Uuid::randomHex();
+        $this->createStorefrontSalesChannelContext($salesChannelId, 'test');
+
+        $aId = $this->createTestCategory('A');
+        $this->createTestCategory('B', $aId);
+
+        $this->updateSalesChannelNavigationEntryPoint($salesChannelId, $aId);
+
+        $data = [
+            'routeName' => NavigationPageSeoUrlRoute::ROUTE_NAME,
+            'entityName' => $this->getContainer()->get(CategoryDefinition::class)->getEntityName(),
+            'template' => NavigationPageSeoUrlRoute::DEFAULT_TEMPLATE,
+            'salesChannelId' => $salesChannelId,
+        ];
+        $this->getBrowser()->request('POST', '/api/v1/_action/seo-url-template/preview', $data);
+
+        $response = $this->getBrowser()->getResponse();
+        static::assertEquals(200, $response->getStatusCode(), $response->getContent());
+
+        $data = json_decode($response->getContent(), true);
+
+        $urls = array_column($data, 'seoPathInfo');
+        static::assertContains('B/', $urls);
     }
 
     public function testUnknownRoute(): void
@@ -163,31 +174,12 @@ class SeoActionControllerTest extends TestCase
 
     public function testUpdateDefaultCanonical(): void
     {
-        skipTestNext741($this);
+        $salesChannelId = Uuid::randomHex();
+        $this->createStorefrontSalesChannelContext($salesChannelId, 'test');
 
-        $id = Uuid::randomHex();
-        $product = [
-            'id' => $id,
-            'productNumber' => Uuid::randomHex(),
-            'name' => 'test',
-            'price' => [
-                [
-                    'currencyId' => Defaults::CURRENCY,
-                    'gross' => 10,
-                    'net' => 20,
-                    'linked' => false,
-                ],
-            ],
-            'manufacturer' => [
-                'id' => Uuid::randomHex(),
-                'name' => 'test',
-            ],
-            'tax' => ['name' => 'test', 'taxRate' => 15],
-            'stock' => 0,
-        ];
-        $this->getBrowser()->request('POST', '/api/v1/product', $product);
+        $id = $this->createTestProduct();
 
-        $seoUrls = $this->getSeoUrls($id, true);
+        $seoUrls = $this->getSeoUrls($id, true, $salesChannelId);
         static::assertCount(1, $seoUrls);
 
         $seoUrl = $seoUrls[0]['attributes'];
@@ -202,7 +194,7 @@ class SeoActionControllerTest extends TestCase
         $response = $this->getBrowser()->getResponse();
         static::assertEquals(204, $response->getStatusCode(), $response->getContent());
 
-        $seoUrls = $this->getSeoUrls($id, true);
+        $seoUrls = $this->getSeoUrls($id, true, $salesChannelId);
         static::assertCount(1, $seoUrls);
         $seoUrl = $seoUrls[0]['attributes'];
         static::assertTrue($seoUrl['isModified']);
@@ -215,7 +207,7 @@ class SeoActionControllerTest extends TestCase
         $this->getBrowser()->request('PATCH', '/api/v1/product/' . $id, $productUpdate);
 
         // seo url is not updated with the product
-        $seoUrls = $this->getSeoUrls($id, true);
+        $seoUrls = $this->getSeoUrls($id, true, $salesChannelId);
         static::assertCount(1, $seoUrls);
         $seoUrl = $seoUrls[0]['attributes'];
         static::assertTrue($seoUrl['isModified']);
@@ -224,32 +216,10 @@ class SeoActionControllerTest extends TestCase
 
     public function testUpdateCanonicalWithCustomSalesChannel(): void
     {
-        skipTestNext741($this);
-
         $salesChannelId = Uuid::randomHex();
         $this->createStorefrontSalesChannelContext($salesChannelId, 'test');
 
-        $id = Uuid::randomHex();
-        $product = [
-            'id' => $id,
-            'productNumber' => Uuid::randomHex(),
-            'name' => 'test',
-            'price' => [
-                [
-                    'currencyId' => Defaults::CURRENCY,
-                    'gross' => 10,
-                    'net' => 20,
-                    'linked' => false,
-                ],
-            ],
-            'manufacturer' => [
-                'id' => Uuid::randomHex(),
-                'name' => 'test',
-            ],
-            'tax' => ['name' => 'test', 'taxRate' => 15],
-            'stock' => 0,
-        ];
-        $this->getBrowser()->request('POST', '/api/v1/product', $product);
+        $id = $this->createTestProduct();
 
         $seoUrls = $this->getSeoUrls($id, true, $salesChannelId);
         static::assertCount(1, $seoUrls);
@@ -273,9 +243,11 @@ class SeoActionControllerTest extends TestCase
         static::assertTrue($seoUrl['isModified']);
         static::assertEquals($newSeoPathInfo, $seoUrl['seoPathInfo']);
 
+        $newProductNumber = Uuid::randomHex();
         $productUpdate = [
             'id' => $id,
             'name' => 'updated-name',
+            'productNumber' => $newProductNumber,
         ];
         $this->getBrowser()->request('PATCH', '/api/v1/product/' . $id, $productUpdate);
 
@@ -285,14 +257,6 @@ class SeoActionControllerTest extends TestCase
         $seoUrl = $seoUrls[0]['attributes'];
         static::assertTrue($seoUrl['isModified']);
         static::assertEquals($newSeoPathInfo, $seoUrl['seoPathInfo']);
-
-        // the seoPathInfo for the default sales channel is updated
-        $seoUrls = $this->getSeoUrls($id, true, null);
-        static::assertCount(1, $seoUrls);
-        $seoUrl = $seoUrls[0]['attributes'];
-        static::assertFalse($seoUrl['isModified']);
-        $expectedPath = $productUpdate['name'] . '/' . $product['productNumber'];
-        static::assertEquals($expectedPath, $seoUrl['seoPathInfo']);
     }
 
     private function getSeoUrls(string $id, ?bool $canonical = null, ?string $salesChannelId = null): array
@@ -312,5 +276,45 @@ class SeoActionControllerTest extends TestCase
         $content = $this->getBrowser()->getResponse()->getContent();
 
         return json_decode($content, true)['data'];
+    }
+
+    private function createTestProduct(): string
+    {
+        $id = Uuid::randomHex();
+        $product = [
+            'id' => $id,
+            'productNumber' => Uuid::randomHex(),
+            'name' => 'test',
+            'price' => [
+                [
+                    'currencyId' => Defaults::CURRENCY,
+                    'gross' => 10,
+                    'net' => 20,
+                    'linked' => false,
+                ],
+            ],
+            'manufacturer' => [
+                'id' => Uuid::randomHex(),
+                'name' => 'test',
+            ],
+            'tax' => ['name' => 'test', 'taxRate' => 15],
+            'stock' => 0,
+        ];
+        $this->getBrowser()->request('POST', '/api/v1/product', $product);
+
+        return $id;
+    }
+
+    private function createTestCategory(string $name, ?string $parentId = null): string
+    {
+        $id = Uuid::randomHex();
+        $product = [
+            'id' => $id,
+            'name' => $name,
+            'parentId' => $parentId,
+        ];
+        $this->getBrowser()->request('POST', '/api/v1/category', $product);
+
+        return $id;
     }
 }

@@ -2,13 +2,14 @@
 
 namespace Shopware\Core\Framework\Api\Response\Type\Api;
 
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\ContextSource;
 use Shopware\Core\Framework\Api\Response\Type\JsonFactoryBase;
 use Shopware\Core\Framework\Api\Serializer\JsonEntityEncoder;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
-use Shopware\Core\Framework\Context\ContextSource;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -31,14 +32,20 @@ class JsonType extends JsonFactoryBase
         return $contentType === 'application/json' && $origin instanceof AdminApiSource;
     }
 
-    public function createDetailResponse(Entity $entity, EntityDefinition $definition, Request $request, Context $context, bool $setLocationHeader = false): Response
+    public function createDetailResponse(Criteria $criteria, Entity $entity, EntityDefinition $definition, Request $request, Context $context, bool $setLocationHeader = false): Response
     {
         $headers = [];
         if ($setLocationHeader) {
             $headers['Location'] = $this->getEntityBaseUrl($request, $definition) . '/' . $entity->getUniqueIdentifier();
         }
 
-        $decoded = $this->encoder->encode($definition, $entity, $this->getApiBaseUrl($request));
+        $decoded = $this->encoder->encode(
+            $criteria,
+            $definition,
+            $entity,
+            $this->getApiBaseUrl($request),
+            $request->attributes->getInt('version')
+        );
 
         $response = [
             'data' => $decoded,
@@ -47,9 +54,15 @@ class JsonType extends JsonFactoryBase
         return new JsonResponse($response, JsonResponse::HTTP_OK, $headers);
     }
 
-    public function createListingResponse(EntitySearchResult $searchResult, EntityDefinition $definition, Request $request, Context $context): Response
+    public function createListingResponse(Criteria $criteria, EntitySearchResult $searchResult, EntityDefinition $definition, Request $request, Context $context): Response
     {
-        $decoded = $this->encoder->encode($definition, $searchResult->getEntities(), $this->getApiBaseUrl($request));
+        $decoded = $this->encoder->encode(
+            $criteria,
+            $definition,
+            $searchResult->getEntities(),
+            $this->getApiBaseUrl($request),
+            $request->attributes->getInt('version')
+        );
 
         $response = [
             'total' => $searchResult->getTotal(),
@@ -58,7 +71,7 @@ class JsonType extends JsonFactoryBase
 
         $aggregations = [];
         foreach ($searchResult->getAggregations() as $aggregation) {
-            $aggregations[$aggregation->getName()] = $aggregation->getResult();
+            $aggregations[$aggregation->getName()] = $aggregation;
         }
 
         $response['aggregations'] = $aggregations;

@@ -54,14 +54,19 @@ Basic example for `theme.json`:
   },
   "style": [
     "@Storefront",
-    "Resources/style/base.scss"
+    "Resources/storefront/style/base.scss"
+  ],
+  "views": [
+    "@Storefront",
+    "@Plugins",
+    "@JustAnotherTheme"
   ],
   "script": [
     "@Storefront",
-    "Resources/dist/js/plugin-name.js"
+    "Resources/storefront/dist/script/all.js"
   ],
   "asset": [
-    "dist/assets"
+    "Resources/storefront/asset"
   ]
 }
 ```
@@ -73,36 +78,15 @@ Common options:
 | style    | Array of paths to style files (e.g. *.css/*.scss          |
 | script   | Array of paths to compiled script files (e.g. javascript) |
 | asset    | Array of paths to asset folders                           |
+| views    | Array of theme or plugin names                            |
 
-Using `@Storefront` in the `style` and `script` array specifies that your theme extends
+Using `@Storefront` in the `style`, `views` and `script` array specifies that your theme extends
 the basic storefront theme which ships with shopware. This is useful if a theme just makes some
 adjustments to this theme or to use it as a starting point.
 Without these entries the storefront would be completely unstyled.
 
 Please be aware that all paths have to be relative to the theme.json 
 without leading and trailing slashes.
-
-If you want to change the location of the `theme.json`, define the method `getThemeConfigPath`
-in the plugin bootstrap file.
-
-Example:
-
-```php
-<?php declare(strict_types=1);
-
-namespace Swag\ThemeQuickStart;
-
-use Shopware\Core\Framework\Plugin;
-use Showpare\Storefront\Framework\ThemeInterface;
-
-class ThemeQuickStart extends Plugin implements ThemeInterface
-{
-        public function getThemeConfigPath(): string
-        {
-            return 'theme.json';
-        }
-}
-```
 
 Once you have created a custom theme you need to install and activate it:
 ```bash
@@ -119,6 +103,27 @@ This command checks all plugins and if a new theme is found, it will be register
 Please be aware that this command currently doesn't recognize changes in the config, name or
 author of the theme.
 
+## Theme template inheritance
+The inheritance of the templates can be controlled via the `views` option. Here you define the order in which the templates are to be loaded.
+To illustrate this, here is an example for the `views` configuration:
+
+```json
+{
+  "views": [
+    "@Storefront",
+    "@Plugins",
+    "@PayPal",
+    "@MyTheme"
+  ]
+}
+```
+
+Defining the above configuration results in the following behavior:
+* Templates are first searched in `@MyTheme`.
+* The specification of `@PayPal` allows to control the order for a specific plugin more precisely
+* `@Plugins` serves as a placeholder and defines that the `@MyTheme` and `@PayPal` should be searched for in all other plugins for the templates
+* `@Storefront` then defines that the shopware storefront theme should be used as the last inheritance level.
+
 ## Theme assets
 You can add custom styles or javascript by using the `style` and `script` property in the `theme.json`.
 Example `theme.json`
@@ -132,11 +137,11 @@ Example `theme.json`
   },
   "style": [
     "@Storefront",
-    "Resources/style/base.scss"
+    "Resources/storefront/style/base.scss"
   ],
   "script": [
     "@Storefront",
-    "Resources/dist/js/plugin-name.js"
+    "Resources/storefront/dist/script/all.js"
   ]
 }
 ```
@@ -215,6 +220,7 @@ The following parameters can be defined for a config field item:
 | editable     | If set to false, the config option will not be displayed (e.g. in the administration |
 | block        | Name of a block to organize the config options                                       |
 | section      | Name of a section to organize the config options                                     |
+| custom       | The defined data will not be processed but is available via API                      |
 
 
 If your plugin is installed and active, Shopware will automatically collect all your 

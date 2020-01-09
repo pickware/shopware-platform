@@ -6,6 +6,7 @@ use League\Flysystem\FilesystemInterface;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderEntity;
 use Shopware\Core\Content\Media\Aggregate\MediaFolderConfiguration\MediaFolderConfigurationEntity;
 use Shopware\Core\Content\Media\Aggregate\MediaThumbnail\MediaThumbnailCollection;
+use Shopware\Core\Content\Media\Aggregate\MediaThumbnail\MediaThumbnailEntity;
 use Shopware\Core\Content\Media\Aggregate\MediaThumbnailSize\MediaThumbnailSizeCollection;
 use Shopware\Core\Content\Media\Aggregate\MediaThumbnailSize\MediaThumbnailSizeEntity;
 use Shopware\Core\Content\Media\Exception\FileTypeNotSupportedException;
@@ -127,6 +128,7 @@ class ThumbnailService
                 ) {
                     $toBeDeletedThumbnails->remove($thumbnail->getId());
                     $tobBeCreatedSizes->remove($thumbnailSize->getId());
+
                     continue 2;
                 }
             }
@@ -158,8 +160,10 @@ class ThumbnailService
 
         $mediaImage = $this->getImageResource($media);
         $originalImageSize = $this->getOriginalImageSize($mediaImage);
+        $originalUrl = $this->urlGenerator->getRelativeMediaUrl($media);
 
         $savedThumbnails = [];
+
         try {
             foreach ($thumbnailSizes as $size) {
                 $thumbnailSize = $this->calculateThumbnailSize($originalImageSize, $size, $config);
@@ -172,10 +176,16 @@ class ThumbnailService
 
                 $url = $this->urlGenerator->getRelativeThumbnailUrl(
                     $media,
-                    $size->getWidth(),
-                    $size->getHeight()
+                    (new MediaThumbnailEntity())->assign(['width' => $size->getWidth(), 'height' => $size->getHeight()])
                 );
                 $this->writeThumbnail($thumbnail, $media, $url, $config->getThumbnailQuality());
+
+                $mediaFilesystem = $this->getFileSystem($media);
+                if ($originalImageSize === $thumbnailSize
+                    && $mediaFilesystem->getSize($originalUrl) < $mediaFilesystem->getSize($url)) {
+                    $mediaFilesystem->update($url, $mediaFilesystem->read($originalUrl));
+                }
+
                 $savedThumbnails[] = [
                     'width' => $size->getWidth(),
                     'height' => $size->getHeight(),
@@ -190,7 +200,7 @@ class ThumbnailService
                 'thumbnails' => $savedThumbnails,
             ];
 
-            $context->scope(Context::SYSTEM_SCOPE, function ($context) use ($mediaData) {
+            $context->scope(Context::SYSTEM_SCOPE, function ($context) use ($mediaData): void {
                 $this->mediaRepository->update([$mediaData], $context);
             });
 
@@ -209,7 +219,7 @@ class ThumbnailService
         }
 
         $criteria = new Criteria([$media->getMediaFolderId()]);
-        $criteria->addAssociationPath('configuration.mediaThumbnailSizes');
+        $criteria->addAssociation('configuration.mediaThumbnailSizes');
         /** @var MediaFolderEntity $folder */
         $folder = $this->mediaFolderRepository->search($criteria, $context)->get($media->getMediaFolderId());
         $media->setMediaFolder($folder);
@@ -245,7 +255,7 @@ class ThumbnailService
         MediaThumbnailSizeEntity $preferredThumbnailSize,
         MediaFolderConfigurationEntity $config
     ): array {
-        if (!$config->getKeepAspectRatio()) {
+        if (!$config->getKeepAspectRatio() || $preferredThumbnailSize->getWidth() !== $preferredThumbnailSize->getHeight()) {
             return [
                 'width' => $preferredThumbnailSize->getWidth(),
                 'height' => $preferredThumbnailSize->getHeight(),
@@ -309,13 +319,16 @@ class ThumbnailService
         switch ($media->getMimeType()) {
             case 'image/png':
                 imagepng($thumbnail);
+
                 break;
             case 'image/gif':
                 imagegif($thumbnail);
+
                 break;
             case 'image/jpg':
             case 'image/jpeg':
                 imagejpeg($thumbnail, null, $quality);
+
                 break;
         }
         $imageFile = ob_get_contents();

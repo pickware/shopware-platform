@@ -176,7 +176,6 @@ class PluginLifecycleSubscriber implements EventSubscriberInterface
 
         $childThemeSalesChannel = [];
         if ($childThemes && $childThemes->count() > 0) {
-            /** @var ThemeEntity $childTheme */
             foreach ($childThemes as $childTheme) {
                 if (!$childTheme->getSalesChannels() || $childTheme->getSalesChannels()->count() === 0) {
                     continue;
@@ -206,7 +205,7 @@ class PluginLifecycleSubscriber implements EventSubscriberInterface
         StorefrontPluginConfiguration $config,
         StorefrontPluginConfigurationCollection $configurationCollection,
         Context $context
-    ) {
+    ): void {
         if ($config->getIsTheme()) {
             $this->themeLifecycleService->refreshTheme($config, $context);
         }
@@ -277,7 +276,7 @@ class PluginLifecycleSubscriber implements EventSubscriberInterface
     private function createConfigFromClassName(string $pluginPath, string $className): StorefrontPluginConfiguration
     {
         /** @var Plugin $plugin */
-        $plugin = new $className(true, $this->projectDirectory . '/' . $pluginPath);
+        $plugin = new $className(true, $pluginPath, $this->projectDirectory);
 
         if (!$plugin instanceof Plugin) {
             throw new \RuntimeException(

@@ -3,15 +3,19 @@
 namespace Shopware\Core\Content\MailTemplate\Api;
 
 use Shopware\Core\Content\MailTemplate\Service\MailService;
+use Shopware\Core\Framework\Adapter\Twig\Exception\StringTemplateRenderingException;
+use Shopware\Core\Framework\Adapter\Twig\StringTemplateRenderer;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Twig\Exception\StringTemplateRenderingException;
-use Shopware\Core\Framework\Twig\StringTemplateRenderer;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class MailActionController extends AbstractController
 {
     /**
@@ -39,7 +43,7 @@ class MailActionController extends AbstractController
     {
         $message = $this->mailService->send($post->all(), $context);
 
-        return new JsonResponse(['size' => strlen($message ? $message->toString() : '')]);
+        return new JsonResponse(['size' => mb_strlen($message ? $message->toString() : '')]);
     }
 
     /**
@@ -49,10 +53,10 @@ class MailActionController extends AbstractController
      *
      * @throws StringTemplateRenderingException
      */
-    public function validate(RequestDataBag $post): JsonResponse
+    public function validate(RequestDataBag $post, Context $context): JsonResponse
     {
-        $this->templateRenderer->render($post->get('contentHtml', ''), []);
-        $this->templateRenderer->render($post->get('contentPlain', ''), []);
+        $this->templateRenderer->render($post->get('contentHtml', ''), [], $context);
+        $this->templateRenderer->render($post->get('contentPlain', ''), [], $context);
 
         return new JsonResponse(null, Response::HTTP_NO_CONTENT);
     }

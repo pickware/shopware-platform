@@ -29,7 +29,7 @@ Table(ShopwareCoreFrameworkMessageQueueDeadMessageDeadMessageDefinition, "dead_m
    not_null(handlerClass) longText
    not_null(encrypted) bool
    not_null(errorCount) int
-   not_null(nextExecutionTime) date
+   not_null(nextExecutionTime) dateTime
    not_null(exception) longText
    not_null(exceptionMessage) longText
    not_null(exceptionFile) longText

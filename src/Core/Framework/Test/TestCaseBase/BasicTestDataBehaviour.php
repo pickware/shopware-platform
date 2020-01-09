@@ -9,7 +9,7 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\Language\LanguageEntity;
+use Shopware\Core\System\Language\LanguageEntity;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 trait BasicTestDataBehaviour
@@ -47,7 +47,9 @@ trait BasicTestDataBehaviour
         /** @var EntityRepositoryInterface $repository */
         $repository = $this->getContainer()->get('payment_method.repository');
 
-        $paymentMethods = $repository->search(new Criteria(), Context::createDefaultContext())->getEntities();
+        $criteria = (new Criteria())
+            ->addFilter(new EqualsFilter('active', true));
+        $paymentMethods = $repository->search($criteria, Context::createDefaultContext())->getEntities();
 
         /** @var PaymentMethodEntity $paymentMethod */
         foreach ($paymentMethods as $paymentMethod) {
@@ -56,7 +58,7 @@ trait BasicTestDataBehaviour
             }
         }
 
-        throw new \LogicException('No available ShippingMethod configured');
+        throw new \LogicException('No available Payment method configured');
     }
 
     protected function getValidShippingMethodId(): string

@@ -3,24 +3,27 @@
 namespace Shopware\Core\Content\Product;
 
 use Shopware\Core\Checkout\Cart\Delivery\Struct\DeliveryDate;
-use Shopware\Core\Checkout\Cart\Tax\Struct\TaxRule;
-use Shopware\Core\Checkout\Cart\Tax\Struct\TaxRuleCollection;
+use Shopware\Core\Checkout\Order\Aggregate\OrderLineItem\OrderLineItemCollection;
 use Shopware\Core\Content\Category\CategoryCollection;
-use Shopware\Core\Content\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductConfiguratorSetting\ProductConfiguratorSettingCollection;
+use Shopware\Core\Content\Product\Aggregate\ProductCrossSelling\ProductCrossSellingCollection;
 use Shopware\Core\Content\Product\Aggregate\ProductManufacturer\ProductManufacturerEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductMedia\ProductMediaCollection;
 use Shopware\Core\Content\Product\Aggregate\ProductMedia\ProductMediaEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductPrice\ProductPriceCollection;
+use Shopware\Core\Content\Product\Aggregate\ProductReview\ProductReviewCollection;
 use Shopware\Core\Content\Product\Aggregate\ProductSearchKeyword\ProductSearchKeywordCollection;
 use Shopware\Core\Content\Product\Aggregate\ProductTranslation\ProductTranslationCollection;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityCollection;
 use Shopware\Core\Content\Property\Aggregate\PropertyGroupOption\PropertyGroupOptionCollection;
+use Shopware\Core\Content\Seo\MainCategory\MainCategoryCollection;
+use Shopware\Core\Content\Seo\SeoUrl\SeoUrlCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
-use Shopware\Core\Framework\Pricing\ListingPriceCollection;
-use Shopware\Core\Framework\Pricing\Price;
-use Shopware\Core\Framework\Pricing\PriceCollection;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\ListingPriceCollection;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\Price;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection;
+use Shopware\Core\System\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\System\Tag\TagCollection;
 use Shopware\Core\System\Tax\TaxEntity;
 use Shopware\Core\System\Unit\UnitEntity;
@@ -38,6 +41,11 @@ class ProductEntity extends Entity
      * @var int
      */
     protected $childCount;
+
+    /**
+     * @var int
+     */
+    protected $autoIncrement;
 
     /**
      * @var string|null
@@ -58,6 +66,11 @@ class ProductEntity extends Entity
      * @var bool
      */
     protected $active;
+
+    /**
+     * @var string
+     */
+    protected $displayGroup;
 
     /**
      * @var PriceCollection|null
@@ -195,16 +208,6 @@ class ProductEntity extends Entity
     protected $propertyIds;
 
     /**
-     * @var bool
-     */
-    protected $displayInListing;
-
-    /**
-     * @var string|null
-     */
-    protected $additionalText;
-
-    /**
      * @var string|null
      */
     protected $name;
@@ -218,6 +221,11 @@ class ProductEntity extends Entity
      * @var string|null
      */
     protected $description;
+
+    /**
+     * @var string|null
+     */
+    protected $metaDescription;
 
     /**
      * @var string|null
@@ -354,6 +362,36 @@ class ProductEntity extends Entity
      */
     protected $tagIds;
 
+    /**
+     * @var ProductReviewCollection|null
+     */
+    protected $productReviews;
+
+    /**
+     * @var float|null
+     */
+    protected $ratingAverage;
+
+    /**
+     * @var MainCategoryCollection|null
+     */
+    protected $mainCategories;
+
+    /**
+     * @var SeoUrlCollection|null
+     */
+    protected $seoUrls;
+
+    /**
+     * @var OrderLineItemCollection|null
+     */
+    protected $orderLineItems;
+
+    /**
+     * @var ProductCrossSellingCollection|null
+     */
+    protected $crossSellings;
+
     public function __construct()
     {
         $this->prices = new ProductPriceCollection();
@@ -362,6 +400,16 @@ class ProductEntity extends Entity
     public function __toString()
     {
         return (string) $this->getName();
+    }
+
+    public function getProductReviews(): ?ProductReviewCollection
+    {
+        return $this->productReviews;
+    }
+
+    public function setProductReviews(ProductReviewCollection $productReviews): void
+    {
+        $this->productReviews = $productReviews;
     }
 
     public function getParentId(): ?string
@@ -613,16 +661,6 @@ class ProductEntity extends Entity
         $this->categoryTree = $categoryTree;
     }
 
-    public function getAdditionalText(): ?string
-    {
-        return $this->additionalText;
-    }
-
-    public function setAdditionalText(?string $additionalText): void
-    {
-        $this->additionalText = $additionalText;
-    }
-
     public function getName(): ?string
     {
         return $this->name;
@@ -731,13 +769,6 @@ class ProductEntity extends Entity
     public function setRestockTime(int $restockTime): void
     {
         $this->restockTime = $restockTime;
-    }
-
-    public function getTaxRuleCollection(): TaxRuleCollection
-    {
-        return new TaxRuleCollection([
-            new TaxRule($this->getTax()->getTaxRate(), 100),
-        ]);
     }
 
     public function getDeliveryDate(): DeliveryDate
@@ -907,6 +938,16 @@ class ProductEntity extends Entity
         $this->categoriesRo = $categoriesRo;
     }
 
+    public function getAutoIncrement(): int
+    {
+        return $this->autoIncrement;
+    }
+
+    public function setAutoIncrement(int $autoIncrement): void
+    {
+        $this->autoIncrement = $autoIncrement;
+    }
+
     public function getCoverId(): ?string
     {
         return $this->coverId;
@@ -997,16 +1038,6 @@ class ProductEntity extends Entity
         $this->configuratorGroupConfig = $configuratorGroupConfig;
     }
 
-    public function getDisplayInListing(): bool
-    {
-        return $this->displayInListing;
-    }
-
-    public function setDisplayInListing(bool $displayInListing): void
-    {
-        $this->displayInListing = $displayInListing;
-    }
-
     public function getAvailableStock(): ?int
     {
         return $this->availableStock;
@@ -1055,5 +1086,75 @@ class ProductEntity extends Entity
     public function setChildCount(int $childCount): void
     {
         $this->childCount = $childCount;
+    }
+
+    public function getRatingAverage(): ?float
+    {
+        return $this->ratingAverage;
+    }
+
+    public function setRatingAverage(?float $ratingAverage): void
+    {
+        $this->ratingAverage = $ratingAverage;
+    }
+
+    public function getDisplayGroup(): string
+    {
+        return $this->displayGroup;
+    }
+
+    public function setDisplayGroup(string $displayGroup): void
+    {
+        $this->displayGroup = $displayGroup;
+    }
+
+    public function getMainCategories(): ?MainCategoryCollection
+    {
+        return $this->mainCategories;
+    }
+
+    public function setMainCategories(MainCategoryCollection $mainCategories): void
+    {
+        $this->mainCategories = $mainCategories;
+    }
+
+    public function getMetaDescription(): ?string
+    {
+        return $this->metaDescription;
+    }
+
+    public function setMetaDescription(?string $metaDescription): void
+    {
+        $this->metaDescription = $metaDescription;
+    }
+
+    public function getSeoUrls(): ?SeoUrlCollection
+    {
+        return $this->seoUrls;
+    }
+
+    public function setSeoUrls(SeoUrlCollection $seoUrls): void
+    {
+        $this->seoUrls = $seoUrls;
+    }
+
+    public function getOrderLineItems(): ?OrderLineItemCollection
+    {
+        return $this->orderLineItems;
+    }
+
+    public function setOrderLineItems(OrderLineItemCollection $orderLineItems): void
+    {
+        $this->orderLineItems = $orderLineItems;
+    }
+
+    public function getCrossSellings(): ?ProductCrossSellingCollection
+    {
+        return $this->crossSellings;
+    }
+
+    public function setCrossSellings(ProductCrossSellingCollection $crossSellings): void
+    {
+        $this->crossSellings = $crossSellings;
     }
 }

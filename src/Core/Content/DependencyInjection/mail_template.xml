@@ -29,7 +29,8 @@
         </service>
 
         <service id="Shopware\Core\Content\MailTemplate\Service\MailSender" public="true">
-            <argument type="service" id="mailer"/>
+            <argument type="service" id="core_mailer"/>
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
         </service>
 
         <service id="Shopware\Core\Content\MailTemplate\Service\MessageFactory" public="true">
@@ -40,7 +41,7 @@
         <!-- Controller -->
         <service id="Shopware\Core\Content\MailTemplate\Api\MailActionController" public="true">
             <argument type="service" id="Shopware\Core\Content\MailTemplate\Service\MailService"/>
-            <argument type="service" id="Shopware\Core\Framework\Twig\StringTemplateRenderer"/>
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Twig\StringTemplateRenderer"/>
             <call method="setContainer">
                 <argument type="service" id="service_container"/>
             </call>
@@ -48,11 +49,11 @@
 
         <!-- Header Footer Entities -->
         <service id="Shopware\Core\Content\MailTemplate\Aggregate\MailHeaderFooter\MailHeaderFooterDefinition">
-            <tag name="shopware.entity.definition"  entity="mail_header_footer"/>
+            <tag name="shopware.entity.definition" entity="mail_header_footer"/>
         </service>
 
         <service id="Shopware\Core\Content\MailTemplate\Aggregate\MailHeaderFooterTranslation\MailHeaderFooterTranslationDefinition">
-            <tag name="shopware.entity.definition"  entity="mail_header_footer_translation"/>
+            <tag name="shopware.entity.definition" entity="mail_header_footer_translation"/>
         </service>
 
         <!-- Header Footer Repository -->
@@ -67,10 +68,10 @@
 
         <service id="Shopware\Core\Content\MailTemplate\Service\MailService">
             <argument type="service" id="Shopware\Core\Framework\Validation\DataValidator" />
-            <argument type="service" id="Shopware\Core\Framework\Twig\StringTemplateRenderer" />
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Twig\StringTemplateRenderer" />
             <argument type="service" id="Shopware\Core\Content\MailTemplate\Service\MessageFactory" />
             <argument type="service" id="Shopware\Core\Content\MailTemplate\Service\MailSender" />
-            <argument type="service" id="Shopware\Core\Content\Media\DataAbstractionLayer\MediaThumbnailRepositoryDecorator" />
+            <argument type="service" id="Shopware\Core\Content\Media\DataAbstractionLayer\MediaRepositoryDecorator" />
             <argument type="service" id="Shopware\Core\System\SalesChannel\SalesChannelDefinition" />
             <argument type="service" id="sales_channel.repository"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
@@ -84,5 +85,20 @@
             <argument type="service" id="mail_template.repository"/>
         </service>
 
+        <!-- Commands -->
+        <service id="Shopware\Core\Content\MailTemplate\Commands\AssignAllTemplatesToAllSalesChannelsCommand">
+            <argument type="service" id="mail_template.repository"/>
+            <argument type="service" id="sales_channel.repository"/>
+
+            <tag name="console.command"/>
+        </service>
+
+        <service id="core_mailer" class="Swift_Mailer">
+            <factory service="Shopware\Core\Content\MailTemplate\Service\MailerFactory" method="create" />
+            <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
+            <argument type="service" id="mailer"/>
+        </service>
+
+        <service id="Shopware\Core\Content\MailTemplate\Service\MailerFactory" />
     </services>
 </container>

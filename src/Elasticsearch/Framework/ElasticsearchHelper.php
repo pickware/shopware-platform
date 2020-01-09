@@ -5,12 +5,12 @@ namespace Shopware\Elasticsearch\Framework;
 use Elasticsearch\Client;
 use ONGR\ElasticsearchDSL\Query\Compound\BoolQuery;
 use ONGR\ElasticsearchDSL\Query\FullText\MatchQuery;
-use ONGR\ElasticsearchDSL\Query\FullText\MultiMatchQuery;
 use ONGR\ElasticsearchDSL\Search;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Elasticsearch\Exception\NoIndexedDocumentsException;
 use Shopware\Elasticsearch\Exception\ServerNotAvailableException;
@@ -136,6 +136,24 @@ class ElasticsearchHelper
         return $this->logOrThrowException(new NoIndexedDocumentsException($definition->getEntityName()));
     }
 
+    public function handleIds(EntityDefinition $definition, Criteria $criteria, Search $search, Context $context): void
+    {
+        $ids = $criteria->getIds();
+
+        if (empty($ids)) {
+            return;
+        }
+
+        $query = $this->parser->parseFilter(
+            new EqualsAnyFilter('id', array_values($ids)),
+            $definition,
+            $definition->getEntityName(),
+            $context
+        );
+
+        $search->addQuery($query, BoolQuery::FILTER);
+    }
+
     public function addFilters(EntityDefinition $definition, Criteria $criteria, Search $search, Context $context): void
     {
         $filters = $criteria->getFilters();
@@ -143,7 +161,7 @@ class ElasticsearchHelper
             return;
         }
 
-        $query = $this->parser->parse(
+        $query = $this->parser->parseFilter(
             new MultiFilter(MultiFilter::CONNECTION_AND, $filters),
             $definition,
             $definition->getEntityName(),
@@ -160,7 +178,7 @@ class ElasticsearchHelper
             return;
         }
 
-        $query = $this->parser->parse(
+        $query = $this->parser->parseFilter(
             new MultiFilter(MultiFilter::CONNECTION_AND, $postFilters),
             $definition,
             $definition->getEntityName(),
@@ -179,19 +197,26 @@ class ElasticsearchHelper
         $bool = new BoolQuery();
 
         $bool->add(
-            // search boosting
-            new MultiMatchQuery(
-                ['fullText^2', 'fullTextBoosted^7'],
-                $criteria->getTerm(),
-                ['type' => 'cross_fields']
-            ),
+            new MatchQuery('fullText', $criteria->getTerm(), ['boost' => 2]),
             BoolQuery::SHOULD
         );
 
         $bool->add(
-            // fuzziness for typos
-            new MatchQuery('fullText', $criteria->getTerm(), ['fuzziness' => 'auto'])
+            new MatchQuery('fullTextBoosted', $criteria->getTerm(), ['boost' => 5]),
+            BoolQuery::SHOULD
         );
+
+        $bool->add(
+            new MatchQuery('fullText', $criteria->getTerm(), ['fuzziness' => 'auto']),
+            BoolQuery::SHOULD
+        );
+
+        $bool->add(
+            new MatchQuery('description', $criteria->getTerm()),
+            BoolQuery::SHOULD
+        );
+
+        $bool->addParameter('minimum_should_match', 1);
 
         $search->addQuery($bool);
     }
@@ -206,7 +231,7 @@ class ElasticsearchHelper
         $bool = new BoolQuery();
 
         foreach ($queries as $query) {
-            $parsed = $this->parser->parse($query->getQuery(), $definition, $definition->getEntityName(), $context);
+            $parsed = $this->parser->parseFilter($query->getQuery(), $definition, $definition->getEntityName(), $context);
 
             if ($parsed instanceof MatchQuery) {
                 $score = (string) $query->getScore();

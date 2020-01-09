@@ -5,7 +5,6 @@ namespace Shopware\Core\Checkout\Cart;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\Exception\CartTokenNotFoundException;
 use Shopware\Core\Content\Rule\RuleCollection;
-use Shopware\Core\Content\Rule\RuleEntity;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
@@ -48,25 +47,18 @@ class CartRuleLoader
      */
     private $cache;
 
-    /**
-     * @var int
-     */
-    private $expirationTime;
-
     public function __construct(
         CartPersisterInterface $cartPersister,
         Processor $processor,
         EntityRepositoryInterface $repository,
         LoggerInterface $logger,
-        TagAwareAdapterInterface $cache,
-        int $expirationTime
+        TagAwareAdapterInterface $cache
     ) {
         $this->cartPersister = $cartPersister;
         $this->repository = $repository;
         $this->processor = $processor;
         $this->logger = $logger;
         $this->cache = $cache;
-        $this->expirationTime = $expirationTime;
     }
 
     public function loadByToken(SalesChannelContext $context, string $cartToken): RuleLoaderResult
@@ -124,6 +116,11 @@ class CartRuleLoader
 
         $context->setRuleIds($rules->getIds());
 
+        // save the cart if errors exist, so the errors get persisted
+        if ($cart->getErrors()->count() > 0) {
+            $this->cartPersister->save($cart, $context);
+        }
+
         return new RuleLoaderResult($cart, $rules);
     }
 
@@ -148,7 +145,6 @@ class CartRuleLoader
             ->search($criteria, $context)
             ->getEntities();
 
-        /** @var RuleEntity $rule */
         foreach ($rules as $key => $rule) {
             if ($rule->isInvalid() || !$rule->getPayload()) {
                 $rules->remove($key);
@@ -156,7 +152,6 @@ class CartRuleLoader
         }
 
         $item->set($rules);
-        $item->expiresAfter($this->expirationTime);
 
         $this->cache->save($item);
 

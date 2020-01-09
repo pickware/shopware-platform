@@ -6,13 +6,13 @@ use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Snippet\Files\SnippetFileCollection;
-use Shopware\Core\Framework\Snippet\Files\SnippetFileInterface;
-use Shopware\Core\Framework\Snippet\Filter\SnippetFilterFactory;
-use Shopware\Core\Framework\Snippet\SnippetService;
 use Shopware\Core\Framework\Test\Snippet\Mock\MockSnippetFile;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Snippet\Files\SnippetFileCollection;
+use Shopware\Core\System\Snippet\Files\SnippetFileInterface;
+use Shopware\Core\System\Snippet\Filter\SnippetFilterFactory;
+use Shopware\Core\System\Snippet\SnippetService;
 use Symfony\Component\Translation\MessageCatalogue;
 use Symfony\Component\Translation\MessageCatalogueInterface;
 
@@ -20,7 +20,7 @@ class SnippetServiceTest extends TestCase
 {
     use IntegrationTestBehaviour;
 
-    public static function tearDownAfterClass(): void
+    public function tearDown(): void
     {
         foreach (glob(__DIR__ . '/Mock/_fixtures/*.json') as $mockFile) {
             unlink($mockFile);
@@ -38,7 +38,9 @@ class SnippetServiceTest extends TestCase
 
     public function testGetRegionFilterItems(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -202,8 +204,10 @@ json
 
     public function testGetListMergesFromFileAndDb(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
-<<<json
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
+            <<<json
 {
     "foo": {
         "bar": "foo_bar"
@@ -242,7 +246,9 @@ json
 
     public function testGetListDbOverwritesFile(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -281,7 +287,9 @@ json
 
     public function testGetListWithMultipleSets(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -329,7 +337,9 @@ json
 
     public function testGetListWithSameTranslationKeyInMultipleSets(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -374,10 +384,12 @@ json
         foreach ($result['data']['foo.bar'] as $snippetSetData) {
             if ($snippetSetData['setId'] === Uuid::fromBytesToHex($fooId)) {
                 static::assertSame('foo_bar', $snippetSetData['value']);
+
                 continue;
             }
             if ($snippetSetData['setId'] === Uuid::fromBytesToHex($barId)) {
                 static::assertSame('bar_baz', $snippetSetData['value']);
+
                 continue;
             }
 
@@ -387,7 +399,9 @@ json
 
     public function testGetListWithPagination(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -445,7 +459,9 @@ json
 
     public function testGetListSortsByTranslationKey(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -502,7 +518,9 @@ json
 
     public function testGetListSortsByTranslationKeyDESC(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -559,7 +577,9 @@ json
 
     public function testGetListSortsBySnippetSetId(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -618,7 +638,9 @@ json
 
     public function testGetListSortsBySnippetSetIdDESC(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -677,7 +699,9 @@ json
 
     public function testGetListIgnoresSortingForNotExistingSnippetSetId(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {
@@ -733,7 +757,9 @@ json
 
     public function testGetListFilters(): void
     {
-        $snippetFile = new MockSnippetFile('foo', 'foo',
+        $snippetFile = new MockSnippetFile(
+            'foo',
+            'foo',
             <<<json
 {
     "foo": {

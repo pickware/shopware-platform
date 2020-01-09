@@ -11,13 +11,13 @@ shopware:
 
     cdn:
         url: ~
-        strategy: "md5"
+        strategy: "id"
 
     api:
         max_limit: 500
         allowed_limits: [1, 5, 9, 10, 25, 50, 75, 100, 500]
         api_browser:
-            public: true
+            auth_required: true
 
     admin_worker:
         enable_admin_worker: true
@@ -27,9 +27,10 @@ shopware:
     auto_update:
         enabled: true
 
-    cache:
-        entity_cache:
-            enabled: true
-            expiration_time: 3600
     store:
         frw: false
+
+    sitemap:
+        batchsize: 100
+        custom_urls:
+        excluded_urls:

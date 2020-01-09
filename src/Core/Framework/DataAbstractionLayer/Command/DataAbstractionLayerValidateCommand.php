@@ -2,7 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Command;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionValidator;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -11,6 +11,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class DataAbstractionLayerValidateCommand extends Command
 {
+    protected static $defaultName = 'dal:validate';
+
     /**
      * @var DefinitionValidator
      */
@@ -22,12 +24,7 @@ class DataAbstractionLayerValidateCommand extends Command
         $this->validator = $validator;
     }
 
-    protected function configure(): void
-    {
-        $this->setName('dal:validate');
-    }
-
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new ShopwareStyle($input, $output);
         $io->title('Data Abstraction Layer Validation');

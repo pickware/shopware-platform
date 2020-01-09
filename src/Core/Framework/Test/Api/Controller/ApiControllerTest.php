@@ -4,17 +4,29 @@ namespace Shopware\Core\Framework\Test\Api\Controller;
 
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
+use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
+use Shopware\Core\Content\Product\ProductDefinition;
+use Shopware\Core\Content\Seo\SeoUrl\SeoUrlDefinition;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Exception\LiveVersionDeleteException;
 use Shopware\Core\Framework\Api\Util\AccessKeyHelper;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Extension;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Test\TestCaseBase\AdminApiTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\BasicTestDataBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\FilesystemBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
+use Shopware\Core\Framework\Test\TestCaseHelper\TestUser;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\PlatformRequest;
+use Shopware\Core\System\SalesChannel\SalesChannelDefinition;
 use Symfony\Component\HttpFoundation\Response;
+use function Flag\next3722;
+use function Flag\skipTestNext3722;
 
 class ApiControllerTest extends TestCase
 {
@@ -48,11 +60,11 @@ EOF;
         $namedStatement = <<<EOF
 CREATE TABLE `named` (
     `id` binary(16) NOT NULL,
-    `name` varchar(255) NOT NULL,    
-    `optional_group_id` varbinary(16) NULL,   
+    `name` varchar(255) NOT NULL,
+    `optional_group_id` varbinary(16) NULL,
     `created_at` DATETIME(3) NOT NULL,
-    `updated_at` DATETIME(3) NULL, 
-    PRIMARY KEY `id` (`id`),  
+    `updated_at` DATETIME(3) NULL,
+    PRIMARY KEY `id` (`id`),
     CONSTRAINT `fk` FOREIGN KEY (`optional_group_id`) REFERENCES `named_optional_group` (`id`) ON DELETE SET NULL
 );
 EOF;
@@ -103,6 +115,9 @@ EOF;
 
     public function testInsertAuthenticatedWithIntegration(): void
     {
+        if (next3722()) {
+            static::markTestSkipped('Reactivate if Integrations can have their own acls or delete if integrations are finally removed');
+        }
         $id = Uuid::randomHex();
 
         $data = [
@@ -171,6 +186,43 @@ EOF;
         static::assertSame($data['shortCode'], $responseData['data'][0]['attributes']['shortCode']);
     }
 
+    public function testOneToManyInsertWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = ['id' => $id, 'name' => $id];
+        $browser = $this->getBrowser();
+        $connection = $this->getBrowser()->getContainer()->get(Connection::class);
+        $user = TestUser::createNewTestUser($connection, ['country' => ['create', 'detail']]);
+        $admin = TestUser::getAdmin();
+
+        $user->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/country', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/country/' . $id, $response->headers->get('Location'));
+
+        $this->assertEntityExists($browser, 'country', $id);
+
+        $data = [
+            'id' => $id,
+            'name' => 'test_state',
+            'shortCode' => 'test',
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/country/' . $id . '/states/', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+
+        $admin->authorizeBrowser($browser);
+
+        $this->assertEntityNotExists($browser, 'country-state', $id);
+    }
+
     public function testManyToOneInsert(): void
     {
         $id = Uuid::randomHex();
@@ -213,6 +265,59 @@ EOF;
         static::assertSame($data['name'], $responseData['data'][0]['attributes']['name']);
         static::assertSame($data['link'], $responseData['data'][0]['attributes']['link']);
         static::assertSame($data['id'], $responseData['data'][0]['id']);
+    }
+
+    public function testManyToOneInsertWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $manufacturer = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => $id,
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'manufacturer' => ['name' => 'test'],
+            'stock' => 12,
+            'productNumber' => '1',
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+        ];
+
+        $browser = $this->getBrowser();
+        $connection = $this->getBrowser()->getContainer()->get(Connection::class);
+        $user = TestUser::createNewTestUser($connection, ['product' => ['create', 'detail']]);
+        $admin = TestUser::getAdmin();
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), 'Create product failed id:' . $id);
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/product/' . $id, $response->headers->get('Location'));
+
+        $user->authorizeBrowser($browser);
+
+        $data = [
+            'id' => $manufacturer,
+            'name' => 'Manufacturer - 1',
+            'link' => 'https://www.shopware.com',
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product/' . $id . '/manufacturer', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+
+        $admin->authorizeBrowser($browser);
+
+        $this->assertEntityNotExists($browser, 'product-manufacturer', $manufacturer);
+
+        $browser->request('GET', '/api/v' . PlatformRequest::API_VERSION . '/product/' . $id . '/manufacturer');
+        $responseData = json_decode($browser->getResponse()->getContent(), true);
+        static::assertSame(Response::HTTP_OK, $browser->getResponse()->getStatusCode(), 'Read manufacturer of product failed id: ' . $id . PHP_EOL . $browser->getResponse()->getContent());
+
+        static::assertArrayHasKey('data', $responseData, $browser->getResponse()->getContent());
+        static::assertArrayHasKey(0, $responseData['data'], $browser->getResponse()->getContent());
+        static::assertSame('test', $responseData['data'][0]['attributes']['name']);
     }
 
     public function testManyToManyInsert(): void
@@ -258,6 +363,67 @@ EOF;
         static::assertSame($data['id'], $responseData['data'][0]['id']);
     }
 
+    public function testManyToManyInsertWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => $id,
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'stock' => 12,
+            'productNumber' => '1',
+            'manufacturer' => ['name' => 'test'],
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+        ];
+
+        $browser = $this->getBrowser();
+
+        $connection = $this->getBrowser()->getContainer()->get(Connection::class);
+        $user = TestUser::createNewTestUser(
+            $connection,
+            [
+                'product' => ['create', 'detail'],
+                'tax' => ['create', 'detail'],
+                'product_manufacturer' => ['create', 'detail'],
+                'product_price' => ['create', 'detail'],
+                'version_commit_data' => ['create'],
+                'version_commit' => ['create'],
+            ]
+        );
+        $admin = TestUser::getAdmin();
+
+        $user->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/product/' . $id, $response->headers->get('Location'));
+
+        $data = [
+            'id' => $id,
+            'name' => 'Category - 1',
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product/' . $id . '/categories/', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+
+        $admin->authorizeBrowser($browser);
+
+        $this->assertEntityNotExists($browser, 'category', $id);
+
+        $browser->request('GET', '/api/v' . PlatformRequest::API_VERSION . '/product/' . $id . '/categories/');
+        $responseData = json_decode($browser->getResponse()->getContent(), true);
+        static::assertSame(Response::HTTP_OK, $browser->getResponse()->getStatusCode());
+
+        static::assertArrayHasKey('data', $responseData);
+        static::assertCount(0, $responseData['data']);
+    }
+
     public function testDelete(): void
     {
         $id = Uuid::randomHex();
@@ -284,6 +450,121 @@ EOF;
         static::assertSame(Response::HTTP_NO_CONTENT, $this->getBrowser()->getResponse()->getStatusCode(), $this->getBrowser()->getResponse()->getContent());
 
         $this->assertEntityNotExists($this->getBrowser(), 'product', $id);
+    }
+
+    public function testDeleteVersion(): void
+    {
+        $id = Uuid::randomHex();
+        $browser = $this->getBrowser();
+
+        $data = [
+            'id' => $id,
+            'productNumber' => Uuid::randomHex(),
+            'stock' => 1,
+            'name' => $id,
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'manufacturer' => ['name' => 'test'],
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 50, 'net' => 25, 'linked' => false]],
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/product/' . $id, $response->headers->get('Location'));
+
+        $this->assertEntityExists($browser, 'product', $id);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/_action/version/product/' . $id);
+        $response = json_decode($browser->getResponse()->getContent(), true);
+        static::assertSame(Response::HTTP_OK, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertArrayHasKey('versionId', $response);
+        static::assertArrayHasKey('versionName', $response);
+        static::assertArrayHasKey('id', $response);
+        static::assertArrayHasKey('entity', $response);
+        static::assertTrue(Uuid::isValid($response['versionId']));
+        $versionId = $response['versionId'];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/_action/version/' . $response['versionId'] . '/product/' . $id);
+        $response = json_decode($browser->getResponse()->getContent(), true);
+        static::assertSame(Response::HTTP_OK, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertEmpty($response);
+
+        $this->assertEntityExists($browser, 'product', $id);
+
+        /** @var EntityRepositoryInterface $productRepo */
+        $productRepo = $this->getContainer()->get(ProductDefinition::ENTITY_NAME . '.repository');
+        $criteria = new Criteria([$id]);
+        $criteria->addFilter(
+            new EqualsFilter('versionId', $versionId)
+        );
+
+        static::assertCount(0, $productRepo->search($criteria, Context::createDefaultContext()));
+    }
+
+    public function testDeleteVersionWithLiveVersion(): void
+    {
+        $id = Uuid::randomHex();
+        $browser = $this->getBrowser();
+
+        $data = [
+            'id' => $id,
+            'productNumber' => Uuid::randomHex(),
+            'stock' => 1,
+            'name' => $id,
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'manufacturer' => ['name' => 'test'],
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 50, 'net' => 25, 'linked' => false]],
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/_action/version/' . Defaults::LIVE_VERSION . '/product/' . $id);
+
+        $repo = $this->getContainer()->get(ProductDefinition::ENTITY_NAME . '.repository');
+        $criteria = new Criteria([$id]);
+        $criteria->addFilter(new EqualsFilter('versionId', Defaults::LIVE_VERSION));
+
+        static::assertNotNull($repo->search($criteria, Context::createDefaultContext())->getEntities()->first());
+
+        $response = $browser->getResponse();
+
+        static::assertSame(Response::HTTP_INTERNAL_SERVER_ERROR, $response->getStatusCode(), $response->getContent());
+
+        $content = \json_decode($response->getContent(), true);
+
+        static::assertSame((new LiveVersionDeleteException())->getErrorCode(), $content['errors'][0]['code']);
+    }
+
+    public function testDeleteWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $data = [
+            'id' => $id,
+            'name' => 'test tax',
+            'taxRate' => 15,
+        ];
+
+        $browser = $this->getBrowser();
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'tax' => ['detail', 'create'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/tax', [], [], [], json_encode($data));
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), $response->getContent());
+
+        $browser->request('DELETE', '/api/v' . PlatformRequest::API_VERSION . '/tax/' . $id, ['name' => 'foo']);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+
+        $this->assertEntityExists($browser, 'tax', $id);
     }
 
     public function testDeleteOneToMany(): void
@@ -313,6 +594,47 @@ EOF;
 
         $this->assertEntityExists($this->getBrowser(), 'country', $id);
         $this->assertEntityNotExists($this->getBrowser(), 'country-state', $stateId);
+    }
+
+    public function testDeleteOneToManyWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $stateId = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => $id,
+            'states' => [
+                ['id' => $stateId, 'shortCode' => 'test', 'name' => 'test'],
+            ],
+        ];
+
+        $browser = $this->getBrowser();
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'country_state' => ['detail', 'create'],
+                'country' => ['create', 'detail'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/country', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/country/' . $id, $response->headers->get('Location'));
+
+        $this->assertEntityExists($browser, 'country', $id);
+        $this->assertEntityExists($browser, 'country-state', $stateId);
+
+        $browser->request('DELETE', '/api/v' . PlatformRequest::API_VERSION . '/country/' . $id . '/states/' . $stateId, $data);
+        static::assertSame(Response::HTTP_FORBIDDEN, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+
+        $this->assertEntityExists($browser, 'country', $id);
+        $this->assertEntityExists($browser, 'country-state', $stateId);
     }
 
     public function testDeleteManyToOne(): void
@@ -386,6 +708,54 @@ EOF;
         $this->assertEntityExists($this->getBrowser(), 'category', $category);
     }
 
+    public function testDeleteManyToManyWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $category = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => 'Test',
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'stock' => 12,
+            'productNumber' => '1',
+            'manufacturer' => ['name' => 'test'],
+            'categories' => [
+                ['id' => $category, 'name' => 'Test'],
+            ],
+        ];
+
+        $browser = $this->getBrowser();
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/product/' . $id, $response->headers->get('Location'));
+
+        $this->assertEntityExists($browser, 'product', $id);
+        $this->assertEntityExists($browser, 'category', $category);
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'product' => ['detail'],
+                'category' => ['detail'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('DELETE', '/api/v' . PlatformRequest::API_VERSION . '/product/' . $id . '/categories/' . $category);
+        static::assertSame(Response::HTTP_FORBIDDEN, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+
+        $a = $this->getContainer()->get(Connection::class)->executeQuery('SELECT * FROM product_category WHERE product_id = :pid AND category_id = :cid', ['pid' => Uuid::fromHexToBytes($id), 'cid' => Uuid::fromHexToBytes($category)])->fetchAll();
+        static::assertNotEmpty($a);
+
+        $this->assertEntityExists($browser, 'product', $id);
+        $this->assertEntityExists($browser, 'category', $category);
+    }
+
     public function testResponseDataTypeOnWrite(): void
     {
         $id = Uuid::randomHex();
@@ -411,6 +781,43 @@ EOF;
         $response = $this->getBrowser()->getResponse();
         static::assertSame(Response::HTTP_OK, $this->getBrowser()->getResponse()->getStatusCode());
         static::assertNull($response->headers->get('Location'));
+    }
+
+    public function testSearchTerm(): void
+    {
+        $id = Uuid::randomHex();
+
+        $product = [
+            'id' => $id,
+            'productNumber' => 'SW-API-14999',
+            'stock' => 1,
+            'name' => 'asdf',
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'manufacturer' => ['name' => 'Shopware AG'],
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 50, 'net' => 25, 'linked' => false]],
+        ];
+
+        $this->getBrowser()->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $product);
+
+        $data = [
+            'page' => 1,
+            'limit' => 5,
+            'sort' => [
+                [
+                    'field' => 'productNumber',
+                    'order' => 'desc',
+                ],
+            ],
+            'term' => 'SW-API-14999',
+        ];
+
+        $this->getBrowser()->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/search/product', $data);
+        $response = $this->getBrowser()->getResponse();
+        $content = json_decode($response->getContent(), true);
+
+        static::assertArrayHasKey('meta', $content, print_r($content, true));
+        static::assertEquals(1, $content['meta']['total']);
+        static::assertEquals($id, $content['data'][0]['id']);
     }
 
     public function testSearch(): void
@@ -496,6 +903,126 @@ EOF;
         static::assertEquals(Response::HTTP_NO_CONTENT, $this->getBrowser()->getResponse()->getStatusCode());
     }
 
+    public function testSearchWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => 'Cotton Shirt',
+            'tax' => ['name' => 'test', 'taxRate' => 10],
+            'manufacturer' => ['name' => 'Shopware AG'],
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+            'stock' => 12,
+            'productNumber' => '1',
+        ];
+
+        $browser = $this->getBrowser();
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'product' => ['create'],
+                'tax' => ['create'],
+                'product_manufacturer' => ['create'],
+                'price' => ['create'],
+                'version_commit_data' => ['create'],
+                'version_commit' => ['create'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/product/' . $id, $response->headers->get('Location'));
+
+        $data = [
+            'page' => 1,
+            'limit' => 5,
+        ];
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/search/product', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+    }
+
+    /**
+     * Tests the API search endpoint. Asserts that an entity can be both part of the result data as well as the
+     * associations when the entity is fetched as a top level entity result and through circular associations.
+     */
+    public function testEntityIsPresentInTopLevelEntityResultWhenAlsoPartOfAssociations(): void
+    {
+        // In this test case both products are created with the same base data (i.e. they are part of the same sales
+        // channel).
+        $productBase = [
+            'name' => 'Some product',
+            'stock' => 1,
+            'tax' => [
+                'name' => 'test',
+                'taxRate' => 10,
+            ],
+            'manufacturer' => [
+                'name' => 'Shopware AG',
+            ],
+            'price' => [
+                [
+                    'currencyId' => Defaults::CURRENCY,
+                    'gross' => 50,
+                    'net' => 25,
+                    'linked' => false,
+                ],
+            ],
+            'visibilities' => [
+                [
+                    'salesChannelId' => Defaults::SALES_CHANNEL,
+                    'visibility' => ProductVisibilityDefinition::VISIBILITY_ALL,
+                ],
+            ],
+        ];
+
+        $product1 = array_merge($productBase, [
+            'id' => Uuid::randomHex(),
+            'productNumber' => 'product-1',
+        ]);
+        $this->getBrowser()->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $product1);
+
+        $product2 = array_merge($productBase, [
+            'id' => Uuid::randomHex(),
+            'productNumber' => 'product-2',
+        ]);
+        $this->getBrowser()->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/product', $product2);
+
+        // Add associations so that the products are both part of the top level entity result as well as the
+        // associations through the circular association chain.
+        $data = [
+            'page' => 1,
+            'limit' => 25,
+            'associations' => [
+                'visibilities' => [
+                    'associations' => [
+                        'salesChannel' => [
+                            'associations' => [
+                                'productVisibilities' => [
+                                    'associations' => [
+                                        'product' => [],
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->getBrowser()->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/search/product', $data);
+        $response = $this->getBrowser()->getResponse();
+        $searchResult = json_decode($response->getContent(), true);
+        static::assertCount(2, $searchResult['data']);
+    }
+
     public function testNestedSearchOnOneToMany(): void
     {
         $id = Uuid::randomHex();
@@ -564,6 +1091,108 @@ EOF;
         static::assertArrayHasKey('total', $responseData['meta']);
         static::assertSame(1, $responseData['meta']['total']);
         static::assertArrayHasKey('data', $responseData);
+    }
+
+    public function testNestedSearchOnOneToManyWithoutPermissionOnParent(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => $id,
+            'states' => [
+                [
+                    'name' => 'test_state',
+                    'shortCode' => 'test',
+                ],
+                [
+                    'name' => 'test_state_2',
+                    'shortCode' => 'test 2',
+                ],
+            ],
+        ];
+
+        $browser = $this->getBrowser();
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/country', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/country/' . $id, $response->headers->get('Location'));
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'country_state' => ['list'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $filter = [
+            'filter' => [
+                [
+                    'type' => 'equals',
+                    'field' => 'country_state.name',
+                    'value' => 'test_state',
+                ],
+            ],
+        ];
+
+        $path = '/api/v' . PlatformRequest::API_VERSION . '/search/country/' . $id . '/states';
+        $browser->request('POST', $path, $filter);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+    }
+
+    public function testNestedSearchOnOneToManyWithoutPermissionOnChild(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => $id,
+            'states' => [
+                [
+                    'name' => 'test_state',
+                    'shortCode' => 'test',
+                ],
+                [
+                    'name' => 'test_state_2',
+                    'shortCode' => 'test 2',
+                ],
+            ],
+        ];
+
+        $browser = $this->getBrowser();
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/country', $data);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+        static::assertNotEmpty($response->headers->get('Location'));
+        static::assertEquals('http://localhost/api/v' . PlatformRequest::API_VERSION . '/country/' . $id, $response->headers->get('Location'));
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'country' => ['list'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $filter = [
+            'filter' => [
+                [
+                    'type' => 'equals',
+                    'field' => 'country_state.name',
+                    'value' => 'test_state',
+                ],
+            ],
+        ];
+
+        $path = '/api/v' . PlatformRequest::API_VERSION . '/search/country/' . $id . '/states';
+        $browser->request('POST', $path, $filter);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
     }
 
     public function testNestedSearchOnOneToManyWithAggregation(): void
@@ -688,6 +1317,100 @@ EOF;
         static::assertArrayHasKey('data', $responseData);
     }
 
+    public function testNestedSearchOnManyToManyWithoutPermissionOnParent(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => 'price test',
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+            'manufacturer' => ['name' => 'test'],
+            'tax' => ['name' => 'test', 'taxRate' => 15],
+            'stock' => 12,
+            'productNumber' => '1',
+            'categories' => [
+                ['name' => 'category 1'],
+                ['name' => 'category 2'],
+            ],
+        ];
+
+        $this->getContainer()->get('product.repository')
+            ->create([$data], Context::createDefaultContext());
+
+        $filter = [
+            'filter' => [
+                [
+                    'type' => 'equals',
+                    'field' => 'category.name',
+                    'value' => 'category 1',
+                ],
+            ],
+        ];
+
+        $path = '/api/v' . PlatformRequest::API_VERSION . '/search/product/' . $id . '/categories';
+        $browser = $this->getBrowser();
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'categories' => ['list'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', $path, $filter);
+        static::assertSame(Response::HTTP_FORBIDDEN, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+    }
+
+    public function testNestedSearchOnManyToManyWithoutPermissionOnChild(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => 'price test',
+            'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
+            'manufacturer' => ['name' => 'test'],
+            'tax' => ['name' => 'test', 'taxRate' => 15],
+            'stock' => 12,
+            'productNumber' => '1',
+            'categories' => [
+                ['name' => 'category 1'],
+                ['name' => 'category 2'],
+            ],
+        ];
+
+        $this->getContainer()->get('product.repository')
+            ->create([$data], Context::createDefaultContext());
+
+        $filter = [
+            'filter' => [
+                [
+                    'type' => 'equals',
+                    'field' => 'category.name',
+                    'value' => 'category 1',
+                ],
+            ],
+        ];
+
+        $path = '/api/v' . PlatformRequest::API_VERSION . '/search/product/' . $id . '/categories';
+        $browser = $this->getBrowser();
+
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'product' => ['list'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', $path, $filter);
+        static::assertSame(Response::HTTP_FORBIDDEN, $browser->getResponse()->getStatusCode(), $browser->getResponse()->getContent());
+    }
+
     public function testSimpleFilter(): void
     {
         $id = Uuid::randomHex();
@@ -786,11 +1509,10 @@ EOF;
 
         static::assertArrayHasKey('product_count', $aggregations, print_r($aggregations, true));
         $productCount = $aggregations['product_count'];
-        static::assertEquals(2, $productCount[0]['count']);
+        static::assertEquals(2, $productCount['count']);
 
         static::assertArrayHasKey('product_stats', $aggregations);
-        $productStats = $aggregations['product_stats'][0];
-        static::assertEquals(2, $productStats['count']);
+        $productStats = $aggregations['product_stats'];
         static::assertEquals(75, $productStats['avg']);
         static::assertEquals(150, $productStats['sum']);
         static::assertEquals(50, $productStats['min']);
@@ -974,12 +1696,17 @@ EOF;
 
     public function testWriteExtensionWithExtensionKey(): void
     {
+        $field = (new OneToManyAssociationField('testSeoUrls', SeoUrlDefinition::class, 'sales_channel_id'))
+            ->addFlags(new Extension());
+
+        $this->getContainer()->get(SalesChannelDefinition::class)->getFields()->addNewField($field);
+
         $salesChannelId = Uuid::randomHex();
         $this->createSalesChannel($salesChannelId);
 
         $data = [
             'extensions' => [
-                'seoUrls' => [
+                'testSeoUrls' => [
                     [
                         'languageId' => Defaults::LANGUAGE_SYSTEM,
                         'foreignKey' => $salesChannelId,
@@ -1004,7 +1731,7 @@ EOF;
                 ],
             ],
             'associations' => [
-                'seoUrls' => [],
+                'testSeoUrls' => [],
             ],
         ];
 
@@ -1026,7 +1753,7 @@ EOF;
 
         $extension = $included[0];
         static::assertEquals('extension', $extension['type']);
-        static::assertArrayHasKey('seoUrls', $extension['relationships']);
+        static::assertArrayHasKey('testSeoUrls', $extension['relationships']);
 
         $seoUrl = $included[1];
         static::assertEquals('seo_url', $seoUrl['type']);
@@ -1046,11 +1773,16 @@ EOF;
 
     public function testCanWriteExtensionWithoutExtensionKey(): void
     {
+        $field = (new OneToManyAssociationField('testSeoUrls', SeoUrlDefinition::class, 'sales_channel_id'))
+            ->addFlags(new Extension());
+
+        $this->getContainer()->get(SalesChannelDefinition::class)->getFields()->addNewField($field);
+
         $salesChannelId = Uuid::randomHex();
         $this->createSalesChannel($salesChannelId);
 
         $data = [
-            'seoUrls' => [
+            'testSeoUrls' => [
                 [
                     'languageId' => Defaults::LANGUAGE_SYSTEM,
                     'foreignKey' => $salesChannelId,
@@ -1074,7 +1806,7 @@ EOF;
                 ],
             ],
             'associations' => [
-                'seoUrls' => [],
+                'testSeoUrls' => [],
             ],
         ];
 
@@ -1096,7 +1828,7 @@ EOF;
 
         $extension = $included[0];
         static::assertEquals('extension', $extension['type']);
-        static::assertArrayHasKey('seoUrls', $extension['relationships']);
+        static::assertArrayHasKey('testSeoUrls', $extension['relationships']);
 
         $seoUrls = $included[1];
         static::assertEquals('seo_url', $seoUrls['type']);
@@ -1114,7 +1846,79 @@ EOF;
         static::assertEquals('test', $seoUrl['attributes']['routeName']);
     }
 
-    private function createSalesChannel($id): void
+    public function testCloneEntityWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $data = [
+            'id' => $id,
+            'name' => 'test tax clone',
+            'taxRate' => 15,
+        ];
+
+        $browser = $this->getBrowser();
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/tax', [], [], [], json_encode($data));
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), $response->getContent());
+
+        $connection = $browser->getContainer()->get(Connection::class);
+        TestUser::createNewTestUser(
+            $connection,
+            [
+                'tax' => ['detail'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('GET', '/api/v' . PlatformRequest::API_VERSION . '/tax/' . $id);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_OK, $response->getStatusCode(), $response->getContent());
+
+        $tax = json_decode($response->getContent(), true);
+        static::assertArrayHasKey('data', $tax);
+        static::assertEquals($id, $tax['data']['id']);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/_action/clone/tax/' . $id, [], [], [], json_encode($data));
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+    }
+
+    public function testUpdateWithoutPermission(): void
+    {
+        skipTestNext3722($this);
+
+        $id = Uuid::randomHex();
+        $data = [
+            'id' => $id,
+            'name' => 'test tax',
+            'taxRate' => 15,
+        ];
+        $browser = $this->getBrowser();
+        TestUser::createNewTestUser(
+            $browser->getContainer()->get(Connection::class),
+            [
+                'tax' => ['detail', 'create'],
+            ]
+        )->authorizeBrowser($browser);
+
+        $browser->request('POST', '/api/v' . PlatformRequest::API_VERSION . '/tax', [], [], [], json_encode($data));
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), $response->getContent());
+
+        $browser->request('PATCH', '/api/v' . PlatformRequest::API_VERSION . '/tax/' . $id, ['name' => 'foo']);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode(), $response->getContent());
+
+        $browser->request('GET', '/api/v' . PlatformRequest::API_VERSION . '/tax/' . $id);
+        $response = $browser->getResponse();
+        static::assertSame(Response::HTTP_OK, $response->getStatusCode(), $response->getContent());
+
+        $tax = json_decode($response->getContent(), true);
+        static::assertArrayHasKey('data', $tax);
+        static::assertEquals('test tax', $tax['data']['attributes']['name']);
+    }
+
+    private function createSalesChannel(string $id): void
     {
         $data = [
             'id' => $id,

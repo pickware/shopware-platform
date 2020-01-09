@@ -23,7 +23,8 @@ class ImageTypeDetector implements TypeDetectorInterface
 
     public function detect(MediaFile $mediaFile, ?MediaType $previouslyDetectedType): ?MediaType
     {
-        if (!array_key_exists($mediaFile->getFileExtension(), self::SUPPORTED_FILE_EXTENSIONS)) {
+        $fileExtension = mb_strtolower($mediaFile->getFileExtension());
+        if (!array_key_exists($fileExtension, self::SUPPORTED_FILE_EXTENSIONS)) {
             return $previouslyDetectedType;
         }
 
@@ -31,7 +32,7 @@ class ImageTypeDetector implements TypeDetectorInterface
             $previouslyDetectedType = new ImageType();
         }
 
-        $previouslyDetectedType->addFlags(self::SUPPORTED_FILE_EXTENSIONS[$mediaFile->getFileExtension()]);
+        $previouslyDetectedType->addFlags(self::SUPPORTED_FILE_EXTENSIONS[$fileExtension]);
         $this->addAnimatedFlag($mediaFile, $previouslyDetectedType);
 
         return $previouslyDetectedType;
@@ -39,11 +40,12 @@ class ImageTypeDetector implements TypeDetectorInterface
 
     private function addAnimatedFlag(MediaFile $mediaFile, MediaType $rootType): void
     {
-        if ($mediaFile->getFileExtension() === 'gif' && $this->isGifAnimated($mediaFile->getFileName())) {
+        $fileExtension = mb_strtolower($mediaFile->getFileExtension());
+        if ($fileExtension === 'gif' && $this->isGifAnimated($mediaFile->getFileName())) {
             $rootType->addFlag(ImageType::ANIMATED);
         }
 
-        if ($mediaFile->getFileExtension() === 'webp' && $this->isWebpAnimated($mediaFile->getFileName())) {
+        if ($fileExtension === 'webp' && $this->isWebpAnimated($mediaFile->getFileName())) {
             $rootType->addFlag(ImageType::ANIMATED);
         }
     }
@@ -82,7 +84,7 @@ class ImageTypeDetector implements TypeDetectorInterface
      * We check if the file uses the extended file format, which is necessary for animated images
      * then we check if the Animation Flag is set
      */
-    private function isWebpAnimated($filename): bool
+    private function isWebpAnimated(string $filename): bool
     {
         $result = false;
         $fh = fopen($filename, 'rb');

@@ -133,29 +133,40 @@ trait SalesChannelApiTestBehaviour
 
         $this->salesChannelIds[] = $salesChannel['id'];
 
-        $header = 'HTTP_' . str_replace('-', '_', strtoupper(PlatformRequest::HEADER_ACCESS_KEY));
+        $header = 'HTTP_' . str_replace('-', '_', mb_strtoupper(PlatformRequest::HEADER_ACCESS_KEY));
         $salesChannelApiClient->setServerParameter($header, $salesChannelOverride['accessKey']);
+        $salesChannelApiClient->setServerParameter('test-sales-channel-id', $salesChannel['id']);
     }
 
     private function createSalesChannel(array $salesChannelOverride = []): array
     {
         $salesChannelRepository = $this->getContainer()->get('sales_channel.repository');
+        $paymentMethod = $this->getAvailablePaymentMethod();
 
         $salesChannel = array_merge([
             'id' => Uuid::randomHex(),
-            'typeId' => Defaults::SALES_CHANNEL_TYPE_API,
+            'typeId' => Defaults::SALES_CHANNEL_TYPE_STOREFRONT,
             'name' => 'API Test case sales channel',
             'accessKey' => AccessKeyHelper::generateAccessKey('sales-channel'),
             'languageId' => Defaults::LANGUAGE_SYSTEM,
             'snippetSetId' => $this->getSnippetSetIdForLocale('en-GB'),
             'currencyId' => Defaults::CURRENCY,
-            'paymentMethodId' => $this->getAvailablePaymentMethod()->getId(),
+            'paymentMethodId' => $paymentMethod->getId(),
+            'paymentMethods' => [['id' => $paymentMethod->getId()]],
             'shippingMethodId' => $this->getAvailableShippingMethod()->getId(),
             'navigationCategoryId' => $this->getValidCategoryId(),
             'countryId' => $this->getValidCountryId(),
             'currencies' => [['id' => Defaults::CURRENCY]],
             'languages' => [['id' => Defaults::LANGUAGE_SYSTEM]],
             'customerGroupId' => Defaults::FALLBACK_CUSTOMER_GROUP,
+            'domains' => [
+                [
+                    'languageId' => Defaults::LANGUAGE_SYSTEM,
+                    'currencyId' => Defaults::CURRENCY,
+                    'snippetSetId' => $this->getSnippetSetIdForLocale('en-GB'),
+                    'url' => 'http://localhost',
+                ],
+            ],
         ], $salesChannelOverride);
 
         $salesChannelRepository->upsert([$salesChannel], Context::createDefaultContext());

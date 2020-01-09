@@ -41,6 +41,10 @@ class ProductSearchTermInterpreter implements ProductSearchTermInterpreterInterf
 
         $slops = $this->slop($tokens);
 
+        if (empty($slops['normal'])) {
+            return new SearchPattern(new SearchTerm($word));
+        }
+
         $matches = $this->fetchKeywords($context, $slops);
 
         $combines = $this->permute($tokens);
@@ -93,14 +97,15 @@ class ProductSearchTermInterpreter implements ProductSearchTermInterpreterInterf
             'reversed' => [],
         ];
 
-        foreach ($tokens as $index => $token) {
+        foreach ($tokens as $token) {
             $token = (string) $token;
-            $slopSize = \strlen($token) > 4 ? 2 : 1;
-            $length = \strlen($token);
+            $slopSize = \mb_strlen($token) > 4 ? 2 : 1;
+            $length = \mb_strlen($token);
 
-            if (\strlen($token) <= 2) {
+            if (\mb_strlen($token) <= 2) {
                 $slops['normal'][] = $token . '%';
                 $slops['reversed'][] = $token . '%';
+
                 continue;
             }
 
@@ -109,7 +114,7 @@ class ProductSearchTermInterpreter implements ProductSearchTermInterpreterInterf
                 for ($i2 = 1; $i2 <= $slopSize; ++$i2) {
                     $placeholder = '';
                     for ($i3 = 1; $i3 <= $slopSize + 1; ++$i3) {
-                        $slops['normal'][] = \substr($token, 0, $i) . $placeholder . \substr($token, $i + $i2) . '%';
+                        $slops['normal'][] = \mb_substr($token, 0, $i) . $placeholder . \mb_substr($token, $i + $i2) . '%';
                         $placeholder .= '_';
                     }
                 }
@@ -120,7 +125,7 @@ class ProductSearchTermInterpreter implements ProductSearchTermInterpreterInterf
                 for ($i2 = 1; $i2 <= $slopSize; ++$i2) {
                     $placeholder = '';
                     for ($i3 = 1; $i3 <= $slopSize + 1; ++$i3) {
-                        $slops['reversed'][] = \substr($token, 0, $i) . $placeholder . \substr($token, $i + $i2) . '%';
+                        $slops['reversed'][] = \mb_substr($token, 0, $i) . $placeholder . \mb_substr($token, $i + $i2) . '%';
                         $placeholder .= '_';
                     }
                 }
@@ -173,11 +178,13 @@ class ProductSearchTermInterpreter implements ProductSearchTermInterpreterInterf
                 $levenshtein = levenshtein($match, (string) $token);
                 if ($levenshtein === 0) {
                     $score += 6;
+
                     continue;
                 }
 
                 if ($levenshtein <= 2) {
                     $score += 3;
+
                     continue;
                 }
 

@@ -24,6 +24,8 @@ class ModuleInspector
     public const TAG_EXTENSION = 'Extension';
     public const TAG_CUSTOM_RULES = 'Custom Rules';
 
+    protected static $defaultName = 'docs:convert';
+
     public function getAllTags(): array
     {
         return [
@@ -57,7 +59,7 @@ class ModuleInspector
                 $moduleTag->addMarkers('extendable classes', $this->findExtendableClasses($module))
                     ->addMarkers('custom events', $this->findCustomEvents($module));
             },
-            self::TAG_BUSINESS_EVENT_DISPATCHER => function (ModuleTag $moduleTag, SplFileInfo $module) {
+            self::TAG_BUSINESS_EVENT_DISPATCHER => function (ModuleTag $moduleTag, SplFileInfo $module): void {
                 $moduleTag->addMarkers('business events', $this->containsSubclassesOf($module, BusinessEventInterface::class));
             },
             self::TAG_EXTENSION => function (ModuleTag $moduleTag, SplFileInfo $module): void {
@@ -91,7 +93,8 @@ class ModuleInspector
 
     public function getClassName(SplFileInfo $file): string
     {
-        $parts = explode('/', $file->getRealPath());
+        $filePath = $file->getRealPath();
+        $parts = explode('/', $filePath);
 
         $startIndex = array_search('Core', $parts, true);
 
@@ -105,12 +108,16 @@ class ModuleInspector
         $className = 'Shopware\\' . implode('\\', $namespaceRelevantParts);
 
         try {
-            class_exists($className);
+            $classExists = class_exists($className);
         } catch (\Throwable $e) {
-            throw new \RuntimeException('No class in file', 0, $e);
+            throw new \RuntimeException(sprintf('No class in file %s', $filePath), 0, $e);
         }
 
-        return $className;
+        if ($classExists) {
+            return $className;
+        }
+
+        throw new \RuntimeException(sprintf('No class in file %s', $filePath));
     }
 
     private function findFiles(SplFileInfo $in, string $pattern): Finder

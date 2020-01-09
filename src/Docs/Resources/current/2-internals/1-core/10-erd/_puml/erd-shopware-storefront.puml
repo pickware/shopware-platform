@@ -22,42 +22,57 @@ skinparam backgroundColor #FFFFFF
 
 ' entities
 
-Table(ShopwareStorefrontFrameworkSeoSeoUrlSeoUrlDefinition, "seo_url\n(Seo urls)") {
+Table(ShopwareStorefrontThemeThemeDefinition, "theme\n(__EMPTY__)") {
    primary_key(id) id
-   salesChannelId foreignKey
-   not_null(languageId) foreignKey
-   not_null(foreignKey) id
-   not_null(routeName) string
-   not_null(pathInfo) string
-   not_null(seoPathInfo) string
-   isCanonical bool
-   isModified bool
-   isDeleted bool
-   isValid bool
-   autoIncrement int
+   technicalName string
+   not_null(name) string
+   not_null(author) string
+   description translated
+   labels translated
+   helpTexts translated
+   customFields translated
+   previewMediaId foreignKey
+   parentThemeId foreignKey
+   baseConfig json
+   configValues json
+   not_null(active) bool
+   not_null(createdAt) createdAt
+   not_null(updatedAt) updatedAt
+   translated json
+}
+TranslationTable(ShopwareStorefrontThemeAggregateThemeTranslationDefinition, "theme_translation\n((Translations))") {
+   description string
+   labels json
+   helpTexts json
    customFields customFields
    not_null(createdAt) createdAt
    not_null(updatedAt) updatedAt
+   primary_key(themeId) foreignKey
+   primary_key(languageId) foreignKey
 }
-Table(ShopwareStorefrontFrameworkSeoSeoUrlTemplateSeoUrlTemplateDefinition, "seo_url_template\n(Template)") {
-   primary_key(id) id
-   salesChannelId foreignKey
-   not_null(entityName) string
-   not_null(routeName) string
-   not_null(template) string
-   isValid bool
-   customFields customFields
-   not_null(createdAt) createdAt
-   not_null(updatedAt) updatedAt
+Table(ShopwareStorefrontThemeAggregateThemeSalesChannelDefinition, "theme_sales_channel\n(M:N Mapping)") {
+   primary_key(salesChannelId) foreignKey
+   not_null(themeId) foreignKey
 }
-ForeignTable(ShopwareCoreSystemSalesChannelSalesChannelDefinition, "sales_channel") {
+Table(ShopwareStorefrontThemeAggregateThemeMediaDefinition, "theme_media\n(M:N Mapping)") {
+   primary_key(themeId) foreignKey
+   primary_key(mediaId) foreignKey
+}
+ForeignTable(ShopwareCoreContentMediaMediaDefinition, "media") {
 }
 ForeignTable(ShopwareCoreFrameworkLanguageLanguageDefinition, "language") {
+}
+ForeignTable(ShopwareCoreSystemSalesChannelSalesChannelDefinition, "sales_channel") {
 }
 
 ' relationshipd
 
-ShopwareStorefrontFrameworkSeoSeoUrlSeoUrlDefinition --> ShopwareCoreSystemSalesChannelSalesChannelDefinition
-ShopwareStorefrontFrameworkSeoSeoUrlSeoUrlDefinition --> ShopwareCoreFrameworkLanguageLanguageDefinition
-ShopwareStorefrontFrameworkSeoSeoUrlTemplateSeoUrlTemplateDefinition --> ShopwareCoreSystemSalesChannelSalesChannelDefinition
+ShopwareStorefrontThemeAggregateThemeTranslationDefinition --> ShopwareStorefrontThemeThemeDefinition
+ShopwareStorefrontThemeAggregateThemeSalesChannelDefinition --> ShopwareStorefrontThemeThemeDefinition
+ShopwareStorefrontThemeAggregateThemeMediaDefinition --> ShopwareStorefrontThemeThemeDefinition
+ShopwareStorefrontThemeThemeDefinition --> ShopwareCoreContentMediaMediaDefinition
+ShopwareStorefrontThemeThemeDefinition --> ShopwareStorefrontThemeThemeDefinition
+ShopwareStorefrontThemeAggregateThemeTranslationDefinition --> ShopwareCoreFrameworkLanguageLanguageDefinition
+ShopwareStorefrontThemeAggregateThemeSalesChannelDefinition --> ShopwareCoreSystemSalesChannelSalesChannelDefinition
+ShopwareStorefrontThemeAggregateThemeMediaDefinition --> ShopwareCoreContentMediaMediaDefinition
 @enduml

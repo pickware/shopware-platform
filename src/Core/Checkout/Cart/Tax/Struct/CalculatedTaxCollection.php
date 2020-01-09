@@ -59,10 +59,10 @@ class CalculatedTaxCollection extends Collection
     {
         $new = new self($this->elements);
 
-        /** @var CalculatedTax $calculatedTax */
         foreach ($taxCollection as $calculatedTax) {
             if (!$new->exists($calculatedTax)) {
                 $new->add(clone $calculatedTax);
+
                 continue;
             }
 

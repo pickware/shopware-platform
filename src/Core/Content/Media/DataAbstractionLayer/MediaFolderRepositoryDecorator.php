@@ -8,7 +8,7 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregatorResult;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\AggregationResultCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -49,7 +49,7 @@ class MediaFolderRepositoryDecorator implements EntityRepositoryInterface
     }
 
     // Unchanged methods
-    public function aggregate(Criteria $criteria, Context $context): AggregatorResult
+    public function aggregate(Criteria $criteria, Context $context): AggregationResultCollection
     {
         return $this->innerRepo->aggregate($criteria, $context);
     }
@@ -124,7 +124,6 @@ class MediaFolderRepositoryDecorator implements EntityRepositoryInterface
 
     private function deleteMediaAndSubfolders(MediaFolderCollection $folders, Context $context): void
     {
-        /** @var MediaFolderEntity $folder */
         foreach ($folders as $folder) {
             $criteria = new Criteria();
             $criteria->addFilter(new EqualsFilter('mediaFolderId', $folder->getId()));

@@ -75,7 +75,7 @@ class ThemeTest extends TestCase
         }
     }
 
-    public function testDefaultThemeConfig()
+    public function testDefaultThemeConfig(): void
     {
         /** @var ThemeEntity $theme */
         $theme = $this->themeRepository->search(new Criteria(), $this->context)->first();
@@ -90,7 +90,7 @@ class ThemeTest extends TestCase
         static::assertEquals($themeConfigFix, $themeConfiguration);
     }
 
-    public function testDefaultThemeConfigTranslated()
+    public function testDefaultThemeConfigTranslated(): void
     {
         $theme = $this->themeRepository->search(new Criteria(), $this->context)->first();
         $themeConfiguration = $this->themeService->getThemeConfiguration($theme->getId(), true, $this->context);
@@ -102,7 +102,7 @@ class ThemeTest extends TestCase
         }
     }
 
-    public function testDefaultThemeConfigFields()
+    public function testDefaultThemeConfigFields(): void
     {
         $theme = $this->themeRepository->search(new Criteria(), $this->context)->first();
 
@@ -110,7 +110,7 @@ class ThemeTest extends TestCase
         static::assertEquals(ThemeFixtures::getThemeFields(), $theme);
     }
 
-    public function testInheritedThemeConfig()
+    public function testInheritedThemeConfig(): void
     {
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('technicalName', StorefrontPluginRegistry::BASE_THEME_NAME));
@@ -149,7 +149,68 @@ class ThemeTest extends TestCase
         static::assertEquals($themeInheritedConfig, $theme);
     }
 
-    public function testCompileTheme()
+    public function testInheritedSecondLevelThemeConfig(): void
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('technicalName', StorefrontPluginRegistry::BASE_THEME_NAME));
+
+        /** @var ThemeEntity $baseTheme */
+        $baseTheme = $this->themeRepository->search($criteria, $this->context)->first();
+
+        $name = $this->createTheme($baseTheme, [
+            'blocks' => [
+                'newBlock' => [
+                    'label' => [
+                        'en-GB' => 'New Block',
+                        'de-DE' => 'Neuer Block',
+                    ],
+                ],
+            ],
+        ]);
+
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('technicalName', $name));
+
+        /** @var ThemeEntity $inheritedTheme */
+        $inheritedTheme = $this->themeRepository->search($criteria, $this->context)->first();
+
+        $name = $this->createTheme($inheritedTheme);
+
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('name', $name));
+
+        /** @var ThemeEntity $childTheme */
+        $childTheme = $this->themeRepository->search($criteria, $this->context)->first();
+
+        $this->themeService->updateTheme(
+            $childTheme->getId(),
+            [
+                'sw-color-brand-primary' => [
+                    'value' => '#ff00ff',
+                ],
+            ],
+            null,
+            $this->context
+        );
+
+        $theme = $this->themeService->getThemeConfiguration($childTheme->getId(), false, $this->context);
+        $themeInheritedConfig = ThemeFixtures::getThemeInheritedConfig();
+
+        $themeInheritedConfig['blocks']['newBlock']['label'] = [
+            'en-GB' => 'New Block',
+            'de-DE' => 'Neuer Block',
+        ];
+
+        foreach ($themeInheritedConfig['fields'] as $key => $field) {
+            if ($field['type'] === 'media') {
+                $themeInheritedConfig['fields'][$key]['value'] = $theme['fields'][$key]['value'];
+            }
+        }
+
+        static::assertEquals($themeInheritedConfig, $theme);
+    }
+
+    public function testCompileTheme(): void
     {
         static::markTestSkipped('theme compile is not possible cause app.js does not exists');
         $criteria = new Criteria();
@@ -182,7 +243,7 @@ class ThemeTest extends TestCase
         static::assertTrue($themeCompiled);
     }
 
-    public function testRefreshPlugin()
+    public function testRefreshPlugin(): void
     {
         $themeLifecycleService = $this->getContainer()->get(ThemeLifecycleService::class);
         $themeLifecycleService->refreshThemes($this->context);
@@ -195,7 +256,7 @@ class ThemeTest extends TestCase
         static::assertNotEmpty($theme->getLabels());
     }
 
-    public function testResetTheme()
+    public function testResetTheme(): void
     {
         /** @var ThemeEntity $theme */
         $theme = $this->themeRepository->search(new Criteria(), $this->context)->first();
@@ -228,7 +289,7 @@ class ThemeTest extends TestCase
     /**
      * @throws \Exception
      */
-    private function createTheme(ThemeEntity $baseTheme): string
+    private function createTheme(ThemeEntity $parentTheme, array $customConfig = []): string
     {
         $name = 'test' . Uuid::randomHex();
 
@@ -237,16 +298,17 @@ class ThemeTest extends TestCase
             [
                 [
                     'id' => $id,
-                    'parentThemeId' => $baseTheme->getId(),
+                    'parentThemeId' => $parentTheme->getId(),
                     'name' => $name,
+                    'technicalName' => $name,
                     'createdAt' => (new \DateTimeImmutable())->format(Defaults::STORAGE_DATE_TIME_FORMAT),
-                    'configValues' => $baseTheme->getConfigValues(),
-                    'baseConfig' => $baseTheme->getBaseConfig(),
-                    'description' => $baseTheme->getDescription(),
-                    'author' => $baseTheme->getAuthor(),
-                    'labels' => $baseTheme->getLabels(),
-                    'customFields' => $baseTheme->getCustomFields(),
-                    'previewMediaId' => $baseTheme->getPreviewMediaId(),
+                    'configValues' => $parentTheme->getConfigValues(),
+                    'baseConfig' => array_merge_recursive($parentTheme->getBaseConfig(), $customConfig),
+                    'description' => $parentTheme->getDescription(),
+                    'author' => $parentTheme->getAuthor(),
+                    'labels' => $parentTheme->getLabels(),
+                    'customFields' => $parentTheme->getCustomFields(),
+                    'previewMediaId' => $parentTheme->getPreviewMediaId(),
                     'active' => true,
                 ],
             ],

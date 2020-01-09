@@ -84,7 +84,7 @@ class Download
 
         $me = $this;
 
-        curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function ($ch, $dltotal, $dlnow) use ($size) {
+        curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function ($ch, $dltotal, $dlnow) use ($size): void {
             if ($dlnow > 0) {
                 $this->progress($dltotal, $dlnow, $size + $dlnow);
             }
@@ -99,7 +99,7 @@ class Download
                 return -1;
             }
 
-            $partFile->fwrite($str);
+            $writtenBytes = $partFile->fwrite($str);
 
             if ($me->shouldHalt()) {
                 $isHalted = true;
@@ -107,7 +107,7 @@ class Download
                 return -1;
             }
 
-            return strlen($str);
+            return $writtenBytes;
         });
 
         $result = curl_exec($ch);
@@ -144,7 +144,7 @@ class Download
         return $size;
     }
 
-    private function progress(int $downloadSize, int $downloaded, int $total)
+    private function progress(int $downloadSize, int $downloaded, int $total): void
     {
         if ($this->progressCallback === null) {
             return;
@@ -158,6 +158,7 @@ class Download
         if (sha1_file($partFile->getPathname()) !== $hash) {
             // try to delete invalid file so a valid one can be downloaded
             @unlink($partFile->getPathname());
+
             throw new UpdateFailedException('Hash mismatch');
         }
 

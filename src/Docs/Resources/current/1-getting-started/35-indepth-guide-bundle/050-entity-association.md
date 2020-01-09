@@ -212,7 +212,8 @@ This interface will automatically force you to implement the two methods `extend
 Simply return the FQCN to the extended definition here.
 
 The `extendFields` method though provides you with a `FieldCollection` parameter, which contains all fields from the original definition class.
-Add the `ManyToManyAssociationField` here as well, quite similar to the same field in your `BundleDefinition`, of course with adjusted parameters to be passed to the constructor:
+Add the `ManyToManyAssociationField` here as well, quite similar to the same field in your `BundleDefinition`, of course with adjusted parameters to be passed to the constructor.
+Also note that you have to mark the association as an Inherited field, otherwise it would not work for variant products.
 
 ```php
 <?php declare(strict_types=1);
@@ -221,6 +222,7 @@ namespace Swag\BundleExample\Core\Content\Product;
 
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityExtensionInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Inherited;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
 use Swag\BundleExample\Core\Content\Bundle\Aggregate\BundleProduct\BundleProductDefinition;
@@ -231,13 +233,65 @@ class ProductExtension implements EntityExtensionInterface
     public function extendFields(FieldCollection $collection): void
     {
         $collection->add(
-            new ManyToManyAssociationField('bundles', BundleDefinition::class, BundleProductDefinition::class, 'product_id', 'bundle_id')
+            (new ManyToManyAssociationField(
+                'bundles', 
+                BundleDefinition::class,
+                BundleProductDefinition::class, 
+                'product_id', 
+                'bundle_id'
+            ))->addFlags(new Inherited())
         );
     }
 
     public function getDefinitionClass(): string
     {
         return ProductDefinition::class;
+    }
+}
+```
+
+For every inherited field you have to add a binary column to the entity, which is used for saving the inherited information in a read optimized manner.
+You can use the `InheritanceUpdaterTrait` for this purpose, so add the following lines to your migration:
+
+```php
+<?php declare(strict_types=1);
+
+namespace Swag\BundleExample\Migration;
+
+use Doctrine\DBAL\Connection;
+use Shopware\Core\Framework\Migration\InheritanceUpdaterTrait;
+use Shopware\Core\Framework\Migration\MigrationStep;
+
+class Migration1554708925Bundle extends MigrationStep
+{
+    use InheritanceUpdaterTrait;
+
+    public function update(Connection $connection): void
+    {
+        ...
+
+        $this->updateInheritance($connection, 'product', 'bundles');
+    }
+
+    ...
+}
+```
+
+The newly added column will be automatically managed by te DAL through an Indexer. But as there may already be some products in the Database that don't have that column set we have to run the `InheritanceIndexer` during the activation process of the plugin.
+Because running the Indexer may take a longer time it's a bad idea to run the Indexer directly, therefore you can use the  `IndexerMessageSender` to run the Indexer asynchronously in your plugin base class `activate()`-method.
+
+```php
+use Shopware\Core\Framework\DataAbstractionLayer\Indexing\Indexer\InheritanceIndexer;
+use Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue\IndexerMessageSender;
+use Shopware\Core\Framework\Plugin;
+use Shopware\Core\Framework\Plugin\Context\ActivateContext;
+
+class BundleExample extends Plugin
+{
+    public function activate(ActivateContext $activateContext): void
+    {
+        $indexerMessageSender = $this->container->get(IndexerMessageSender::class);
+        $indexerMessageSender->partial(new \DateTimeImmutable(), [InheritanceIndexer::getName()]);
     }
 }
 ```

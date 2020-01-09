@@ -1,4 +1,6 @@
 enqueue:
     default:
-        transport: "file://%kernel.project_dir%/var/queue"
+        transport:
+            dsn: "null:"
+            factory_service: Shopware\Core\Framework\MessageQueue\Enqueue\ConnectionFactoryFactory
         client: ~

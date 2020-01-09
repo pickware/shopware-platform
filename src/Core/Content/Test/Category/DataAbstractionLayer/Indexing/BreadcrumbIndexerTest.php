@@ -5,8 +5,8 @@ namespace Shopware\Core\Content\Test\Category\DataAbstractionLayer\Indexing;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Category\CategoryCollection;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\SystemSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
@@ -34,7 +34,7 @@ class BreadcrumbIndexerTest extends TestCase
         $this->deLanguageId = $this->getDeDeLanguageId();
     }
 
-    public function testBreadcrumbAfterCreate()
+    public function testBreadcrumbAfterCreate(): void
     {
         $ids = $this->setUpData();
 
@@ -75,11 +75,11 @@ class BreadcrumbIndexerTest extends TestCase
         $c3 = $categories->get($ids->level3);
 
         static::assertSame(['DE-A'], $c1->getBreadcrumb());
-        static::assertSame(['DE-A', 'DE-B'], $c2->getBreadcrumb());
+        static::assertSame(['DE-A',  'DE-B'], $c2->getBreadcrumb());
         static::assertSame(['DE-A', 'DE-B', 'DE-C'], $c3->getBreadcrumb());
     }
 
-    public function testUpdateTranslation()
+    public function testUpdateTranslation(): void
     {
         $ids = $this->setUpData();
 
@@ -149,7 +149,7 @@ class BreadcrumbIndexerTest extends TestCase
         static::assertSame(['DE-A', 'DE-B', 'DE-C'], $c3->getBreadcrumb());
     }
 
-    public function testLanguageInheritance()
+    public function testLanguageInheritance(): void
     {
         $ids = $this->setUpData();
 

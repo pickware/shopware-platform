@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer;
 
+use Shopware\Core\Framework\Struct\ArrayEntity;
 use Shopware\Core\Framework\Struct\Struct;
 
 class Entity extends Struct
@@ -53,13 +54,23 @@ class Entity extends Struct
 
     public function get(string $property)
     {
-        if (!$this->has($property)) {
-            throw new \InvalidArgumentException(
-                sprintf('Property %s do not exist in class %s', $property, \get_class($this))
-            );
+        if ($this->has($property)) {
+            return $this->$property;
         }
 
-        return $this->$property;
+        if ($this->hasExtension($property)) {
+            return $this->getExtension($property);
+        }
+
+        /** @var Entity|null $extension */
+        $extension = $this->getExtension('foreignKeys');
+        if ($extension && $extension instanceof self && $extension->has($property)) {
+            return $extension->get($property);
+        }
+
+        throw new \InvalidArgumentException(
+            sprintf('Property %s do not exist in class %s', $property, static::class)
+        );
     }
 
     public function has(string $property): bool
@@ -105,5 +116,29 @@ class Entity extends Struct
     public function setUpdatedAt(\DateTimeInterface $updatedAt): void
     {
         $this->updatedAt = $updatedAt;
+    }
+
+    public function jsonSerialize(): array
+    {
+        $data = parent::jsonSerialize();
+
+        if (!$this->hasExtension('foreignKeys')) {
+            return $data;
+        }
+
+        $extension = $this->getExtension('foreignKeys');
+
+        if (!$extension instanceof ArrayEntity) {
+            return $data;
+        }
+
+        foreach ($extension->all() as $key => $value) {
+            if (array_key_exists($key, $data)) {
+                continue;
+            }
+            $data[$key] = $value;
+        }
+
+        return $data;
     }
 }

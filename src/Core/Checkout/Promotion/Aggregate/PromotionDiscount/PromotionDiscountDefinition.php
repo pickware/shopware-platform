@@ -40,6 +40,11 @@ class PromotionDiscountDefinition extends EntityDefinition
         return PromotionDiscountCollection::class;
     }
 
+    protected function getParentDefinitionClass(): ?string
+    {
+        return PromotionDefinition::class;
+    }
+
     protected function defineFields(): FieldCollection
     {
         return new FieldCollection([
@@ -50,6 +55,10 @@ class PromotionDiscountDefinition extends EntityDefinition
             (new FloatField('value', 'value'))->addFlags(new Required()),
             (new BoolField('consider_advanced_rules', 'considerAdvancedRules'))->addFlags(new Required()),
             new FloatField('max_value', 'maxValue'),
+
+            (new StringField('sorter_key', 'sorterKey', 32)),
+            (new StringField('applier_key', 'applierKey', 32)),
+            (new StringField('usage_key', 'usageKey', 32)),
 
             new ManyToOneAssociationField('promotion', 'promotion_id', PromotionDefinition::class, 'id'),
             (new ManyToManyAssociationField('discountRules', RuleDefinition::class, PromotionDiscountRuleDefinition::class, 'discount_id', 'rule_id'))->addFlags(new CascadeDelete()),

@@ -3,6 +3,7 @@
 namespace Shopware\Core\Framework\Test\DataAbstractionLayer;
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DBALException;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Category\CategoryCollection;
 use Shopware\Core\Content\Category\CategoryDefinition;
@@ -14,21 +15,27 @@ use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Extension;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\PaginationCriteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityWriter;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\DataAbstractionLayerFieldTestBehaviour;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\AssociationExtension;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ExtendableDefinition;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ExtendedDefinition;
+use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\FkFieldExtension;
+use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\InvalidReferenceExtension;
+use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ReferenceVersionExtension;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ScalarExtension;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ScalarRuntimeExtension;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Tax\TaxDefinition;
+use Shopware\Core\System\Tax\TaxEntity;
 
 class EntityExtensionTest extends TestCase
 {
@@ -67,7 +74,6 @@ class EntityExtensionTest extends TestCase
         $this->productRepository = $this->getContainer()->get('product.repository');
         $this->priceRepository = $this->getContainer()->get('product_price.repository');
         $this->categoryRepository = $this->getContainer()->get('category.repository');
-
         $this->writer = $this->getContainer()->get(EntityWriter::class);
     }
 
@@ -77,7 +83,68 @@ class EntityExtensionTest extends TestCase
         $this->getContainer()->get(ProductDefinition::class)->getFields()->remove('myPrices');
         $this->getContainer()->get(ProductDefinition::class)->getFields()->remove('myCategories');
 
-        $this->removeExtension(ScalarExtension::class, ScalarRuntimeExtension::class, AssociationExtension::class);
+        $this->removeExtension(ScalarExtension::class, ScalarRuntimeExtension::class, AssociationExtension::class, ReferenceVersionExtension::class, InvalidReferenceExtension::class);
+    }
+
+    public function testICanWriteAndReadManyToOneAssociationExtension(): void
+    {
+        $this->connection->rollBack();
+
+        try {
+            $this->connection->executeUpdate('ALTER TABLE `product` ADD COLUMN my_tax_id binary(16) NULL');
+        } catch (DBALException $e) {
+        }
+
+        $this->connection->beginTransaction();
+
+        $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField(
+            (new ManyToOneAssociationField('myTax', 'my_tax_id', TaxDefinition::class, 'id'))->addFlags(new Extension())
+        );
+        $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField(
+            (new FkField('my_tax_id', 'myTaxId', TaxDefinition::class))->addFlags(new Extension())
+        );
+
+        $id = Uuid::randomHex();
+
+        $data = [
+            'id' => $id,
+            'name' => 'test',
+            'productNumber' => $id,
+            'stock' => 1,
+            'price' => [
+                ['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false],
+            ],
+            'manufacturer' => ['name' => 'test'],
+            'tax' => ['name' => 'test', 'taxRate' => 15],
+            'myTax' => ['id' => $id, 'name' => 'my-tax', 'taxRate' => 50],
+        ];
+
+        $this->productRepository->create([$data], Context::createDefaultContext());
+
+        $criteria = new Criteria([$id]);
+        $criteria->addAssociation('myTax');
+
+        $product = $this->productRepository->search($criteria, Context::createDefaultContext())->first();
+
+        static::assertInstanceOf(ProductEntity::class, $product);
+
+        /** @var ProductEntity $product */
+        static::assertTrue($product->hasExtension('myTax'));
+
+        /** @var TaxEntity $tax */
+        $tax = $product->getExtension('myTax');
+        static::assertInstanceOf(TaxEntity::class, $tax);
+
+        static::assertSame('my-tax', $tax->getName());
+
+        $this->connection->rollBack();
+
+        $this->connection->executeUpdate('ALTER TABLE `product` DROP COLUMN my_tax_id');
+
+        $this->connection->beginTransaction();
+
+        $this->getContainer()->get(ProductDefinition::class)->getFields()->remove('myTax');
+        $this->getContainer()->get(ProductDefinition::class)->getFields()->remove('myTaxId');
     }
 
     public function testICanWriteOneToManyAssociationsExtensions(): void
@@ -245,7 +312,7 @@ class EntityExtensionTest extends TestCase
         static::assertFalse($product->hasExtension('myPrices'));
 
         $criteria = new Criteria([$id]);
-        $criteria->addAssociation('myPrices', new PaginationCriteria(1));
+        $criteria->getAssociation('myPrices')->setLimit(1);
 
         /** @var ProductEntity $product */
         $product = $this->productRepository->search($criteria, Context::createDefaultContext())
@@ -260,8 +327,11 @@ class EntityExtensionTest extends TestCase
     public function testICanWriteManyToManyAssociationsExtensions(): void
     {
         $field = (new ManyToManyAssociationField(
-            'myCategories', CategoryDefinition::class,
-            ProductCategoryDefinition::class, 'product_id', 'category_id'
+            'myCategories',
+            CategoryDefinition::class,
+            ProductCategoryDefinition::class,
+            'product_id',
+            'category_id'
         ))->addFlags(new Extension());
 
         $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField($field);
@@ -299,8 +369,11 @@ class EntityExtensionTest extends TestCase
     public function testICanReadManyToManyAssociationsExtensionsInBasic(): void
     {
         $field = (new ManyToManyAssociationField(
-            'myCategories', CategoryDefinition::class,
-            ProductCategoryDefinition::class, 'product_id', 'category_id'
+            'myCategories',
+            CategoryDefinition::class,
+            ProductCategoryDefinition::class,
+            'product_id',
+            'category_id'
         ))->addFlags(new Extension());
 
         $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField($field);
@@ -327,8 +400,11 @@ class EntityExtensionTest extends TestCase
     public function testICanReadManyToManyAssociationsExtensionsNotInBasic(): void
     {
         $field = (new ManyToManyAssociationField(
-            'myCategories', CategoryDefinition::class,
-            ProductCategoryDefinition::class, 'product_id', 'category_id'
+            'myCategories',
+            CategoryDefinition::class,
+            ProductCategoryDefinition::class,
+            'product_id',
+            'category_id'
         ))->addFlags(new Extension());
 
         $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField($field);
@@ -374,8 +450,11 @@ class EntityExtensionTest extends TestCase
     public function testICanSearchManyToManyAssociationsExtensions(): void
     {
         $field = (new ManyToManyAssociationField(
-            'myCategories', CategoryDefinition::class,
-            ProductCategoryDefinition::class, 'product_id', 'category_id'
+            'myCategories',
+            CategoryDefinition::class,
+            ProductCategoryDefinition::class,
+            'product_id',
+            'category_id'
         ))->addFlags(new Extension());
 
         $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField($field);
@@ -412,8 +491,11 @@ class EntityExtensionTest extends TestCase
     public function testICanReadPaginatedManyToManyAssociationsExtensions(): void
     {
         $field = (new ManyToManyAssociationField(
-            'myCategories', CategoryDefinition::class,
-            ProductCategoryDefinition::class, 'product_id', 'category_id'
+            'myCategories',
+            CategoryDefinition::class,
+            ProductCategoryDefinition::class,
+            'product_id',
+            'category_id'
         ))->addFlags(new Extension());
 
         $this->getContainer()->get(ProductDefinition::class)->getFields()->addNewField($field);
@@ -432,7 +514,7 @@ class EntityExtensionTest extends TestCase
         static::assertFalse($product->hasExtension('myCategories'));
 
         $criteria = new Criteria([$id]);
-        $criteria->addAssociation('extensions.myCategories', new PaginationCriteria(2));
+        $criteria->getAssociation('extensions.myCategories')->setLimit(2);
 
         /** @var ProductEntity $product */
         $product = $this->productRepository->search($criteria, Context::createDefaultContext())
@@ -444,7 +526,7 @@ class EntityExtensionTest extends TestCase
         static::assertCount(2, $product->getExtension('myCategories'));
 
         $criteria = new Criteria([$id]);
-        $criteria->addAssociation('myCategories', new PaginationCriteria(2));
+        $criteria->addAssociation('myCategories')->setLimit(2);
 
         /** @var ProductEntity $product */
         $product = $this->productRepository->search($criteria, Context::createDefaultContext())
@@ -459,7 +541,7 @@ class EntityExtensionTest extends TestCase
     public function testICantAddScalarExtensions(): void
     {
         static::expectException(\Exception::class);
-        static::expectExceptionMessage('Only AssociationFields or fields flagged as Runtime can be added as Extension.');
+        static::expectExceptionMessage('Only AssociationFields, FkFields/ReferenceVersionFields for a ManyToOneAssociationField or fields flagged as Runtime can be added as Extension.');
 
         $this->registerDefinitionWithExtensions(ExtendableDefinition::class, ScalarExtension::class);
 
@@ -473,6 +555,13 @@ class EntityExtensionTest extends TestCase
         static::assertTrue($this->getContainer()->get(ExtendableDefinition::class)->getFields()->has('test'));
     }
 
+    public function testICanAddFkFieldsAsExtensions(): void
+    {
+        $this->registerDefinitionWithExtensions(ExtendableDefinition::class, FkFieldExtension::class);
+
+        static::assertTrue($this->getContainer()->get(ExtendableDefinition::class)->getFields()->has('test'));
+    }
+
     public function testICanAddAssociationExtensions(): void
     {
         $this->registerDefinition(ExtendedDefinition::class);
@@ -482,7 +571,16 @@ class EntityExtensionTest extends TestCase
         static::assertTrue($this->getContainer()->get(ExtendableDefinition::class)->getFields()->has('toMany'));
     }
 
-    private function getPricesData($id): array
+    public function testICanAddReferenceVersionAsExtensionWithValidManyToOneAssociation(): void
+    {
+        $this->registerDefinition(ExtendedDefinition::class);
+        $this->registerDefinitionWithExtensions(ExtendableDefinition::class, ReferenceVersionExtension::class);
+
+        static::assertTrue($this->getContainer()->get(ExtendableDefinition::class)->getFields()->has('toOne'));
+        static::assertTrue($this->getContainer()->get(ExtendableDefinition::class)->getFields()->has('extendedVersionId'));
+    }
+
+    private function getPricesData(string $id): array
     {
         $ruleA = Uuid::randomHex();
         $ruleB = Uuid::randomHex();
@@ -525,7 +623,7 @@ class EntityExtensionTest extends TestCase
         return $data;
     }
 
-    private function getCategoriesData($id): array
+    private function getCategoriesData(string $id): array
     {
         $categoryA = Uuid::randomHex();
         $categoryB = Uuid::randomHex();

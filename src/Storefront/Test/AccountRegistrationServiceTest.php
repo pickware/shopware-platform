@@ -91,7 +91,6 @@ class AccountRegistrationServiceTest extends TestCase
         $customers = $this->accountService->getCustomersByEmail($data->get('email'), $this->salesChannelContext, false);
         static::assertCount(1, $customers);
 
-        /** @var CustomerEntity $customer */
         $customer = $this->accountService->getCustomerByEmail($data->get('email'), $this->salesChannelContext, true);
         static::assertTrue($customer->getGuest());
     }
@@ -141,7 +140,25 @@ class AccountRegistrationServiceTest extends TestCase
         static::assertNotEmpty($customerId);
     }
 
-    private function getRegistrationData($isGuest = false): DataBag
+    public function testRegistrationWithRequiredPhoneNumber(): void
+    {
+        $this->systemConfigService->set('core.loginRegistration.showPhoneNumber', true);
+        $this->systemConfigService->set('core.loginRegistration.requirePhoneNumber', true);
+
+        $data = $this->getRegistrationData();
+
+        $this->expectException(ConstraintViolationException::class);
+        $this->accountRegistrationService->register($data, false, $this->salesChannelContext);
+
+        /** @var DataBag $billingAddress */
+        $billingAddress = $data->get('billingAddress');
+        $billingAddress->set('phoneNumber', '12345');
+
+        $customerId = $this->accountRegistrationService->register($data, false, $this->salesChannelContext);
+        static::assertNotEmpty($customerId);
+    }
+
+    private function getRegistrationData(bool $isGuest = false): DataBag
     {
         $data = [
             'accountType' => CustomerEntity::ACCOUNT_TYPE_PRIVATE,

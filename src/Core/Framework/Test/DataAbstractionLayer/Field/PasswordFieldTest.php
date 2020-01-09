@@ -4,6 +4,7 @@ namespace Shopware\Core\Framework\Test\DataAbstractionLayer\Field;
 
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PasswordField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldSerializer\PasswordFieldSerializer;
@@ -35,11 +36,12 @@ class PasswordFieldTest extends TestCase
     public function testNullableField(): void
     {
         $field = new PasswordField('password', 'password');
-        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class), [], false, false, false, []);
+        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class)->getEntityName(), [], false, false, false, []);
         $kvPair = new KeyValuePair('password', null, true);
 
         $passwordFieldHandler = new PasswordFieldSerializer(
-            $this->getContainer()->get('validator')
+            $this->getContainer()->get('validator'),
+            $this->getContainer()->get(DefinitionInstanceRegistry::class)
         );
 
         $payload = $passwordFieldHandler->encode($field, $existence, $kvPair, new WriteParameterBag(
@@ -56,11 +58,12 @@ class PasswordFieldTest extends TestCase
     public function testEncoding(): void
     {
         $field = new PasswordField('password', 'password');
-        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class), [], false, false, false, []);
+        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class)->getEntityName(), [], false, false, false, []);
         $kvPair = new KeyValuePair('password', 'shopware', true);
 
         $passwordFieldHandler = new PasswordFieldSerializer(
-            $this->getContainer()->get('validator')
+            $this->getContainer()->get('validator'),
+            $this->getContainer()->get(DefinitionInstanceRegistry::class)
         );
 
         $payload = $passwordFieldHandler->encode($field, $existence, $kvPair, new WriteParameterBag(
@@ -80,10 +83,12 @@ class PasswordFieldTest extends TestCase
         $field = new PasswordField('password', 'password');
         $field->addFlags(new Required());
 
-        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class), [], false, false, false, []);
+        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class)->getEntityName(), [], false, false, false, []);
         $kvPair = new KeyValuePair('password', null, true);
 
         $exception = null;
+        $array = null;
+
         try {
             $handler = $this->getContainer()->get(PasswordFieldSerializer::class);
 
@@ -95,10 +100,11 @@ class PasswordFieldTest extends TestCase
             );
 
             $x = $handler->encode($field, $existence, $kvPair, $parameters);
-            iterator_to_array($x);
+            $array = iterator_to_array($x);
         } catch (WriteConstraintViolationException $exception) {
         }
 
+        static::assertIsNotArray($array);
         static::assertInstanceOf(WriteConstraintViolationException::class, $exception);
         static::assertNotNull($exception->getViolations()->findByCodes(NotBlank::IS_BLANK_ERROR));
     }
@@ -108,10 +114,12 @@ class PasswordFieldTest extends TestCase
         $field = new PasswordField('password', 'password');
         $field->addFlags(new Required());
 
-        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class), [], true, false, false, []);
+        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class)->getEntityName(), [], true, false, false, []);
         $kvPair = new KeyValuePair('password', null, true);
 
         $exception = null;
+        $array = null;
+
         try {
             $handler = $this->getContainer()->get(PasswordFieldSerializer::class);
 
@@ -121,10 +129,11 @@ class PasswordFieldTest extends TestCase
                 '',
                 new WriteCommandQueue()
             ));
-            iterator_to_array($x);
+            $array = iterator_to_array($x);
         } catch (WriteConstraintViolationException $exception) {
         }
 
+        static::assertIsNotArray($array);
         static::assertInstanceOf(WriteConstraintViolationException::class, $exception);
         static::assertNotNull($exception->getViolations()->findByCodes(NotBlank::IS_BLANK_ERROR));
     }
@@ -134,11 +143,12 @@ class PasswordFieldTest extends TestCase
         $password = password_hash('shopware', PASSWORD_DEFAULT);
 
         $field = new PasswordField('password', 'password');
-        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class), [], false, false, false, []);
+        $existence = new EntityExistence($this->getContainer()->get(UserDefinition::class)->getEntityName(), [], false, false, false, []);
         $kvPair = new KeyValuePair('password', $password, true);
 
         $passwordFieldHandler = new PasswordFieldSerializer(
-            $this->getContainer()->get('validator')
+            $this->getContainer()->get('validator'),
+            $this->getContainer()->get(DefinitionInstanceRegistry::class)
         );
 
         $payload = $passwordFieldHandler->encode($field, $existence, $kvPair, new WriteParameterBag(

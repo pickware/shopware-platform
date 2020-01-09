@@ -3,16 +3,16 @@
 namespace Shopware\Core\Framework\Test\Snippet\Files;
 
 use PHPUnit\Framework\TestCase;
-use Shopware\Core\Framework\Snippet\Exception\InvalidSnippetFileException;
-use Shopware\Core\Framework\Snippet\Files\SnippetFileCollection;
 use Shopware\Core\Framework\Test\Snippet\Mock\MockSnippetFile;
 use Shopware\Core\Framework\Test\TestCaseHelper\ReflectionHelper;
+use Shopware\Core\System\Snippet\Exception\InvalidSnippetFileException;
+use Shopware\Core\System\Snippet\Files\SnippetFileCollection;
 
 class SnippetFileCollectionTest extends TestCase
 {
     public static function tearDownAfterClass(): void
     {
-        foreach (glob(__DIR__ . '/../_fixtures/*.json') as $mockFile) {
+        foreach (glob(__DIR__ . '/../Mock/_fixtures/*.json') as $mockFile) {
             unlink($mockFile);
         }
     }
@@ -21,8 +21,8 @@ class SnippetFileCollectionTest extends TestCase
     {
         $collection = $this->getCollection();
 
-        $result_en_GB = $collection->get('messages.en-GB');
-        $result_de_DE = $collection->get('messages.de-DE');
+        $result_en_GB = $collection->get('storefront.en-GB');
+        $result_de_DE = $collection->get('storefront.de-DE');
         $result_NA = $collection->get('not.available');
 
         static::assertSame('en-GB', $result_en_GB->getIso());
@@ -104,9 +104,9 @@ class SnippetFileCollectionTest extends TestCase
     private function getCollection(): SnippetFileCollection
     {
         $collection = new SnippetFileCollection([]);
-        $collection->add(new MockSnippetFile('messages.de-DE', 'de-DE', '{}', true));
-        $collection->add(new MockSnippetFile('messages.de-DE_extension', 'de-DE', '{}', false));
-        $collection->add(new MockSnippetFile('messages.en-GB', 'en-GB', '{}', true));
+        $collection->add(new MockSnippetFile('storefront.de-DE', 'de-DE', '{}', true));
+        $collection->add(new MockSnippetFile('storefront.de-DE_extension', 'de-DE', '{}', false));
+        $collection->add(new MockSnippetFile('storefront.en-GB', 'en-GB', '{}', true));
 
         return $collection;
     }

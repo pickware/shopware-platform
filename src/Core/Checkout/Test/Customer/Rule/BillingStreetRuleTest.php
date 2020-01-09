@@ -11,7 +11,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteException;
 use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Shopware\Core\Framework\Validation\WriteConstraintViolationException;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Type;
 
@@ -44,79 +43,66 @@ class BillingStreetRuleTest extends TestCase
 
     public function testValidationWithMissingStreetName(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new BillingStreetRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/streetName', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $exceptions = iterator_to_array($stackException->getErrors());
+            static::assertCount(2, $exceptions);
+            static::assertSame('/0/value/streetName', $exceptions[0]['source']['pointer']);
+            static::assertSame(NotBlank::IS_BLANK_ERROR, $exceptions[0]['code']);
+
+            static::assertSame('/0/value/operator', $exceptions[1]['source']['pointer']);
+            static::assertSame(NotBlank::IS_BLANK_ERROR, $exceptions[1]['code']);
         }
     }
 
     public function testValidationWithEmptyStreetName(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new BillingStreetRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'streetName' => '',
+                        'operator' => BillingStreetRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/streetName', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $exceptions = iterator_to_array($stackException->getErrors());
+            static::assertCount(1, $exceptions);
+            static::assertSame('/0/value/streetName', $exceptions[0]['source']['pointer']);
+            static::assertSame(NotBlank::IS_BLANK_ERROR, $exceptions[0]['code']);
         }
     }
 
     public function testValidateWithInvalidStreetNameType(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new BillingStreetRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
                         'streetName' => true,
+                        'operator' => BillingStreetRule::OPERATOR_EQ,
                     ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/streetName', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(Type::INVALID_TYPE_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should be of type string.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $exceptions = iterator_to_array($stackException->getErrors());
+            static::assertCount(1, $exceptions);
+            static::assertSame('/0/value/streetName', $exceptions[0]['source']['pointer']);
+            static::assertSame(Type::INVALID_TYPE_ERROR, $exceptions[0]['code']);
         }
     }
 
@@ -136,6 +122,7 @@ class BillingStreetRuleTest extends TestCase
                 'ruleId' => $ruleId,
                 'value' => [
                     'streetName' => 'Street 1',
+                    'operator' => BillingStreetRule::OPERATOR_EQ,
                 ],
             ],
         ], $this->context);

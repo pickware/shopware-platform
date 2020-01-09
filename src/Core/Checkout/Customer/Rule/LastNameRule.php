@@ -48,7 +48,7 @@ class LastNameRule extends Rule
                 return strcasecmp($this->lastName, $customer->getLastName()) !== 0;
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -56,7 +56,7 @@ class LastNameRule extends Rule
     {
         return [
             'lastName' => [new NotBlank(), new Type('string')],
-            'operator' => [new Choice([Rule::OPERATOR_EQ, Rule::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([Rule::OPERATOR_EQ, Rule::OPERATOR_NEQ])],
         ];
     }
 

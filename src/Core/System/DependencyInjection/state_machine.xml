@@ -5,11 +5,21 @@
            xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
 
     <services>
-        <!-- deprecated -->
-        <service alias="Shopware\Core\System\StateMachine\StateMachineRegistry" id="Shopware\Core\Framework\StateMachine\StateMachineRegistry" />
+        <service alias="Shopware\Core\System\StateMachine\StateMachineRegistry" id="Shopware\Core\Framework\StateMachine\StateMachineRegistry" >
+            <deprecated>tag:v6.3.0: The "%alias_id%" service is deprecated and will be removed in 6.3.0. Use "%Shopware\Core\System\StateMachine\StateMachineRegistry%" instead</deprecated>
+        </service>
+
+        <service id="Shopware\Core\System\StateMachine\Api\StateMachineActionController" public="true">
+            <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
+            <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry"/>
+            <call method="setContainer">
+                <argument type="service" id="service_container"/>
+            </call>
+        </service>
 
         <service id="Shopware\Core\System\StateMachine\StateMachineRegistry">
             <argument type="service" id="state_machine.repository" />
+            <argument type="service" id="state_machine_state.repository" />
             <argument type="service" id="state_machine_history.repository" />
             <argument type="service" id="event_dispatcher"/>
             <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry"/>
@@ -17,6 +27,7 @@
 
         <service id="Shopware\Core\System\StateMachine\Command\WorkflowDumpCommand">
             <argument type="service" id="Shopware\Core\System\StateMachine\StateMachineRegistry"/>
+
             <tag name="console.command"/>
         </service>
         <service id="Shopware\Core\System\StateMachine\StateMachineDefinition">

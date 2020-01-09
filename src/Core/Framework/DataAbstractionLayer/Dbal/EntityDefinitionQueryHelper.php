@@ -40,7 +40,7 @@ class EntityDefinitionQueryHelper
 
     public static function escape(string $string): string
     {
-        if (strpos($string, '`') !== false) {
+        if (mb_strpos($string, '`') !== false) {
             throw new \InvalidArgumentException('Backtick not allowed in identifier');
         }
 
@@ -50,7 +50,9 @@ class EntityDefinitionQueryHelper
     public static function getFieldsOfAccessor(EntityDefinition $definition, string $accessor): array
     {
         $parts = explode('.', $accessor);
-        array_shift($parts);
+        if ($definition->getEntityName() === $parts[0]) {
+            array_shift($parts);
+        }
 
         $accessorFields = [];
 
@@ -68,6 +70,7 @@ class EntityDefinitionQueryHelper
                 $source = $source->getTranslationDefinition();
                 $fields = $source->getFields();
                 $accessorFields[] = $fields->get($part);
+
                 continue;
             }
 
@@ -104,13 +107,15 @@ class EntityDefinitionQueryHelper
         $original = $fieldName;
         $prefix = $root . '.';
 
-        if (strpos($fieldName, $prefix) === 0) {
-            $fieldName = substr($fieldName, \strlen($prefix));
+        if (mb_strpos($fieldName, $prefix) === 0) {
+            $fieldName = mb_substr($fieldName, \mb_strlen($prefix));
+        } else {
+            $original = $prefix . $original;
         }
 
         $fields = $definition->getFields();
 
-        $isAssociation = strpos($fieldName, '.') !== false;
+        $isAssociation = mb_strpos($fieldName, '.') !== false;
 
         if (!$isAssociation && $fields->has($fieldName)) {
             return $fields->get($fieldName);
@@ -165,8 +170,10 @@ class EntityDefinitionQueryHelper
         $original = $fieldName;
         $prefix = $root . '.';
 
-        if (strpos($fieldName, $prefix) === 0) {
-            $fieldName = substr($fieldName, \strlen($prefix));
+        if (mb_strpos($fieldName, $prefix) === 0) {
+            $fieldName = mb_substr($fieldName, \mb_strlen($prefix));
+        } else {
+            $original = $prefix . $original;
         }
 
         $fields = $definition->getFields();
@@ -187,7 +194,6 @@ class EntityDefinitionQueryHelper
             throw new UnmappedFieldException($original, $definition);
         }
 
-        /** @var Field $field */
         $field = $fields->get($associationKey);
 
         //case for json object fields, other fields has now same option to act with more point notations but hasn't to be an association field. E.g. price.gross
@@ -195,8 +201,9 @@ class EntityDefinitionQueryHelper
             return $this->buildInheritedAccessor($field, $root, $definition, $context, $fieldName);
         }
 
-        /** @var AssociationField $field */
-        $field = $field;
+        if (!$field instanceof AssociationField) {
+            throw new \RuntimeException(sprintf('Expected field "%s" to be instance of %s', $associationKey, AssociationField::class));
+        }
 
         $referenceDefinition = $field->getReferenceDefinition();
         if ($field instanceof ManyToManyAssociationField) {
@@ -310,8 +317,10 @@ class EntityDefinitionQueryHelper
         $original = $fieldName;
         $prefix = $root . '.';
 
-        if (strpos($fieldName, $prefix) === 0) {
-            $fieldName = substr($fieldName, \strlen($prefix));
+        if (mb_strpos($fieldName, $prefix) === 0) {
+            $fieldName = mb_substr($fieldName, \mb_strlen($prefix));
+        } else {
+            $original = $prefix . $original;
         }
 
         $fields = $definition->getFields();
@@ -475,10 +484,12 @@ class EntityDefinitionQueryHelper
         $field = $translationDefinition->getFields()->get($translatedField->getPropertyName());
 
         if ($field === null || !$field instanceof StorageAware || !$field instanceof Field) {
-            throw new \RuntimeException(\sprintf(
+            throw new \RuntimeException(
+                \sprintf(
                     'Missing translated storage aware property %s in %s',
                     $translatedField->getPropertyName(),
-                    $translationDefinition->getClass())
+                    $translationDefinition->getClass()
+                )
             );
         }
 
@@ -528,7 +539,7 @@ class EntityDefinitionQueryHelper
         return $chain;
     }
 
-    private function getAssociations($fieldName, EntityDefinition $definition, string $root): array
+    private function getAssociations(string $fieldName, EntityDefinition $definition, string $root): array
     {
         $fieldName = str_replace('extensions.', '', $fieldName);
 
@@ -536,8 +547,8 @@ class EntityDefinitionQueryHelper
         $original = $fieldName;
         $prefix = $root . '.';
 
-        if (strpos($fieldName, $prefix) === 0) {
-            $fieldName = substr($fieldName, \strlen($prefix));
+        if (mb_strpos($fieldName, $prefix) === 0) {
+            $fieldName = mb_substr($fieldName, \mb_strlen($prefix));
         }
 
         $fields = $definition->getFields();

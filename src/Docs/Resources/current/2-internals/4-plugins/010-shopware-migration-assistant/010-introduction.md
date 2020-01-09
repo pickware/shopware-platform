@@ -4,7 +4,9 @@
 These enable you to extend the plugin in various ways and migrate data into the Shopware 6 environment.
 You should have a basic understanding of how to use the migration plugin and its core features, before extending it yourself.
 (this documentation will not explain the usage of the plugin).
-We will provide you with a basic introduction into the concepts and possibilities of extending the plugin right here in this chapter.
+
+We will provide you with a basic introduction into the concepts and structure right here in this chapter.
+Take a look at the last headline (Extension points) to find out more about the various ways to extend this plugin.
 
 ## Profile and Connections
 Users of the plugin can create connections to different source systems.
@@ -42,17 +44,18 @@ For the `shopware55` profile we have the `api` gateway, which communicates via h
 and the `local` gateway, which communicates directly with the source system's database. Thus both systems must be on the 
 same server for successfully using the `local` gateway.
 
-If you want to use the `Shopware55ApiGateway` you have to download the [Shopware Connector](https://github.com/shopware/SwagMigrationConnector)
+If you want to use the `ShopwareApiGateway` you have to download the [Shopware Connector](https://github.com/shopware/SwagMigrationConnector)
 plugin for your Shopware 5. For more details have a look at the [Gateway and reader](./060-gateway-and-reader.md).
 
-## Converter and Mapping
+## Converter, Mapping and Deltas
 Data gathered by `Reader` objects is transferred to `Converter` objects that put the data in a format Shopware 6 is able to work with.
 Simultaneously entries in the underlying mapping table are inserted to map the old identifiers to the new ones for future migrations (Have a look at the `MappingService` for that).
 The mapping is saved for the current connection. Converted data will be removed after the migration, the mapping will stay persistent.
-You can find out more about them here: [Converter and mapping](./070-converter-and-mapping.md)
+Also a checksum is saved to the mapping to identify and skip the same source data (data has not been changed since last migration).
+You can find out more about them here: [Converter, mapping and deltas](./070-converter-and-mapping.md)
 
 ## Logging
-During a migration, especially during the data conversion there will be possibly errors that you should log.
+During any migration, especially during the data conversion, there will possibly be errors that should be logged.
 The users can see these errors and these should be as helpful as possible.
 For more information have a look at [Logging](./071-logging.md).
 
@@ -92,3 +95,9 @@ These steps can be done multiple times. Each migration is called a `Run` / `Migr
 ## Extension points
 The recommended way to migrate plugin data from a source system is to extend that profile by a new `DataSelection`.
 It is also possible to create a new profile, in case a migration from a different shop / source system is sought.
+
+Take a look at the following HowTos for your scenario to get a step by step tutorial:
+- [Extending a Shopware migration profile](./../../../4-how-to/520-extend-shopware-migration-profile.md) <- migrating your first basic plugin data (via local gateway)
+- [Extending the Migration Connector](./../../../4-how-to/530-extend-shopware-migration-connector.md) <- add API support for your migration
+- [Decorating a Shopware Migration Assistant converter](./../../../4-how-to/550-decorate-shopware-migration-converter.md) <- implement a premapping and change the behavior of an existing converter
+- [Creating a new migration profile](./../../../4-how-to/600-create-migration-profile.md) <- create a new profile from scratch to support a third party source system (other than Shopware)

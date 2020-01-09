@@ -12,6 +12,7 @@ use Shopware\Core\System\StateMachine\Aggregation\StateMachineTransition\StateMa
 class StateMachineEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string
      */
@@ -57,7 +58,7 @@ class StateMachineEntity extends Entity
         return $this->historyEntries;
     }
 
-    public function setHistoryEntries(?StateMachineHistoryCollection $historyEntries): void
+    public function setHistoryEntries(StateMachineHistoryCollection $historyEntries): void
     {
         $this->historyEntries = $historyEntries;
     }

@@ -2,6 +2,7 @@
 
 namespace Shopware\Storefront\Page\Product;
 
+use Shopware\Core\Content\Product\Aggregate\ProductCrossSelling\ProductCrossSellingEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
 use Shopware\Core\Content\Product\Exception\ProductNotFoundException;
 use Shopware\Core\Content\Product\SalesChannel\ProductAvailableFilter;
@@ -13,6 +14,7 @@ use Shopware\Core\Content\Property\PropertyGroupDefinition;
 use Shopware\Core\Content\Property\PropertyGroupEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelRepositoryInterface;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -48,9 +50,13 @@ class ProductLoader
             ->addAssociation('media')
             ->addAssociation('prices')
             ->addAssociation('manufacturer')
-            ->addAssociationPath('manufacturer.media')
+            ->addAssociation('manufacturer.media')
             ->addAssociation('cover')
-            ->addAssociationPath('properties.group');
+            ->addAssociation('properties.group')
+            ->addAssociation('mainCategories.category')
+            ->addAssociation('crossSellings');
+
+        $criteria->getAssociation('media')->addSorting(new FieldSorting('position'));
 
         $this->eventDispatcher->dispatch(
             new ProductLoaderCriteriaEvent($criteria, $salesChannelContext)
@@ -66,6 +72,10 @@ class ProductLoader
         $product->setSortedProperties(
             $this->sortProperties($product)
         );
+
+        $product->getCrossSellings()->sort(function (ProductCrossSellingEntity $a, ProductCrossSellingEntity $b) {
+            return $a->getPosition() <=> $b->getPosition();
+        });
 
         return $product;
     }
@@ -101,7 +111,6 @@ class ProductLoader
             }
         );
 
-        /** @var PropertyGroupEntity $group */
         foreach ($sorted as $group) {
             $group->getOptions()->sort(
                 static function (PropertyGroupOptionEntity $a, PropertyGroupOptionEntity $b) use ($group) {

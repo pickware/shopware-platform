@@ -16,10 +16,14 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class OrderConverterController extends AbstractController
 {
     /**
@@ -40,8 +44,8 @@ class OrderConverterController extends AbstractController
     public function __construct(
         OrderConverter $orderConverter,
         CartPersisterInterface $cartPersister,
-        EntityRepositoryInterface $orderRepository)
-    {
+        EntityRepositoryInterface $orderRepository
+    ) {
         $this->orderConverter = $orderConverter;
         $this->cartPersister = $cartPersister;
         $this->orderRepository = $orderRepository;
@@ -63,10 +67,10 @@ class OrderConverterController extends AbstractController
         $criteria = (new Criteria([$orderId]))
             ->addAssociation('lineItems')
             ->addAssociation('transactions')
-            ->addAssociationPath('deliveries.shippingMethod')
-            ->addAssociationPath('deliveries.positions.orderLineItem')
-            ->addAssociationPath('deliveries.shippingOrderAddress.country')
-            ->addAssociationPath('deliveries.shippingOrderAddress.countryState');
+            ->addAssociation('deliveries.shippingMethod')
+            ->addAssociation('deliveries.positions.orderLineItem')
+            ->addAssociation('deliveries.shippingOrderAddress.country')
+            ->addAssociation('deliveries.shippingOrderAddress.countryState');
 
         /** @var OrderEntity|null $order */
         $order = $this->orderRepository->search($criteria, $context)->get($orderId);

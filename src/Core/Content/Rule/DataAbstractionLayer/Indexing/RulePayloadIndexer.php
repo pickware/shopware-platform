@@ -5,12 +5,12 @@ namespace Shopware\Core\Content\Rule\DataAbstractionLayer\Indexing;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Checkout\Cart\CartRuleLoader;
 use Shopware\Core\Content\Rule\RuleDefinition;
-use Shopware\Core\Content\Rule\Util\EventIdExtractor;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
@@ -24,7 +24,6 @@ use Shopware\Core\Framework\Rule\Container\AndRule;
 use Shopware\Core\Framework\Rule\Container\ContainerInterface;
 use Shopware\Core\Framework\Rule\Rule;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
@@ -41,17 +40,12 @@ class RulePayloadIndexer implements IndexerInterface, EventSubscriberInterface
     private $eventDispatcher;
 
     /**
-     * @var EventIdExtractor
-     */
-    private $eventIdExtractor;
-
-    /**
      * @var RuleConditionRegistry
      */
     private $ruleConditionRegistry;
 
     /**
-     * @var TagAwareAdapter
+     * @var CacheClearer
      */
     private $cache;
 
@@ -73,16 +67,14 @@ class RulePayloadIndexer implements IndexerInterface, EventSubscriberInterface
     public function __construct(
         Connection $connection,
         EventDispatcherInterface $eventDispatcher,
-        EventIdExtractor $eventIdExtractor,
         RuleConditionRegistry $ruleConditionRegistry,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapter $cache,
+        CacheClearer $cache,
         IteratorFactory $iteratorFactory,
         RuleDefinition $ruleDefinition
     ) {
         $this->connection = $connection;
         $this->eventDispatcher = $eventDispatcher;
-        $this->eventIdExtractor = $eventIdExtractor;
         $this->ruleConditionRegistry = $ruleConditionRegistry;
         $this->cache = $cache;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
@@ -124,9 +116,28 @@ class RulePayloadIndexer implements IndexerInterface, EventSubscriberInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $iterator = $this->iteratorFactory->createIterator($this->ruleDefinition, $lastId);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            return null;
+        }
+        $this->update($ids);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $ids = $this->eventIdExtractor->getRuleIds($event);
+        $ids = [];
+
+        $nested = $event->getEventByEntityName(RuleDefinition::ENTITY_NAME);
+        if ($nested) {
+            $ids = $nested->getIds();
+        }
+
         $this->update($ids);
     }
 
@@ -159,6 +170,7 @@ class RulePayloadIndexer implements IndexerInterface, EventSubscriberInterface
         foreach ($rules as $id => $rule) {
             $invalid = false;
             $serialized = null;
+
             try {
                 $nested = $this->buildNested($rule, null);
 
@@ -187,9 +199,14 @@ class RulePayloadIndexer implements IndexerInterface, EventSubscriberInterface
 
         $this->cache->invalidateTags($tags);
 
-        $this->cache->delete(CartRuleLoader::CHECKOUT_RULE_LOADER_CACHE_KEY);
+        $this->cache->deleteItems([CartRuleLoader::CHECKOUT_RULE_LOADER_CACHE_KEY]);
 
         return $updated;
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.RulePayloadIndexer';
     }
 
     private function clearCache(): void

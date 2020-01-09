@@ -4,21 +4,21 @@ namespace Shopware\Core\Content\ProductStream\DataAbstractionLayer\Indexing;
 
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Content\Product\ProductDefinition;
-use Shopware\Core\Content\ProductStream\Util\EventIdExtractor;
+use Shopware\Core\Content\ProductStream\ProductStreamDefinition;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InvalidFilterQueryException;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\SearchRequestException;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Parser\QueryStringParser;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Serializer\Serializer;
 
@@ -40,7 +40,7 @@ class ProductStreamIndexer implements IndexerInterface
     private $cacheKeyGenerator;
 
     /**
-     * @var TagAwareAdapter
+     * @var CacheClearer
      */
     private $cache;
 
@@ -48,11 +48,6 @@ class ProductStreamIndexer implements IndexerInterface
      * @var EventDispatcherInterface
      */
     private $eventDispatcher;
-
-    /**
-     * @var EventIdExtractor
-     */
-    private $eventIdExtractor;
 
     /**
      * @var IteratorFactory
@@ -71,17 +66,15 @@ class ProductStreamIndexer implements IndexerInterface
 
     public function __construct(
         EventDispatcherInterface $eventDispatcher,
-        EventIdExtractor $eventIdExtractor,
         EntityRepositoryInterface $productStreamRepository,
         Connection $connection,
         Serializer $serializer,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapter $cache,
+        CacheClearer $cache,
         IteratorFactory $iteratorFactory,
         ProductDefinition $productDefinition
     ) {
         $this->eventDispatcher = $eventDispatcher;
-        $this->eventIdExtractor = $eventIdExtractor;
         $this->productStreamRepository = $productStreamRepository;
         $this->connection = $connection;
         $this->serializer = $serializer;
@@ -114,10 +107,38 @@ class ProductStreamIndexer implements IndexerInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $iterator = $this->iteratorFactory->createIterator(
+            $this->productStreamRepository->getDefinition(),
+            $lastId
+        );
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            return null;
+        }
+
+        $this->update($ids);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $ids = $this->eventIdExtractor->getProductStreamIds($event);
+        $ids = [];
+
+        $nested = $event->getEventByEntityName(ProductStreamDefinition::ENTITY_NAME);
+        if ($nested) {
+            $ids = $nested->getIds();
+        }
+
         $this->update($ids);
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.ProductStreamIndexer';
     }
 
     private function update(array $ids): void
@@ -126,11 +147,7 @@ class ProductStreamIndexer implements IndexerInterface
             return;
         }
 
-        if ($this->cache->hasItem('product_streams_key')) {
-            $this->cache->deleteItem('product_streams_key');
-        }
-
-        $bytes = array_values(array_map(function ($id) { return Uuid::fromHexToBytes($id); }, $ids));
+        $bytes = Uuid::fromHexToBytesList($ids);
 
         $filters = $this->connection->fetchAll(
             'SELECT product_stream_id as array_key, product_stream_filter.* FROM product_stream_filter  WHERE product_stream_id IN (:ids) ORDER BY product_stream_id',
@@ -144,6 +161,7 @@ class ProductStreamIndexer implements IndexerInterface
         foreach ($filters as $id => $filter) {
             $invalid = false;
             $serialized = null;
+
             try {
                 $nested = $this->buildNested($filter, null);
 
@@ -188,8 +206,12 @@ class ProductStreamIndexer implements IndexerInterface
                 continue;
             }
 
-            if ($this->isJsonString($entity['parameters'])) {
-                $entity['parameters'] = json_decode($entity['parameters'], true);
+            $parameters = $entity['parameters'];
+            if ($parameters && \is_string($parameters)) {
+                $decodedParameters = json_decode($entity['parameters'], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $entity['parameters'] = $decodedParameters;
+                }
             }
 
             if ($this->isMultiFilter($entity['type'])) {
@@ -202,19 +224,8 @@ class ProductStreamIndexer implements IndexerInterface
         return $nested;
     }
 
-    private function isJsonString($string): bool
-    {
-        if (!$string || !is_string($string)) {
-            return false;
-        }
-
-        json_decode($string);
-
-        return json_last_error() === JSON_ERROR_NONE;
-    }
-
     private function isMultiFilter(string $type): bool
     {
-        return in_array($type, ['multi', 'not'], true);
+        return \in_array($type, ['multi', 'not'], true);
     }
 }

@@ -6,14 +6,13 @@ use Shopware\Core\Content\Newsletter\Aggregate\NewsletterRecipient\NewsletterRec
 use Shopware\Core\Content\Newsletter\Aggregate\NewsletterRecipient\NewsletterRecipientEntity;
 use Shopware\Core\Content\Newsletter\NewsletterEvents;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Event\BusinessEventInterface;
 use Shopware\Core\Framework\Event\EventData\EntityType;
 use Shopware\Core\Framework\Event\EventData\EventDataCollection;
 use Shopware\Core\Framework\Event\EventData\MailRecipientStruct;
 use Shopware\Core\Framework\Event\MailActionInterface;
 use Symfony\Contracts\EventDispatcher\Event;
 
-class NewsletterUpdateEvent extends Event implements BusinessEventInterface, MailActionInterface
+class NewsletterUpdateEvent extends Event implements MailActionInterface
 {
     public const EVENT_NAME = NewsletterEvents::NEWSLETTER_UPDATE_EVENT;
 
@@ -25,7 +24,7 @@ class NewsletterUpdateEvent extends Event implements BusinessEventInterface, Mai
     /**
      * @var NewsletterRecipientEntity
      */
-    private $recipientEntity;
+    private $newsletterRecipient;
 
     /**
      * @var MailRecipientStruct|null
@@ -42,10 +41,10 @@ class NewsletterUpdateEvent extends Event implements BusinessEventInterface, Mai
      */
     private $salesChannelId;
 
-    public function __construct(Context $context, NewsletterRecipientEntity $recipientEntity, string $salesChannelId)
+    public function __construct(Context $context, NewsletterRecipientEntity $newsletterRecipient, string $salesChannelId)
     {
         $this->context = $context;
-        $this->recipientEntity = $recipientEntity;
+        $this->newsletterRecipient = $newsletterRecipient;
         $this->salesChannelId = $salesChannelId;
     }
 
@@ -65,9 +64,9 @@ class NewsletterUpdateEvent extends Event implements BusinessEventInterface, Mai
         return $this->context;
     }
 
-    public function getRecipientEntity(): NewsletterRecipientEntity
+    public function getNewsletterRecipient(): NewsletterRecipientEntity
     {
-        return $this->recipientEntity;
+        return $this->newsletterRecipient;
     }
 
     public function getUrl(): string
@@ -83,7 +82,7 @@ class NewsletterUpdateEvent extends Event implements BusinessEventInterface, Mai
 
         return new MailRecipientStruct(
             [
-                $this->recipientEntity->getEmail() => $this->recipientEntity->getFirstName() . ' ' . $this->recipientEntity->getLastName(),
+                $this->newsletterRecipient->getEmail() => $this->newsletterRecipient->getFirstName() . ' ' . $this->newsletterRecipient->getLastName(),
             ]
         );
     }

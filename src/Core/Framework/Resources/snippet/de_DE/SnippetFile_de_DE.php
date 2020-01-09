@@ -2,18 +2,18 @@
 
 namespace Shopware\Core\Framework\Resources\snippet\de_DE;
 
-use Shopware\Core\Framework\Snippet\Files\SnippetFileInterface;
+use Shopware\Core\System\Snippet\Files\SnippetFileInterface;
 
 class SnippetFile_de_DE implements SnippetFileInterface
 {
     public function getName(): string
     {
-        return 'core.de-DE';
+        return 'messages.de-DE';
     }
 
     public function getPath(): string
     {
-        return __DIR__ . '/core.de-DE.json';
+        return __DIR__ . '/messages.de-DE.json';
     }
 
     public function getIso(): string
@@ -28,6 +28,6 @@ class SnippetFile_de_DE implements SnippetFileInterface
 
     public function isBase(): bool
     {
-        return false;
+        return true;
     }
 }

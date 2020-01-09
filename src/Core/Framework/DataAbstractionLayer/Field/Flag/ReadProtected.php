@@ -2,12 +2,12 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Field\Flag;
 
-use Shopware\Core\Framework\Context\AdminApiSource;
-use Shopware\Core\Framework\Context\SalesChannelApiSource;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
 
 class ReadProtected extends Flag
 {
-    const BASE_URLS = [
+    private const BASE_URLS = [
         AdminApiSource::class => '/api/v',
         SalesChannelApiSource::class => '/sales-channel-api/v',
     ];
@@ -31,8 +31,8 @@ class ReadProtected extends Flag
 
     public function isBaseUrlAllowed(string $baseUrl): bool
     {
-        foreach ($this->protectedSources as $source => $url) {
-            if (strpos($baseUrl, $url) !== false) {
+        foreach ($this->protectedSources as $url) {
+            if (mb_strpos($baseUrl, $url) !== false) {
                 return false;
             }
         }

@@ -10,7 +10,6 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 class CustomerMetaFieldSubscriber implements EventSubscriberInterface
@@ -40,7 +39,7 @@ class CustomerMetaFieldSubscriber implements EventSubscriberInterface
 
     public function fillCustomerMetaDataFields(EntityWrittenEvent $event): void
     {
-        if ($event->getDefinition()->getClass() !== OrderDefinition::class) {
+        if ($event->getEntityName() !== OrderDefinition::ENTITY_NAME) {
             return;
         }
 
@@ -52,10 +51,13 @@ class CustomerMetaFieldSubscriber implements EventSubscriberInterface
             }
 
             $payload = $writeResult->getPayload();
+            if (empty($payload)) {
+                continue;
+            }
+
             /** @var \DateTimeInterface $orderDate */
             $orderDate = $payload['orderDateTime'];
 
-            /** @var EntitySearchResult $orderResult */
             $orderResult = $this->orderRepository->search(
                 (new Criteria([$payload['id']]))->addAssociation('orderCustomer'),
                 $context
@@ -76,7 +78,6 @@ class CustomerMetaFieldSubscriber implements EventSubscriberInterface
 
             $orderCount = 0;
 
-            /** @var EntitySearchResult $customerResult */
             $customerResult = $this->customerRepository->search(
                 (new Criteria([$customerId]))->addAssociation('orderCustomers'),
                 $context
@@ -97,7 +98,7 @@ class CustomerMetaFieldSubscriber implements EventSubscriberInterface
                 ],
             ];
 
-            $context->scope(Context::SYSTEM_SCOPE, function () use ($data, $context) {
+            $context->scope(Context::SYSTEM_SCOPE, function () use ($data, $context): void {
                 $this->customerRepository->update($data, $context);
             });
         }

@@ -119,6 +119,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(ListDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -129,15 +130,18 @@ EOF;
 
         $fieldException = $ex->getExceptions()[0];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/0', $fieldException->getPath());
+        static::assertEquals('/0/data', $fieldException->getPath());
+        static::assertEquals('/0', $fieldException->getViolations()->get(0)->getPropertyPath());
 
         $fieldException = $ex->getExceptions()[1];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/1', $fieldException->getPath());
+        static::assertEquals('/0/data', $fieldException->getPath());
+        static::assertEquals('/1', $fieldException->getViolations()->get(0)->getPropertyPath());
 
         $fieldException = $ex->getExceptions()[2];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/3', $fieldException->getPath());
+        static::assertEquals('/0/data', $fieldException->getPath());
+        static::assertEquals('/3', $fieldException->getViolations()->get(0)->getPropertyPath());
     }
 
     public function testWriteUtf8(): void
@@ -149,9 +153,9 @@ EOF;
 
         $written = $this->getWriter()->insert($this->registerDefinition(SalesChannelTypeDefinition::class), [$type], $this->createWriteContext());
 
-        static::assertArrayHasKey(SalesChannelTypeDefinition::class, $written);
-        static::assertCount(1, $written[SalesChannelTypeDefinition::class]);
-        $payload = $written[SalesChannelTypeDefinition::class][0]->getPayload();
+        static::assertArrayHasKey(SalesChannelTypeDefinition::ENTITY_NAME, $written);
+        static::assertCount(1, $written[SalesChannelTypeDefinition::ENTITY_NAME]);
+        $payload = $written[SalesChannelTypeDefinition::ENTITY_NAME][0]->getPayload();
         static::assertCount(1, $payload['screenshotUrls']);
         static::assertEquals('😄', $payload['screenshotUrls'][0]);
     }

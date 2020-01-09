@@ -5,6 +5,7 @@ namespace Shopware\Core\System\Currency;
 use Shopware\Core\Checkout\Order\OrderCollection;
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscountPrice\PromotionDiscountPriceCollection;
 use Shopware\Core\Checkout\Shipping\Aggregate\ShippingMethodPrice\ShippingMethodPriceCollection;
+use Shopware\Core\Content\ProductExport\ProductExportCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
 use Shopware\Core\System\Currency\Aggregate\CurrencyTranslation\CurrencyTranslationCollection;
@@ -93,7 +94,12 @@ class CurrencyEntity extends Entity
     /**
      * @var bool|null
      */
-    protected $isDefault;
+    protected $isSystemDefault;
+
+    /**
+     * @var ProductExportCollection|null
+     */
+    protected $productExports;
 
     public function getIsoCode(): string
     {
@@ -200,7 +206,7 @@ class CurrencyEntity extends Entity
         return $this->salesChannelDomains;
     }
 
-    public function setSalesChannelDomains(?SalesChannelDomainCollection $salesChannelDomains): void
+    public function setSalesChannelDomains(SalesChannelDomainCollection $salesChannelDomains): void
     {
         $this->salesChannelDomains = $salesChannelDomains;
     }
@@ -230,31 +236,38 @@ class CurrencyEntity extends Entity
         return $this->shippingMethodPrices;
     }
 
-    public function setShippingMethodPrices(?ShippingMethodPriceCollection $shippingMethodPrices): void
+    public function setShippingMethodPrices(ShippingMethodPriceCollection $shippingMethodPrices): void
     {
         $this->shippingMethodPrices = $shippingMethodPrices;
     }
 
-    public function getIsDefault(): ?bool
+    public function getIsSystemDefault(): ?bool
     {
-        return $this->isDefault;
+        return $this->isSystemDefault;
     }
 
-    public function setIsDefault(bool $isDefault): void
+    public function setIsSystemDefault(bool $isSystemDefault): void
     {
-        $this->isDefault = $isDefault;
+        $this->isSystemDefault = $isSystemDefault;
     }
 
-    /**
-     * @return PromotionDiscountPriceCollection
-     */
     public function getPromotionDiscountPrices(): ?PromotionDiscountPriceCollection
     {
         return $this->promotionDiscountPrices;
     }
 
-    public function setPromotionDiscountPrices(?PromotionDiscountPriceCollection $promotionDiscountPrices): void
+    public function setPromotionDiscountPrices(PromotionDiscountPriceCollection $promotionDiscountPrices): void
     {
         $this->promotionDiscountPrices = $promotionDiscountPrices;
+    }
+
+    public function getProductExports(): ?ProductExportCollection
+    {
+        return $this->productExports;
+    }
+
+    public function setProductExports(ProductExportCollection $productExports): void
+    {
+        $this->productExports = $productExports;
     }
 }

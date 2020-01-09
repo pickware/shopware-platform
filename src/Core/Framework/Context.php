@@ -4,8 +4,9 @@ namespace Shopware\Core\Framework;
 
 use Shopware\Core\Checkout\Cart\Price\Struct\CartPrice;
 use Shopware\Core\Defaults;
-use Shopware\Core\Framework\Context\ContextSource;
-use Shopware\Core\Framework\Context\SystemSource;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\ContextSource;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Struct\Struct;
 
 class Context extends Struct
@@ -102,6 +103,9 @@ class Context extends Struct
         $this->taxState = $taxState;
     }
 
+    /**
+     * @internal
+     */
     public static function createDefaultContext(?ContextSource $source = null): self
     {
         $source = $source ?? new SystemSource();
@@ -157,6 +161,7 @@ class Context extends Struct
             $this->considerInheritance,
             $this->taxState
         );
+        $context->scope = $this->scope;
 
         foreach ($this->getExtensions() as $key => $extension) {
             $context->addExtension($key, $extension);
@@ -217,6 +222,15 @@ class Context extends Struct
     public function getUseCache(): bool
     {
         return $this->useCache;
+    }
+
+    public function isAllowed(string $resource, string $privilege): bool
+    {
+        if ($this->source instanceof AdminApiSource) {
+            return $this->source->isAllowed($resource, $privilege);
+        }
+
+        return true;
     }
 
     public function setRuleIds(array $ruleIds): void

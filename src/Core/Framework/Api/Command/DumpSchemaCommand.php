@@ -11,6 +11,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class DumpSchemaCommand extends Command
 {
+    protected static $defaultName = 'framework:schema';
+
     /**
      * @var DefinitionService
      */
@@ -25,7 +27,7 @@ class DumpSchemaCommand extends Command
 
     protected function configure(): void
     {
-        $this->setName('framework:schema')
+        $this
             ->setDescription('Dumps the api definition to a json file.')
             ->addArgument('outfile', InputArgument::REQUIRED)
             ->addOption(
@@ -38,7 +40,7 @@ class DumpSchemaCommand extends Command
             ->addOption('pretty', 'p', InputOption::VALUE_NONE, 'Dumps the output in a human-readable form.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $outFile = $input->getArgument('outfile');
         $formatType = $input->getOption('schema-format');
@@ -56,5 +58,7 @@ class DumpSchemaCommand extends Command
         $output->writeln('Writing definition to file ...');
         file_put_contents($outFile, json_encode($definitionContents, $jsonFlags));
         $output->writeln('Done!');
+
+        return 0;
     }
 }

@@ -13,6 +13,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ChildrenAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ConfigJsonField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CreatedAtField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CustomFields;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\DateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\DateTimeField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\EmailField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
@@ -38,6 +39,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\PasswordField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceDefinitionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\StateMachineStateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslationsAssociationField;
@@ -48,7 +50,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionDataPayloadField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\WhitelistRuleField;
 use Shopware\Core\System\NumberRange\DataAbstractionLayer\NumberRangeField;
-use Shopware\Storefront\Framework\Seo\Entity\Field\CanonicalUrlField;
 
 class ErdTypeMap
 {
@@ -62,7 +63,8 @@ class ErdTypeMap
         ChildCountField::class => 'childCount',
         ChildrenAssociationField::class => 'childrenAssociation',
         CreatedAtField::class => 'createdAt',
-        DateTimeField::class => 'date',
+        DateTimeField::class => 'dateTime',
+        DateField::class => 'date',
         EmailField::class => 'email',
         FkField::class => 'foreignKey',
         FloatField::class => 'float',
@@ -92,13 +94,13 @@ class ErdTypeMap
         WhitelistRuleField::class => 'whitelistRule',
         TranslationsAssociationField::class => 'translationAssociation',
         OneToOneAssociationField::class => 'oneToOneAssociation',
-        CanonicalUrlField::class => 'CanonicalUrlAssociation',
         ListingPriceField::class => 'priceRulesJson',
         NumberRangeField::class => 'numberRange',
         ConfigJsonField::class => 'configurationValue',
         ManyToManyIdField::class => 'manyToManyId',
         LockedField::class => 'writeLockIndicator',
         SlotConfigField::class => 'configurationValue',
+        StateMachineStateField::class => 'stateMachineState',
     ];
 
     public function map(Field $field): string

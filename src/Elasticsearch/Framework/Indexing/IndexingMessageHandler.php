@@ -3,12 +3,14 @@
 namespace Shopware\Elasticsearch\Framework\Indexing;
 
 use Elasticsearch\Client;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Shopware\Core\Framework\MessageQueue\Handler\AbstractMessageHandler;
+use Shopware\Elasticsearch\Exception\ElasticsearchIndexingException;
 use Shopware\Elasticsearch\Framework\AbstractElasticsearchDefinition;
 use Shopware\Elasticsearch\Framework\ElasticsearchRegistry;
 
@@ -29,14 +31,21 @@ class IndexingMessageHandler extends AbstractMessageHandler
      */
     private $entityRegistry;
 
+    /**
+     * @var LoggerInterface
+     */
+    private $logger;
+
     public function __construct(
         Client $client,
         ElasticsearchRegistry $registry,
-        DefinitionInstanceRegistry $entityRegistry
+        DefinitionInstanceRegistry $entityRegistry,
+        LoggerInterface $logger
     ) {
         $this->client = $client;
         $this->registry = $registry;
         $this->entityRegistry = $entityRegistry;
+        $this->logger = $logger;
     }
 
     public static function getHandledMessages(): iterable
@@ -55,6 +64,34 @@ class IndexingMessageHandler extends AbstractMessageHandler
             $msg->getEntityName(),
             $msg->getContext()
         );
+    }
+
+    private function mapExtensionsToRoot(array $documents): array
+    {
+        $extensions = [];
+
+        foreach ($documents as $key => $document) {
+            if ($key === 'extensions') {
+                $extensions = $document;
+                unset($documents['extensions']);
+
+                continue;
+            }
+
+            if (is_array($document)) {
+                $documents[$key] = $this->mapExtensionsToRoot($document);
+            }
+        }
+
+        foreach ($extensions as $extensionKey => $extension) {
+            if (is_array($extension)) {
+                $documents[$extensionKey] = $this->mapExtensionsToRoot($extension);
+            } else {
+                $documents[$extensionKey] = $extension;
+            }
+        }
+
+        return $documents;
     }
 
     private function indexEntities(string $index, array $ids, string $entityName, Context $context): void
@@ -88,16 +125,24 @@ class IndexingMessageHandler extends AbstractMessageHandler
 
         $documents = $this->createDocuments($definition, $entities);
 
+        $documents = $this->mapExtensionsToRoot($documents);
+
         foreach ($toRemove as $id) {
             $documents[] = ['delete' => ['_id' => $id]];
         }
 
         // index found entities
-        $this->client->bulk([
+        $result = $this->client->bulk([
             'index' => $index,
             'type' => $definition->getEntityDefinition()->getEntityName(),
             'body' => $documents,
         ]);
+
+        if (isset($result['errors']) && $result['errors']) {
+            $errors = $this->parseErrors($result);
+
+            throw new ElasticsearchIndexingException($errors);
+        }
     }
 
     private function createDocuments(AbstractElasticsearchDefinition $definition, iterable $entities): array
@@ -119,5 +164,28 @@ class IndexingMessageHandler extends AbstractMessageHandler
         }
 
         return $documents;
+    }
+
+    private function parseErrors(array $result): array
+    {
+        $errors = [];
+        foreach ($result['items'] as $item) {
+            $item = $item['index'];
+
+            if (in_array($item['status'], [200, 201], true)) {
+                continue;
+            }
+
+            $errors[] = [
+                'index' => $item['_index'],
+                'id' => $item['_id'],
+                'type' => $item['error']['type'],
+                'reason' => $item['error']['reason'],
+            ];
+
+            $this->logger->error($item['error']['reason']);
+        }
+
+        return $errors;
     }
 }

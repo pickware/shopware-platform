@@ -43,29 +43,33 @@ class DoctrineExtension extends AbstractExtension
 
         // Check if we can match the query against any of the major types
         switch (true) {
-            case stripos($query, 'SELECT') !== false:
+            case mb_stripos($query, 'SELECT') !== false:
                 $keywords = ['SELECT', 'FROM', 'WHERE', 'HAVING', 'ORDER BY', 'LIMIT'];
                 $required = 2;
+
                 break;
 
-            case stripos($query, 'DELETE') !== false:
+            case mb_stripos($query, 'DELETE') !== false:
                 $keywords = ['DELETE', 'FROM', 'WHERE', 'ORDER BY', 'LIMIT'];
                 $required = 2;
+
                 break;
 
-            case stripos($query, 'UPDATE') !== false:
+            case mb_stripos($query, 'UPDATE') !== false:
                 $keywords = ['UPDATE', 'SET', 'WHERE', 'ORDER BY', 'LIMIT'];
                 $required = 2;
+
                 break;
 
-            case stripos($query, 'INSERT') !== false:
+            case mb_stripos($query, 'INSERT') !== false:
                 $keywords = ['INSERT', 'INTO', 'VALUE', 'VALUES'];
                 $required = 2;
+
                 break;
 
             // If there's no match so far just truncate it to the maximum allowed by the interface
             default:
-                $result = substr($query, 0, $this->maxCharWidth);
+                $result = mb_substr($query, 0, $this->maxCharWidth);
         }
 
         // If we had a match then we should minify it
@@ -88,32 +92,38 @@ class DoctrineExtension extends AbstractExtension
 
         switch (true) {
             // Check if result is non-unicode string using PCRE_UTF8 modifier
-            case is_string($result) && !preg_match('//u', $result):
-                $result = '0x' . strtoupper(bin2hex($result));
+            case \is_string($result) && !preg_match('//u', $result):
+                $result = '0x' . mb_strtoupper(bin2hex($result));
+
                 break;
 
-            case is_string($result):
+            case \is_string($result):
                 $result = "'" . addslashes($result) . "'";
+
                 break;
 
-            case is_array($result):
+            case \is_array($result):
                 foreach ($result as &$value) {
-                    $value = static::escapeFunction($value);
+                    $value = self::escapeFunction($value);
                 }
 
                 $result = implode(', ', $result);
+
                 break;
 
-            case is_object($result):
+            case \is_object($result):
                 $result = addslashes((string) $result);
+
                 break;
 
             case $result === null:
                 $result = 'NULL';
+
                 break;
 
-            case is_bool($result):
+            case \is_bool($result):
                 $result = $result ? '1' : '0';
+
                 break;
         }
 
@@ -135,20 +145,20 @@ class DoctrineExtension extends AbstractExtension
 
         $i = 0;
 
-        if (!array_key_exists(0, $values) && array_key_exists(1, $values)) {
+        if (!\array_key_exists(0, $values) && \array_key_exists(1, $values)) {
             $i = 1;
         }
 
         return preg_replace_callback(
             '/\?|((?<!:):[a-z0-9_]+)/i',
             static function ($matches) use ($values, &$i) {
-                $key = substr($matches[0], 1);
-                if (!array_key_exists($i, $values) && (!$key || !array_key_exists($key, $values))) {
+                $key = mb_substr($matches[0], 1);
+                if (!\array_key_exists($i, $values) && (!$key || !\array_key_exists($key, $values))) {
                     return $matches[0];
                 }
 
-                $value = array_key_exists($i, $values) ? $values[$i] : $values[$key];
-                $result = DoctrineExtension::escapeFunction($value);
+                $value = \array_key_exists($i, $values) ? $values[$i] : $values[$key];
+                $result = self::escapeFunction($value);
                 ++$i;
 
                 return $result;
@@ -199,7 +209,7 @@ class DoctrineExtension extends AbstractExtension
      */
     private function getPossibleCombinations(array $elements, int $combinationsLevel): array
     {
-        $baseCount = count($elements);
+        $baseCount = \count($elements);
         $result = [];
 
         if ($combinationsLevel === 1) {
@@ -219,6 +229,7 @@ class DoctrineExtension extends AbstractExtension
             foreach ($elements as $key => $element) {
                 if ($element === $lastElement) {
                     $found = true;
+
                     continue;
                 }
 
@@ -227,9 +238,9 @@ class DoctrineExtension extends AbstractExtension
                 }
 
                 $tmp = $nextLevelElement;
-                $newCombination = array_slice($tmp, 0);
+                $newCombination = \array_slice($tmp, 0);
                 $newCombination[] = $element;
-                $result[] = array_slice($newCombination, 0);
+                $result[] = \array_slice($newCombination, 0);
             }
         }
 
@@ -245,13 +256,13 @@ class DoctrineExtension extends AbstractExtension
         $result = '';
 
         $maxLength = $this->maxCharWidth;
-        $maxLength -= count($parameters) * 5;
-        $maxLength /= count($parameters);
+        $maxLength -= \count($parameters) * 5;
+        $maxLength /= \count($parameters);
 
         foreach ($parameters as $key => $value) {
             $isLarger = false;
 
-            if (strlen($value) > $maxLength) {
+            if (\mb_strlen($value) > $maxLength) {
                 $value = wordwrap($value, $maxLength, "\n", true);
                 $value = explode("\n", $value);
                 $value = $value[0];
@@ -261,7 +272,7 @@ class DoctrineExtension extends AbstractExtension
             $value = self::escapeFunction($value);
 
             if (!is_numeric($value)) {
-                $value = substr($value, 1, -1);
+                $value = mb_substr($value, 1, -1);
             }
 
             if ($isLarger) {
@@ -283,7 +294,7 @@ class DoctrineExtension extends AbstractExtension
         $mandatoryKeywords = array_splice($keywords, 0, $required);
 
         $combinations = [];
-        $combinationsCount = count($keywords);
+        $combinationsCount = \count($keywords);
 
         // Compute all the possible combinations of keywords to match the query for
         while ($combinationsCount > 0) {
@@ -312,6 +323,6 @@ class DoctrineExtension extends AbstractExtension
         }
 
         // Fallback in case we didn't managed to find any good match (can we actually have that happen?!)
-        return substr($query, 0, $this->maxCharWidth);
+        return mb_substr($query, 0, $this->maxCharWidth);
     }
 }

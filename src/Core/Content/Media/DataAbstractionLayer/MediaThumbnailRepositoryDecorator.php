@@ -10,7 +10,7 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregatorResult;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\AggregationResultCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearchResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsAnyFilter;
@@ -29,10 +29,12 @@ class MediaThumbnailRepositoryDecorator implements EntityRepositoryInterface
      * @var EventDispatcherInterface
      */
     private $eventDispatcher;
+
     /**
      * @var EntityRepositoryInterface
      */
     private $innerRepo;
+
     /**
      * @var MessageBusInterface
      */
@@ -59,7 +61,7 @@ class MediaThumbnailRepositoryDecorator implements EntityRepositoryInterface
 
     // Unchanged methods
 
-    public function aggregate(Criteria $criteria, Context $context): AggregatorResult
+    public function aggregate(Criteria $criteria, Context $context): AggregationResultCollection
     {
         return $this->innerRepo->aggregate($criteria, $context);
     }
@@ -143,8 +145,7 @@ class MediaThumbnailRepositoryDecorator implements EntityRepositoryInterface
 
             $thumbnailPaths[] = $this->urlGenerator->getRelativeThumbnailUrl(
                 $thumbnail->getMedia(),
-                $thumbnail->getWidth(),
-                $thumbnail->getHeight()
+                $thumbnail
             );
         }
 

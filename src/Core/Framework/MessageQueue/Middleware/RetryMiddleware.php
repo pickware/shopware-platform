@@ -8,8 +8,8 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\MessageQueue\DeadMessage\DeadMessageEntity;
 use Shopware\Core\Framework\MessageQueue\Exception\MessageFailedException;
 use Shopware\Core\Framework\MessageQueue\Message\RetryMessage;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTask;
 use Shopware\Core\Framework\MessageQueue\Stamp\DecryptedStamp;
-use Shopware\Core\Framework\ScheduledTask\ScheduledTask;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
@@ -60,7 +60,7 @@ class RetryMiddleware implements MiddlewareInterface
 
     private function createDeadMessageFromEnvelope(Envelope $envelope, MessageFailedException $e): void
     {
-        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($envelope, $e) {
+        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($envelope, $e): void {
             $encrypted = count($envelope->all(DecryptedStamp::class)) > 0;
             $scheduledTaskId = null;
             if ($envelope->getMessage() instanceof ScheduledTask) {
@@ -112,7 +112,7 @@ class RetryMiddleware implements MiddlewareInterface
 
     private function incrementErrorCount(DeadMessageEntity $deadMessage): void
     {
-        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($deadMessage) {
+        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($deadMessage): void {
             $this->deadMessageRepository->update([
                 [
                     'id' => $deadMessage->getId(),
@@ -125,7 +125,7 @@ class RetryMiddleware implements MiddlewareInterface
 
     private function createDeadMessageFromExistingMessage(DeadMessageEntity $message, MessageFailedException $e): void
     {
-        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($message, $e) {
+        $this->context->scope(Context::SYSTEM_SCOPE, function () use ($message, $e): void {
             $id = Uuid::randomHex();
             $this->deadMessageRepository->create([
                 [

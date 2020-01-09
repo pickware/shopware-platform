@@ -133,10 +133,9 @@ class LineItem extends Struct
      */
     public static function createFromLineItem(LineItem $lineItem): self
     {
-        $self = new static($lineItem->id, $lineItem->type, $lineItem->getReferencedId(), $lineItem->quantity);
+        $self = new self($lineItem->id, $lineItem->type, $lineItem->getReferencedId(), $lineItem->quantity);
 
-        $vars = get_object_vars($lineItem);
-        foreach ($vars as $property => $value) {
+        foreach (get_object_vars($lineItem) as $property => $value) {
             $self->$property = $value;
         }
 
@@ -231,7 +230,7 @@ class LineItem extends Struct
     /**
      * @throws PayloadKeyNotFoundException
      */
-    public function getPayloadValue(string $key): string
+    public function getPayloadValue(string $key)
     {
         if (!$this->hasPayloadValue($key)) {
             throw new PayloadKeyNotFoundException($key, $this->getId());
@@ -261,7 +260,7 @@ class LineItem extends Struct
      */
     public function setPayloadValue(string $key, $value): self
     {
-        if (!is_string($key) || ($value !== null && !is_scalar($value) && !is_array($value))) {
+        if ($value !== null && !is_scalar($value) && !\is_array($value)) {
             throw new InvalidPayloadException($key, $this->getId());
         }
 
@@ -276,6 +275,10 @@ class LineItem extends Struct
     public function setPayload(array $payload): self
     {
         foreach ($payload as $key => $value) {
+            if (!\is_string($key)) {
+                throw new InvalidPayloadException((string) $key, $this->getId());
+            }
+
             $this->setPayloadValue($key, $value);
         }
 
@@ -385,8 +388,10 @@ class LineItem extends Struct
     }
 
     /**
-     * @throws MixedLineItemTypeException
      * @throws InvalidChildQuantityException
+     * @throws InvalidQuantityException
+     * @throws LineItemNotStackableException
+     * @throws MixedLineItemTypeException
      */
     public function addChild(LineItem $child): self
     {
@@ -462,8 +467,11 @@ class LineItem extends Struct
     /**
      * @throws InvalidQuantityException
      */
-    private function refreshChildQuantity(LineItemCollection $lineItems, int $oldParentQuantity, int $newParentQuantity): void
-    {
+    private function refreshChildQuantity(
+        LineItemCollection $lineItems,
+        int $oldParentQuantity,
+        int $newParentQuantity
+    ): void {
         foreach ($lineItems as $lineItem) {
             $newQuantity = intdiv($lineItem->getQuantity(), $oldParentQuantity) * $newParentQuantity;
 
@@ -484,8 +492,17 @@ class LineItem extends Struct
      */
     private function validateChildQuantity(LineItem $child): void
     {
-        if ($child->getQuantity() % $this->getQuantity() !== 0) {
-            throw new InvalidChildQuantityException($child->getQuantity(), $this->getQuantity());
+        $childQuantity = $child->getQuantity();
+        $parentQuantity = $this->getQuantity();
+        if ($childQuantity % $parentQuantity !== 0) {
+            if ($childQuantity !== 1) {
+                throw new InvalidChildQuantityException($childQuantity, $parentQuantity);
+            }
+
+            // A quantity of 1 for a child line item is allowed, if the parent line item is not stackable
+            if ($this->isStackable()) {
+                throw new InvalidChildQuantityException($childQuantity, $parentQuantity);
+            }
         }
     }
 }

@@ -24,9 +24,7 @@ use Shopware\Core\Checkout\Cart\Order\Transformer\TransactionTransformer;
 use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderAddress\OrderAddressEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryCollection;
-use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryStates;
-use Shopware\Core\Checkout\Order\Aggregate\OrderDeliveryPosition\OrderDeliveryPositionEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionStates;
 use Shopware\Core\Checkout\Order\Exception\DeliveryWithoutAddressException;
 use Shopware\Core\Checkout\Order\OrderDefinition;
@@ -112,14 +110,15 @@ class OrderConverter
      */
     public function convertToOrder(Cart $cart, SalesChannelContext $context, OrderConversionContext $conversionContext): array
     {
-        /** @var Delivery $delivery */
         foreach ($cart->getDeliveries() as $delivery) {
             if ($delivery->getLocation()->getAddress() !== null || $delivery->hasExtensionOfType(self::ORIGINAL_ID, IdStruct::class)) {
                 continue;
             }
+
             throw new DeliveryWithoutAddressException();
         }
-        $data = CartTransformer::transform($cart,
+        $data = CartTransformer::transform(
+            $cart,
             $context,
             $this->stateMachineRegistry->getInitialState(OrderStates::STATE_MACHINE, $context->getContext())->getId()
         );
@@ -159,9 +158,11 @@ class OrderConverter
         }
 
         if ($conversionContext->shouldIncludeTransactions()) {
-            $data['transactions'] = TransactionTransformer::transformCollection($cart->getTransactions(),
+            $data['transactions'] = TransactionTransformer::transformCollection(
+                $cart->getTransactions(),
                 $this->stateMachineRegistry->getInitialState(OrderTransactionStates::STATE_MACHINE, $context->getContext())->getId(),
-                $context->getContext());
+                $context->getContext()
+            );
         }
 
         $data['lineItems'] = array_values($convertedLineItems);
@@ -176,7 +177,9 @@ class OrderConverter
             $data['orderNumber'] = $orderNumberStruct->getId();
         } else {
             $data['orderNumber'] = $this->numberRangeValueGenerator->getValue(
-                $this->orderDefinition->getEntityName(), $context->getContext(), $context->getSalesChannel()->getId()
+                $this->orderDefinition->getEntityName(),
+                $context->getContext(),
+                $context->getSalesChannel()->getId()
             );
         }
 
@@ -260,7 +263,6 @@ class OrderConverter
     {
         $cartDeliveries = new DeliveryCollection();
 
-        /** @var OrderDeliveryEntity $orderDelivery */
         foreach ($orderDeliveries as $orderDelivery) {
             $deliveryDate = new DeliveryDate(
                 $orderDelivery->getShippingDateEarliest(),
@@ -269,7 +271,6 @@ class OrderConverter
 
             $deliveryPositions = new DeliveryPositionCollection();
 
-            /** @var OrderDeliveryPositionEntity $position */
             foreach ($orderDelivery->getPositions() as $position) {
                 $identifier = $position->getOrderLineItem()->getIdentifier();
 

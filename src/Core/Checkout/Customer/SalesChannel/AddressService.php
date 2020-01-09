@@ -9,8 +9,6 @@ use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Customer\CustomerEvents;
 use Shopware\Core\Checkout\Customer\Exception\AddressNotFoundException;
 use Shopware\Core\Checkout\Customer\Exception\CannotDeleteDefaultAddressException;
-use Shopware\Core\Checkout\Customer\Validation\AddressValidationService;
-use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -20,9 +18,10 @@ use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Framework\Validation\BuildValidationEvent;
 use Shopware\Core\Framework\Validation\DataBag\DataBag;
 use Shopware\Core\Framework\Validation\DataValidationDefinition;
+use Shopware\Core\Framework\Validation\DataValidationFactoryInterface;
 use Shopware\Core\Framework\Validation\DataValidator;
 use Shopware\Core\Framework\Validation\Exception\ConstraintViolationException;
-use Shopware\Core\System\Country\CountryCollection;
+use Shopware\Core\Framework\Validation\ValidationServiceInterface;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -41,9 +40,9 @@ class AddressService
     private $customerAddressRepository;
 
     /**
-     * @var AddressValidationService
+     * @var ValidationServiceInterface|DataValidationFactoryInterface
      */
-    private $addressValidationService;
+    private $addressValidationFactory;
 
     /**
      * @var DataValidator
@@ -60,17 +59,20 @@ class AddressService
      */
     private $systemConfigService;
 
+    /**
+     * @param ValidationServiceInterface|DataValidationFactoryInterface $addressValidationFactory
+     */
     public function __construct(
         EntityRepositoryInterface $countryRepository,
         EntityRepositoryInterface $customerAddressRepository,
-        AddressValidationService $addressValidationService,
+        $addressValidationFactory,
         DataValidator $validator,
         EventDispatcherInterface $eventDispatcher,
         SystemConfigService $systemConfigService
     ) {
         $this->countryRepository = $countryRepository;
         $this->customerAddressRepository = $customerAddressRepository;
-        $this->addressValidationService = $addressValidationService;
+        $this->addressValidationFactory = $addressValidationFactory;
         $this->validator = $validator;
         $this->eventDispatcher = $eventDispatcher;
         $this->systemConfigService = $systemConfigService;
@@ -83,21 +85,6 @@ class AddressService
     public function getById(string $addressId, SalesChannelContext $context): CustomerAddressEntity
     {
         return $this->validateAddressId($addressId, $context);
-    }
-
-    public function getCountryList(SalesChannelContext $context): CountryCollection
-    {
-        $criteria = new Criteria([]);
-        $criteria->addFilter(new EqualsFilter('country.active', true))
-            ->addAssociation('country.states');
-
-        /** @var CountryCollection $countries */
-        $countries = $this->countryRepository->search($criteria, $context->getContext())
-            ->getEntities();
-
-        $countries->sortCountryAndStates();
-
-        return $countries;
     }
 
     /**
@@ -122,19 +109,21 @@ class AddressService
      * @throws InvalidUuidException
      * @throws ConstraintViolationException
      */
-    public function create(DataBag $data, SalesChannelContext $context): string
+    public function upsert(DataBag $data, SalesChannelContext $context): string
     {
         $this->validateCustomerIsLoggedIn($context);
 
-        $accountType = $data->get('accountType', CustomerEntity::ACCOUNT_TYPE_PRIVATE);
-        $definition = $this->getCreateValidationDefinition($accountType, $context->getContext());
-        $this->validator->validate($data->all(), $definition);
-
         if ($id = $data->get('id')) {
-            $this->validateAddressId((string) $id, $context)->getId();
+            $this->validateAddressId((string) $id, $context);
+            $isCreate = false;
         } else {
             $id = Uuid::randomHex();
+            $isCreate = true;
         }
+
+        $accountType = $data->get('accountType', CustomerEntity::ACCOUNT_TYPE_PRIVATE);
+        $definition = $this->getValidationDefinition($accountType, $isCreate, $context);
+        $this->validator->validate(array_merge(['id' => $id], $data->all()), $definition);
 
         $addressData = [
             'salutationId' => $data->get('salutationId'),
@@ -144,7 +133,7 @@ class AddressService
             'city' => $data->get('city'),
             'zipcode' => $data->get('zipcode'),
             'countryId' => $data->get('countryId'),
-            'countryStateId' => $data->get('countryStateId'),
+            'countryStateId' => $data->get('countryStateId') ? $data->get('countryStateId') : null,
             'company' => $data->get('company'),
             'department' => $data->get('department'),
             'title' => $data->get('title'),
@@ -208,12 +197,16 @@ class AddressService
             throw new InvalidUuidException($addressId);
         }
 
+        $this->validateCustomerIsLoggedIn($context);
+
         $criteria = new Criteria();
-        $criteria->addFilter(new EqualsFilter('address.id', $addressId));
-        $criteria->addFilter(new EqualsFilter('address.customer_id', $context->getCustomer()->getId()));
+        $criteria->addFilter(new EqualsFilter('id', $addressId));
+        $criteria->addFilter(new EqualsFilter('customerId', $context->getCustomer()->getId()));
 
         /** @var CustomerAddressEntity|null $address */
-        $address = $this->customerAddressRepository->search(new Criteria([$addressId]), $context->getContext())->get($addressId);
+        $address = $this->customerAddressRepository
+            ->search($criteria, $context->getContext())
+            ->get($addressId);
 
         if (!$address) {
             throw new AddressNotFoundException($addressId);
@@ -222,15 +215,27 @@ class AddressService
         return $address;
     }
 
-    private function getCreateValidationDefinition(string $accountType, Context $context): DataValidationDefinition
+    private function getValidationDefinition(string $accountType, bool $isCreate, SalesChannelContext $context): DataValidationDefinition
     {
-        $validation = $this->addressValidationService->buildCreateValidation($context);
+        if ($this->addressValidationFactory instanceof DataValidationFactoryInterface) {
+            if ($isCreate) {
+                $validation = $this->addressValidationFactory->create($context);
+            } else {
+                $validation = $this->addressValidationFactory->update($context);
+            }
+        } else {
+            if ($isCreate) {
+                $validation = $this->addressValidationFactory->buildCreateValidation($context->getContext());
+            } else {
+                $validation = $this->addressValidationFactory->buildUpdateValidation($context->getContext());
+            }
+        }
 
         if ($accountType === CustomerEntity::ACCOUNT_TYPE_BUSINESS && $this->systemConfigService->get('core.loginRegistration.showAccountTypeSelection')) {
             $validation->add('company', new NotBlank());
         }
 
-        $validationEvent = new BuildValidationEvent($validation, $context);
+        $validationEvent = new BuildValidationEvent($validation, $context->getContext());
         $this->eventDispatcher->dispatch($validationEvent, $validationEvent->getName());
 
         return $validation;

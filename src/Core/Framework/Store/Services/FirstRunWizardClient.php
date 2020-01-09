@@ -135,6 +135,8 @@ final class FirstRunWizardClient
         $userToken = new ShopUserTokenStruct();
         $userToken->assign($data['shopUserToken']);
 
+        $this->configService->set('core.store.shopSecret', $data['shopSecret']);
+
         $accessTokenStruct = new AccessTokenStruct();
         $accessTokenStruct->assign($data);
         $accessTokenStruct->setShopUserToken($userToken);
@@ -380,6 +382,7 @@ final class FirstRunWizardClient
 
     private function mapPluginData(array $plugins, PluginCollection $pluginCollection): array
     {
+        /** @var StorePluginStruct[] $mappedPlugins */
         $mappedPlugins = [];
         foreach ($plugins as $plugin) {
             if (empty($plugin['name']) || empty($plugin['localizedInfo']['name'])) {
@@ -399,7 +402,6 @@ final class FirstRunWizardClient
             ]);
         }
 
-        /** @var StorePluginStruct $storePlugin */
         foreach ($mappedPlugins as $storePlugin) {
             /** @var PluginEntity|null $plugin */
             $plugin = $pluginCollection->filterByProperty('name', $storePlugin->getName())->first();

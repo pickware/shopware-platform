@@ -12,7 +12,6 @@ use Shopware\Core\Checkout\Shipping\ShippingMethodDefinition;
 use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Content\Category\CategoryDefinition;
 use Shopware\Core\Content\Category\CategoryEntity;
-use Shopware\Core\Content\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderCollection;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderDefinition;
 use Shopware\Core\Content\Media\Aggregate\MediaFolder\MediaFolderEntity;
@@ -22,18 +21,20 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Read\EntityReaderInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntityAggregatorInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearcherInterface;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\PaginationCriteria;
 use Shopware\Core\Framework\DataAbstractionLayer\VersionManager;
 use Shopware\Core\Framework\Rule\Container\AndRule;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
+use Shopware\Core\Framework\Test\TestCaseHelper\CallableClass;
 use Shopware\Core\Framework\Util\Random;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\System\Locale\LocaleDefinition;
 
 class EntityRepositoryTest extends TestCase
@@ -60,7 +61,7 @@ class EntityRepositoryTest extends TestCase
             $context
         );
 
-        static::assertInstanceOf(EntityWrittenEvent::class, $event->getEventByDefinition(LocaleDefinition::class));
+        static::assertInstanceOf(EntityWrittenEvent::class, $event->getEventByEntityName(LocaleDefinition::ENTITY_NAME));
     }
 
     public function testWrittenEventsFired(): void
@@ -353,7 +354,7 @@ class EntityRepositoryTest extends TestCase
         $result = $repository->clone($id, $context, $newId);
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $result);
 
-        $written = $result->getEventByDefinition(CategoryDefinition::class);
+        $written = $result->getEventByEntityName(CategoryDefinition::ENTITY_NAME);
         static::assertCount(3, $written->getIds());
         static::assertContains($newId, $written->getIds());
 
@@ -396,10 +397,10 @@ class EntityRepositoryTest extends TestCase
 
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $result);
 
-        $written = $result->getEventByDefinition(CategoryDefinition::class);
+        $written = $result->getEventByEntityName(CategoryDefinition::ENTITY_NAME);
 
         static::assertCount(3, $written->getIds());
-        $newId = $result->getEventByDefinition(CategoryDefinition::class)->getIds();
+        $newId = $result->getEventByEntityName(CategoryDefinition::ENTITY_NAME)->getIds();
         $newId = array_shift($newId);
         static::assertNotEquals($id, $newId);
 
@@ -476,7 +477,7 @@ class EntityRepositoryTest extends TestCase
         $result = $repository->clone($recordA, $context, $newId);
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $result);
 
-        $written = $result->getEventByDefinition(CustomerAddressDefinition::class);
+        $written = $result->getEventByEntityName(CustomerAddressDefinition::ENTITY_NAME);
         static::assertCount(2, $written->getIds());
 
         $criteria = new Criteria([$recordA, $newId]);
@@ -499,10 +500,10 @@ class EntityRepositoryTest extends TestCase
         static::assertCount(2, $old->getAddresses());
         static::assertCount(2, $new->getAddresses());
 
-        $oldAddressIds = $old->getAddresses()->map(function (CustomerAddressEntity $address) {
+        $oldAddressIds = $old->getAddresses()->map(static function (CustomerAddressEntity $address) {
             return $address->getId();
         });
-        $newAddressIds = $new->getAddresses()->map(function (CustomerAddressEntity $address) {
+        $newAddressIds = $new->getAddresses()->map(static function (CustomerAddressEntity $address) {
             return $address->getId();
         });
 
@@ -513,7 +514,7 @@ class EntityRepositoryTest extends TestCase
 
     public function testCloneWithManyToMany(): void
     {
-        static::markTestSkipped('ManyToMany are currently intendently not cloned - to be discussed');
+        static::markTestSkipped('ManyToMany are currently intendedly not cloned - to be discussed');
         $recordA = Uuid::randomHex();
         $data = [
             'id' => $recordA,
@@ -547,13 +548,13 @@ class EntityRepositoryTest extends TestCase
         $result = $repository->create([$data], $context);
         $newId = Uuid::randomHex();
 
-        $written = $result->getEventByDefinition(ShippingMethodDefinition::class);
+        $written = $result->getEventByEntityName(ShippingMethodDefinition::ENTITY_NAME);
         static::assertCount(1, $written->getIds());
 
         $result = $repository->clone($recordA, $context, $newId);
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $result);
 
-        $written = $result->getEventByDefinition(ShippingMethodDefinition::class);
+        $written = $result->getEventByEntityName(ShippingMethodDefinition::ENTITY_NAME);
         static::assertCount(1, $written->getIds());
 
         $criteria = new Criteria([$recordA, $newId]);
@@ -676,7 +677,7 @@ class EntityRepositoryTest extends TestCase
             ['id' => Uuid::fromHexToBytes($id)]
         );
         static::assertCount(7, $conditions);
-        $withParent = array_filter($conditions, function ($condition) {
+        $withParent = array_filter($conditions, static function ($condition) {
             return $condition['parent_id'] !== null;
         });
         static::assertCount(6, $withParent);
@@ -761,14 +762,17 @@ class EntityRepositoryTest extends TestCase
         ];
 
         $context = Context::createDefaultContext();
+        /** @var EntityRepositoryInterface $repository */
         $repository = $this->getContainer()->get('media_folder.repository');
 
-        $event = $repository->create([$data], $context)->getEventByDefinition(MediaFolderDefinition::class);
+        $event = $repository->create([$data], $context)->getEventByEntityName(MediaFolderDefinition::ENTITY_NAME);
         static::assertInstanceOf(EntityWrittenEvent::class, $event);
         static::assertCount(12, $event->getIds());
 
         $criteria = new Criteria([$id]);
-        $criteria->addAssociation('children', new PaginationCriteria(2, 0));
+        $criteria->getAssociation('children')
+            ->setLimit(2)
+            ->setOffset(0);
 
         /** @var MediaFolderEntity $folder */
         $folder = $repository->search($criteria, $context)->get($id);
@@ -780,7 +784,7 @@ class EntityRepositoryTest extends TestCase
         $firstIds = $folder->getChildren()->getIds();
 
         $criteria = new Criteria([$id]);
-        $criteria->addAssociation('children', new PaginationCriteria(3, 2));
+        $criteria->getAssociation('children')->setLimit(3)->setOffset(2);
 
         /** @var MediaFolderEntity $folder */
         $folder = $repository->search($criteria, $context)->get($id);
@@ -805,12 +809,5 @@ class EntityRepositoryTest extends TestCase
             $this->getContainer()->get(EntityAggregatorInterface::class),
             $this->getContainer()->get('event_dispatcher')
         );
-    }
-}
-
-class CallableClass
-{
-    public function __invoke()
-    {
     }
 }

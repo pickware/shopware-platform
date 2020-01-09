@@ -17,9 +17,24 @@ class MailTemplateSalesChannelDefinition extends EntityDefinition
 {
     public const ENTITY_NAME = 'mail_template_sales_channel';
 
+    public function getCollectionClass(): string
+    {
+        return MailTemplateSalesChannelCollection::class;
+    }
+
+    public function getEntityClass(): string
+    {
+        return MailTemplateSalesChannelEntity::class;
+    }
+
     public function getEntityName(): string
     {
         return self::ENTITY_NAME;
+    }
+
+    protected function getParentDefinitionClass(): ?string
+    {
+        return MailTemplateDefinition::class;
     }
 
     protected function defineFields(): FieldCollection

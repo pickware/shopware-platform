@@ -13,7 +13,6 @@ use Shopware\Storefront\Theme\Exception\InvalidThemeException;
 use Shopware\Storefront\Theme\StorefrontPluginConfiguration\StorefrontPluginConfiguration;
 use Shopware\Storefront\Theme\StorefrontPluginConfiguration\StorefrontPluginConfigurationCollection;
 use Symfony\Contracts\Cache\CacheInterface;
-use Symfony\Contracts\Cache\ItemInterface;
 
 class ThemeService
 {
@@ -76,7 +75,7 @@ class ThemeService
         Context $context,
         ?StorefrontPluginConfigurationCollection $configurationCollection = null,
         bool $withAssets = true
-    ) {
+    ): void {
         $themePluginConfiguration = $this->getPluginConfiguration(
             $salesChannelId,
             $themeId,
@@ -165,9 +164,10 @@ class ThemeService
     {
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('technicalName', StorefrontPluginRegistry::BASE_THEME_NAME));
+        /** @var ThemeEntity $baseTheme */
         $baseTheme = $this->themeRepository->search($criteria, $context)->first();
 
-        $baseTheme = $this->mergeStaticConfig($baseTheme);
+        $baseThemeConfig = $this->mergeStaticConfig($baseTheme);
 
         $criteria = new Criteria([$themeId]);
 
@@ -183,7 +183,7 @@ class ThemeService
 
         $configuredTheme = $this->mergeStaticConfig($theme);
 
-        $themeConfig = array_replace_recursive($baseTheme, $configuredTheme);
+        $themeConfig = array_replace_recursive($baseThemeConfig, $configuredTheme);
 
         foreach ($themeConfig['fields'] as $name => $item) {
             $configFields[$name] = $themeConfigFieldFactory->create($name, $item);
@@ -191,12 +191,14 @@ class ThemeService
 
         $configFields = json_decode(json_encode($configFields), true);
 
-        if ($translate && $theme->getLabels()) {
-            $configFields = $this->translateLabels($configFields, $theme->getLabels());
+        $labels = array_replace_recursive($baseTheme->getLabels() ?? [], $theme->getLabels() ?? []);
+        if ($translate && !empty($labels)) {
+            $configFields = $this->translateLabels($configFields, $labels);
         }
 
-        if ($translate && $theme->getHelpTexts()) {
-            $configFields = $this->translateHelpTexts($configFields, $theme->getHelpTexts());
+        $helpTexts = array_replace_recursive($baseTheme->getHelpTexts() ?? [], $theme->getHelpTexts() ?? []);
+        if ($translate && !empty($helpTexts)) {
+            $configFields = $this->translateHelpTexts($configFields, $helpTexts);
         }
 
         $themeConfig['fields'] = $configFields;
@@ -206,9 +208,7 @@ class ThemeService
 
     public function getResolvedThemeConfiguration(string $themeId, Context $context): array
     {
-        return $this->cache->get('theme.resolved-config.' . $themeId, function (ItemInterface $item) use ($themeId, $context) {
-            $item->expiresAfter(\DateInterval::createFromDateString('1 hour'));
-
+        return $this->cache->get('theme.resolved-config.' . $themeId, function () use ($themeId, $context) {
             $config = $this->getThemeConfiguration($themeId, false, $context);
             $resolvedConfig = [];
             $mediaItems = [];
@@ -264,6 +264,7 @@ class ThemeService
                         'label' => $fieldConfig['label'],
                         'helpText' => $fieldConfig['helpText'] ?? null,
                         'type' => $fieldConfig['type'],
+                        'custom' => $fieldConfig['custom'],
                     ],
                 ];
             } elseif (!isset($blocks[$fieldConfig['block']])) {
@@ -276,6 +277,7 @@ class ThemeService
                                 'label' => $fieldConfig['label'],
                                 'helpText' => $fieldConfig['helpText'] ?? null,
                                 'type' => $fieldConfig['type'],
+                                'custom' => $fieldConfig['custom'],
                             ],
                         ],
                     ],
@@ -285,6 +287,7 @@ class ThemeService
                     'label' => $fieldConfig['label'],
                     'helpText' => $fieldConfig['helpText'] ?? null,
                     'type' => $fieldConfig['type'],
+                    'custom' => $fieldConfig['custom'],
                 ];
             } else {
                 $blocks[$fieldConfig['block']]['sections'][$section] = [
@@ -293,6 +296,7 @@ class ThemeService
                         'label' => $fieldConfig['label'],
                         'helpText' => $fieldConfig['helpText'] ?? null,
                         'type' => $fieldConfig['type'],
+                        'custom' => $fieldConfig['custom'],
                     ],
                 ];
             }
@@ -336,9 +340,17 @@ class ThemeService
 
         // Is inherited Theme -> get Plugin
         if ($pluginConfig === null) {
-            $pluginConfig = $this->pluginRegistry->getConfigurations()->getByTechnicalName(StorefrontPluginRegistry::BASE_THEME_NAME);
+            if ($theme->getParentThemeId() !== null) {
+                $criteria = (new Criteria())->addFilter(new EqualsFilter('id', $theme->getParentThemeId()));
+                /** @var ThemeEntity $parentTheme */
+                $parentTheme = $this->themeRepository->search($criteria, $context)->first();
+                $pluginConfig = $this->pluginRegistry->getConfigurations()->getByTechnicalName($parentTheme->getTechnicalName());
+            } else {
+                $parentTheme = false;
+                $pluginConfig = $this->pluginRegistry->getConfigurations()->getByTechnicalName(StorefrontPluginRegistry::BASE_THEME_NAME);
+            }
             if (!$pluginConfig) {
-                throw new InvalidThemeException(StorefrontPluginRegistry::BASE_THEME_NAME);
+                throw new InvalidThemeException($parentTheme ? $parentTheme->getTechnicalName() : StorefrontPluginRegistry::BASE_THEME_NAME);
             }
         }
 

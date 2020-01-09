@@ -4,6 +4,7 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing\Indexer;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
@@ -21,7 +22,6 @@ use Shopware\Core\Framework\Event\ProgressStartedEvent;
 use Shopware\Core\Framework\Uuid\Exception\InvalidUuidException;
 use Shopware\Core\Framework\Uuid\Exception\InvalidUuidLengthException;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapter;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class TreeIndexer implements IndexerInterface
@@ -47,7 +47,7 @@ class TreeIndexer implements IndexerInterface
     private $cacheKeyGenerator;
 
     /**
-     * @var TagAwareAdapter
+     * @var CacheClearer
      */
     private $cache;
 
@@ -61,7 +61,7 @@ class TreeIndexer implements IndexerInterface
         EventDispatcherInterface $eventDispatcher,
         DefinitionInstanceRegistry $definitionRegistry,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapter $cache,
+        CacheClearer $cache,
         IteratorFactory $iteratorFactory
     ) {
         $this->definitionRegistry = $definitionRegistry;
@@ -76,7 +76,6 @@ class TreeIndexer implements IndexerInterface
     {
         $context = Context::createDefaultContext();
 
-        /** @var EntityDefinition $definition */
         foreach ($this->definitionRegistry->getDefinitions() as $definition) {
             if (!$definition->isTreeAware()) {
                 continue;
@@ -106,11 +105,55 @@ class TreeIndexer implements IndexerInterface
         }
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $dataOffset = null;
+        $definitionOffset = 0;
+        if ($lastId) {
+            $definitionOffset = $lastId['definitionOffset'];
+            $dataOffset = $lastId['dataOffset'];
+        }
+
+        $definitions = array_values(array_filter(
+            $this->definitionRegistry->getDefinitions(),
+            function (EntityDefinition $definition) {
+                return $definition->isTreeAware();
+            }
+        ));
+
+        if (!isset($definitions[$definitionOffset])) {
+            return null;
+        }
+
+        $definition = $definitions[$definitionOffset];
+
+        $context = Context::createDefaultContext();
+
+        $iterator = $this->iteratorFactory->createIterator($definition, $dataOffset);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            ++$definitionOffset;
+
+            return [
+                'definitionOffset' => $definitionOffset,
+                'dataOffset' => null,
+            ];
+        }
+
+        $this->updateIds($ids, $definition, $context);
+
+        return [
+            'definitionOffset' => $definitionOffset,
+            'dataOffset' => $iterator->getOffset(),
+        ];
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
         /** @var EntityWrittenEvent $nested */
         foreach ($event->getEvents() as $nested) {
-            $definition = $nested->getDefinition();
+            $definition = $this->definitionRegistry->getByEntityName($nested->getEntityName());
 
             if ($definition->isTreeAware()) {
                 $this->updateIds($nested->getIds(), $definition, $nested->getContext());
@@ -118,19 +161,25 @@ class TreeIndexer implements IndexerInterface
         }
     }
 
-    private function updateIds(array $ids, $definition, Context $context): void
+    public static function getName(): string
+    {
+        return 'Swag.TreeIndexer';
+    }
+
+    private function updateIds(array $ids, EntityDefinition $definition, Context $context): void
     {
         foreach ($ids as $id) {
             $this->update($id, $definition, $context);
         }
     }
 
-    private function update(string $parentId, $definition, Context $context): void
+    private function update(string $parentId, EntityDefinition $definition, Context $context): void
     {
         $parent = $this->loadParents(
             Uuid::fromHexToBytes($parentId),
             $definition,
-            Uuid::fromHexToBytes($context->getVersionId()));
+            Uuid::fromHexToBytes($context->getVersionId())
+        );
 
         if ($parent === null) {
             return;
@@ -147,7 +196,7 @@ class TreeIndexer implements IndexerInterface
 
     private function updateRecursive(
         array $entity,
-        $definition,
+        EntityDefinition $definition,
         Context $context
     ): array {
         $ids[] = $this->updateTree($entity, $definition, $context);
@@ -162,7 +211,7 @@ class TreeIndexer implements IndexerInterface
 
     private function getChildren(
         array $parent,
-        $definition,
+        EntityDefinition $definition,
         Context $context
     ): array {
         $query = $this->connection->createQueryBuilder();
@@ -231,7 +280,7 @@ class TreeIndexer implements IndexerInterface
         return $path;
     }
 
-    private function loadParents(string $parentId, $definition, string $versionId): ?array
+    private function loadParents(string $parentId, EntityDefinition $definition, string $versionId): ?array
     {
         $query = $this->getEntityByIdQuery($parentId, $definition);
         $this->makeQueryVersionAware($definition, $versionId, $query);

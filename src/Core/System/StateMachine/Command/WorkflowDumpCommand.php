@@ -34,7 +34,8 @@ class WorkflowDumpCommand extends Command
                 new InputOption('label', 'l', InputOption::VALUE_REQUIRED, 'Labels a graph'),
             ])
             ->setDescription('Dump a workflow')
-            ->setHelp(<<<'EOF'
+            ->setHelp(
+                <<<'EOF'
 The <info>%command.name%</info> command dumps the graphical representation of a
 workflow in different formats
 
@@ -48,7 +49,7 @@ EOF
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $workflowName = $input->getArgument('name');
         $context = Context::createDefaultContext();
@@ -64,5 +65,7 @@ EOF
             ],
         ];
         $output->writeln($dumper->dump($stateMachine, $options));
+
+        return 0;
     }
 }

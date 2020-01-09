@@ -3,7 +3,7 @@
 namespace Shopware\Core\Framework\Plugin\Command;
 
 use Composer\IO\ConsoleIO;
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Plugin\PluginService;
 use Symfony\Component\Console\Application;
@@ -16,6 +16,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class PluginRefreshCommand extends Command
 {
+    protected static $defaultName = 'plugin:refresh';
+
     /**
      * @var PluginService
      */
@@ -33,7 +35,7 @@ class PluginRefreshCommand extends Command
      */
     protected function configure(): void
     {
-        $this->setName('plugin:refresh')
+        $this
             ->setDescription('Refreshes the plugins list in the storage from the file system')
             ->addOption('skipPluginList', 's', InputOption::VALUE_NONE, "Don't display plugin list after refresh");
     }
@@ -41,7 +43,7 @@ class PluginRefreshCommand extends Command
     /**
      * {@inheritdoc}
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new ShopwareStyle($input, $output);
         $io->title('Shopware Plugin Service');
@@ -58,7 +60,7 @@ class PluginRefreshCommand extends Command
 
         $skipPluginList = $input->getOption('skipPluginList');
         if ($skipPluginList) {
-            return null;
+            return 0;
         }
 
         $listInput = new StringInput('plugin:list');
@@ -66,5 +68,7 @@ class PluginRefreshCommand extends Command
         /** @var Application $application */
         $application = $this->getApplication();
         $application->doRun($listInput, $output);
+
+        return 0;
     }
 }

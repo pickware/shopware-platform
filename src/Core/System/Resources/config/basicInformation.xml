@@ -7,10 +7,10 @@
 
         <input-field>
             <name>shopName</name>
-            <label>Name of the shop</label>
-            <label lang="de-DE">Name des Shops</label>
-            <placeholder>Name of the shop...</placeholder>
-            <placeholder lang="de-DE">Name des Shops ...</placeholder>
+            <label>Shop name</label>
+            <label lang="de-DE">Shopname</label>
+            <placeholder>Enter a shop name...</placeholder>
+            <placeholder lang="de-DE">Gib den Shopnamen ein ...</placeholder>
         </input-field>
 
         <input-field>
@@ -19,22 +19,6 @@
             <label lang="de-DE">Shopbetreiber-E-Mail-Adresse</label>
             <placeholder>Enter email address...</placeholder>
             <placeholder lang="de-DE">E-Mail-Adresse eingeben ...</placeholder>
-        </input-field>
-
-        <input-field type="textarea">
-            <name>address</name>
-            <label>Address</label>
-            <label lang="de-DE">Adresse</label>
-            <placeholder>Enter address...</placeholder>
-            <placeholder lang="de-DE">Adresse eingeben ...</placeholder>
-        </input-field>
-
-        <input-field type="textarea">
-            <name>bankAccount</name>
-            <label>Bank account </label>
-            <label lang="de-DE">Bankverbindung</label>
-            <placeholder>Enter bank account...</placeholder>
-            <placeholder lang="de-DE">Bankverbindung eingeben ...</placeholder>
         </input-field>
 
         <input-field type="bool">
@@ -51,32 +35,94 @@
         <title>Shop pages</title>
         <title lang="de-DE">Shopseiten</title>
 
-        <component name="sw-entity-single-select">
+        <component name="sw-cms-page-select">
             <name>tosPage</name>
             <entity>cms_page</entity>
-            <label>Shop page for terms of service</label>
-            <label lang="de-DE">Shopseite für AGB</label>
+            <pageType>page</pageType>
+            <label>Shop page layout for terms of service pages</label>
+            <label lang="de-DE">Shopseiten-Layout für AGB-Seiten</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
         </component>
 
-        <component name="sw-entity-single-select">
+        <component name="sw-cms-page-select">
             <name>revocationPage</name>
             <entity>cms_page</entity>
-            <label>Shop page for revocation notice</label>
-            <label lang="de-DE">Shopseite für Widerrufsbelehrung</label>
+            <pageType>page</pageType>
+            <label>Shop page layout for revocation notices</label>
+            <label lang="de-DE">Shopseiten-Layout für Widerrufsbelehrungen</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
         </component>
 
-        <component name="sw-entity-single-select">
+        <component name="sw-cms-page-select">
             <name>shippingPaymentInfoPage</name>
             <entity>cms_page</entity>
-            <label>Shop page for shipping and payment info</label>
-            <label lang="de-DE">Shopseite für Versand- und Zahlungsarten</label>
+            <pageType>page</pageType>
+            <label>Shop page layout for payment and shipping information</label>
+            <label lang="de-DE">Shopseiten-Layout für Versand- und Zahlungsarten</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
         </component>
 
-        <component name="sw-entity-single-select">
+        <component name="sw-cms-page-select">
             <name>privacyPage</name>
             <entity>cms_page</entity>
-            <label>Shop page for privacy</label>
-            <label lang="de-DE">Shopseite für Datenschutz</label>
+            <pageType>page</pageType>
+            <label>Shop page layout for privacy pages</label>
+            <label lang="de-DE">Shopseiten-Layout für Datenschutz-Seiten</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
+        </component>
+
+        <component name="sw-cms-page-select">
+            <name>imprintPage</name>
+            <entity>cms_page</entity>
+            <pageType>page</pageType>
+            <label>Shop page layout assignment for imprint</label>
+            <label lang="de-DE">Shopseiten-Layout Zuweisung für Impressum</label>
+            <placeholder>Select layout</placeholder>
+            <placeholder lang="de-DE">Layout auswählen</placeholder>
+        </component>
+
+        <component name="sw-cms-page-select">
+            <name>404Page</name>
+            <entity>cms_page</entity>
+            <pageType>page</pageType>
+            <label>Shop page layout for missing pages (404: page not found)</label>
+            <label lang="de-DE">Shopseiten-Layout für fehlende Seiten (404: Seite nicht gefunden)</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
+        </component>
+
+        <component name="sw-cms-page-select">
+            <name>maintenancePage</name>
+            <entity>cms_page</entity>
+            <pageType>page</pageType>
+            <label>Shop page layout assignment for maintenance</label>
+            <label lang="de-DE">Shopseiten-Layout Zuweisung für Wartungen</label>
+            <placeholder>Select layout</placeholder>
+            <placeholder lang="de-DE">Layout auswählen</placeholder>
+        </component>
+
+        <component name="sw-cms-page-select">
+            <name>contactPage</name>
+            <entity>cms_page</entity>
+            <pageType>page</pageType>
+            <label>Shop page layout for contact pages</label>
+            <label lang="de-DE">Shopseiten-Layout für Kontaktseiten</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
+        </component>
+
+        <component name="sw-cms-page-select">
+            <name>newsletterPage</name>
+            <entity>cms_page</entity>
+            <pageType>page</pageType>
+            <label>Shop page layout for newsletter pages</label>
+            <label lang="de-DE">Shopseiten-Layout für Newsletterseiten</label>
+            <placeholder>Assign layout...</placeholder>
+            <placeholder lang="de-DE">Layout zuweisen ...</placeholder>
         </component>
     </card>
 </config>

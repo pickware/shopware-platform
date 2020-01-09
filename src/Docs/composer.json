@@ -13,15 +13,15 @@
     },
     "require": {
         "cocur/slugify": "3.2",
-        "composer/composer": "1.8.6",
-        "erusev/parsedown-extra":"0.7.1",
-        "guzzlehttp/guzzle": "6.3.3",
+        "composer/composer": "1.9.1",
+        "erusev/parsedown-extra": "0.7.1",
+        "guzzlehttp/guzzle": "6.4.1",
         "shopware/core": "*",
-        "symfony/config": "4.3.2",
-        "symfony/console": "4.3.2",
-        "symfony/dependency-injection": "4.3.2",
-        "symfony/filesystem": "4.3.2",
-        "symfony/finder": "4.3.2",
-        "symfony/http-kernel": "4.3.2"
+        "symfony/config": "4.4.1",
+        "symfony/console": "4.4.1",
+        "symfony/dependency-injection": "4.4.1",
+        "symfony/filesystem": "4.4.1",
+        "symfony/finder": "4.4.1",
+        "symfony/http-kernel": "4.4.1"
     }
 }

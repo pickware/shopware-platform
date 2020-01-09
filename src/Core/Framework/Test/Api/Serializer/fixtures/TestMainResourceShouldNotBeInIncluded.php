@@ -20,6 +20,7 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
         $user->setPassword('password');
         $user->setUsername('user1');
         $user->setActive(true);
+        $user->setAdmin(true);
         $user->setEmail('user1@shop.de');
         $user->setCreatedAt(new \DateTime('2018-01-15T08:01:16+00:00'));
 
@@ -57,6 +58,7 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
                     'customFields' => null,
                     'createdAt' => '2018-01-15T08:01:16+00:00',
                     'updatedAt' => null,
+                    'admin' => true,
                 ],
                 'links' => [
                     'self' => sprintf('%s/user/f343a3c119cf42a7841aa0ac5094908c', $baseUrl),
@@ -107,6 +109,12 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
                         'data' => null,
                         'links' => [
                             'related' => sprintf('%s/user/f343a3c119cf42a7841aa0ac5094908c/recovery-user', $baseUrl),
+                        ],
+                    ],
+                    'aclRoles' => [
+                        'data' => [],
+                        'links' => [
+                            'related' => sprintf('%s/user/f343a3c119cf42a7841aa0ac5094908c/acl-roles', $baseUrl),
                         ],
                     ],
                 ],
@@ -245,6 +253,12 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
                                 'related' => sprintf('%s/media/3e352be2d85846dd97529c0f6b544870/cms-blocks', $baseUrl),
                             ],
                         ],
+                        'cmsSections' => [
+                            'data' => [],
+                            'links' => [
+                                'related' => sprintf('%s/media/3e352be2d85846dd97529c0f6b544870/cms-sections', $baseUrl),
+                            ],
+                        ],
                         'cmsPages' => [
                             'data' => [],
                             'links' => [
@@ -314,6 +328,8 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
                         'createdAt' => '2018-01-15T08:01:16+00:00',
                         'updatedAt' => null,
                         'extensions' => [],
+                        'admin' => true,
+                        'aclRoles' => null,
                     ],
                     'translations' => null,
                     'categories' => null,
@@ -335,6 +351,7 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
                     'productConfiguratorSettings' => null,
                     'orderLineItems' => null,
                     'cmsBlocks' => null,
+                    'cmsSections' => null,
                     'cmsPages' => null,
                     'documents' => null,
                     '_uniqueIdentifier' => '3e352be2d85846dd97529c0f6b544870',
@@ -356,12 +373,18 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
             'createdAt' => '2018-01-15T08:01:16+00:00',
             'updatedAt' => null,
             'extensions' => [],
+            'admin' => true,
+            'aclRoles' => null,
         ];
     }
 
     protected function removeProtectedSalesChannelJsonApiData(array $fixtures): array
     {
         unset(
+            $fixtures['data']['relationships']['recoveryUser'],
+            $fixtures['data']['relationships']['aclRoles'],
+            $fixtures['included'][0]['attributes']['userId'],
+            $fixtures['included'][0]['attributes']['userId'],
             $fixtures['included'][0]['attributes']['userId'],
             $fixtures['included'][0]['attributes']['mediaType'],
             $fixtures['included'][0]['attributes']['mediaFolderId'],
@@ -380,6 +403,7 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
             $fixtures['included'][0]['relationships']['productConfiguratorSettings'],
             $fixtures['included'][0]['relationships']['orderLineItems'],
             $fixtures['included'][0]['relationships']['cmsBlocks'],
+            $fixtures['included'][0]['relationships']['cmsSections'],
             $fixtures['included'][0]['relationships']['cmsPages'],
             $fixtures['included'][0]['relationships']['documents']
         );
@@ -390,6 +414,8 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
     protected function removeProtectedSalesChannelJsonData(array $fixtures): array
     {
         unset(
+            $fixtures['recoveryUser'],
+            $fixtures['aclRoles'],
             $fixtures['media'][0]['userId'],
             $fixtures['media'][0]['user'],
             $fixtures['media'][0]['avatarUser'],
@@ -407,6 +433,7 @@ class TestMainResourceShouldNotBeInIncluded extends SerializationFixture
             $fixtures['media'][0]['productConfiguratorSettings'],
             $fixtures['media'][0]['orderLineItems'],
             $fixtures['media'][0]['cmsBlocks'],
+            $fixtures['media'][0]['cmsSections'],
             $fixtures['media'][0]['cmsPages'],
             $fixtures['media'][0]['documents']
         );

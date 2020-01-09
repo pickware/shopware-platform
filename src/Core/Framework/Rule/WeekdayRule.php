@@ -44,7 +44,7 @@ class WeekdayRule extends Rule
                 return $todaysDayOfWeek !== (int) $this->dayOfWeek;
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -52,6 +52,7 @@ class WeekdayRule extends Rule
     {
         return [
             'operator' => [
+                new NotBlank(),
                 new Choice([
                     self::OPERATOR_EQ,
                     self::OPERATOR_NEQ,

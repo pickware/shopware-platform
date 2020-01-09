@@ -2,8 +2,10 @@
 
 namespace Shopware\Core\Framework\Test\TestCaseBase;
 
+use Enqueue\Dbal\DbalContext;
+use Shopware\Core\Framework\Test\TestCaseHelper\StopWorkerWhenIdleListener;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Transport\Receiver\ReceiverInterface;
 use Symfony\Component\Messenger\Worker;
@@ -12,30 +14,13 @@ trait QueueTestBehaviour
 {
     /**
      * @before
-     */
-    public function clearQueue()
-    {
-        if (file_exists($this->getQueueFile())) {
-            file_put_contents($this->getQueueFile(), '');
-        }
-    }
-
-    /**
      * @after
      */
-    public function removeQueue()
+    public function clearQueue(): void
     {
-        if (file_exists($this->getQueueFile())) {
-            unlink($this->getQueueFile());
-        }
-    }
-
-    public function getQueueFile(): string
-    {
-        $path = $this->getContainer()->get('enqueue.client.default.config')->getTransportOption('dsn');
-        $path = str_replace('file://', '', $path);
-
-        return $path . '/messages';
+        /** @var DbalContext $context */
+        $context = $this->getContainer()->get('enqueue.transport.default.context');
+        $context->purgeQueue($context->createQueue('messages'));
     }
 
     public function getBus(): MessageBusInterface
@@ -52,14 +37,14 @@ trait QueueTestBehaviour
     {
         $bus = $this->getBus();
 
-        $worker = new Worker([$this->getReceiver()], $bus);
+        $eventDispatcher = new EventDispatcher();
+        $eventDispatcher->addSubscriber(new StopWorkerWhenIdleListener());
+
+        $worker = new Worker([$this->getReceiver()], $bus, $eventDispatcher);
+
         $worker->run([
             'sleep' => 1000,
-        ], function (?Envelope $envelope) use ($worker) {
-            if ($envelope === null) {
-                $worker->stop();
-            }
-        });
+        ]);
     }
 
     abstract protected function getContainer(): ContainerInterface;

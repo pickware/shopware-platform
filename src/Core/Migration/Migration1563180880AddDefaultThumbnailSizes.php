@@ -42,7 +42,6 @@ class Migration1563180880AddDefaultThumbnailSizes extends MigrationStep
 
     public function updateDestructive(Connection $connection): void
     {
-        // implement update destructive
     }
 
     private function upsertThumbnailSizes(Connection $connection): array
@@ -59,6 +58,7 @@ class Migration1563180880AddDefaultThumbnailSizes extends MigrationStep
             $id = $stmt->fetchColumn();
             if ($id) {
                 $thumbnailSizes[$i]['id'] = $id;
+
                 continue;
             }
             $id = Uuid::randomBytes();

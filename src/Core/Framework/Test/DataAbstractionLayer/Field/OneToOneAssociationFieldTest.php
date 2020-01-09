@@ -11,9 +11,8 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Read\EntityReaderInterface;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Aggregation\SumAggregation;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\AggregationResult;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\SumResult;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Aggregation\Metric\SumAggregation;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\AggregationResult\Metric\SumResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntityAggregatorInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearcherInterface;
@@ -119,7 +118,7 @@ DROP TABLE IF EXISTS `root_sub_many`;
         ');
     }
 
-    public function testWriteRootOverSub()
+    public function testWriteRootOverSub(): void
     {
         $id = Uuid::randomHex();
         $id2 = Uuid::randomHex();
@@ -139,12 +138,12 @@ DROP TABLE IF EXISTS `root_sub_many`;
 
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $event);
 
-        $rootEvent = $event->getEventByDefinition(RootDefinition::class);
+        $rootEvent = $event->getEventByEntityName(RootDefinition::ENTITY_NAME);
         static::assertInstanceOf(EntityWrittenEvent::class, $rootEvent);
         static::assertCount(1, $rootEvent->getWriteResults());
         static::assertSame([$id2], $rootEvent->getIds());
 
-        $subEvent = $event->getEventByDefinition(SubDefinition::class);
+        $subEvent = $event->getEventByEntityName(SubDefinition::ENTITY_NAME);
         static::assertInstanceOf(EntityWrittenEvent::class, $subEvent);
         static::assertCount(1, $subEvent->getWriteResults());
         static::assertSame([$id], $subEvent->getIds());
@@ -170,12 +169,12 @@ DROP TABLE IF EXISTS `root_sub_many`;
 
         static::assertInstanceOf(EntityWrittenContainerEvent::class, $event);
 
-        $rootEvent = $event->getEventByDefinition(RootDefinition::class);
+        $rootEvent = $event->getEventByEntityName(RootDefinition::ENTITY_NAME);
         static::assertInstanceOf(EntityWrittenEvent::class, $rootEvent);
         static::assertCount(1, $rootEvent->getWriteResults());
         static::assertSame([$id2], $rootEvent->getIds());
 
-        $subEvent = $event->getEventByDefinition(SubDefinition::class);
+        $subEvent = $event->getEventByEntityName(SubDefinition::ENTITY_NAME);
         static::assertInstanceOf(EntityWrittenEvent::class, $subEvent);
         static::assertCount(1, $subEvent->getWriteResults());
         static::assertSame([$id], $subEvent->getIds());
@@ -299,19 +298,16 @@ DROP TABLE IF EXISTS `root_sub_many`;
         $this->repository->create($data, $context);
 
         $criteria = new Criteria();
-        $criteria->addAggregation(new SumAggregation('root.sub.stock', 'stock_sum'));
+        $criteria->addAggregation(new SumAggregation('stock_sum', 'root.sub.stock'));
         $result = $this->repository->search($criteria, $context);
 
         static::assertTrue($result->getAggregations()->has('stock_sum'));
         $sum = $result->getAggregations()->get('stock_sum');
 
-        /** @var AggregationResult $sum */
-        static::assertInstanceOf(AggregationResult::class, $sum);
+        /** @var SumResult $sum */
+        static::assertInstanceOf(SumResult::class, $sum);
 
-        /** @var SumResult $sumResult */
-        $sumResult = $sum->getResult()[0];
-
-        static::assertEquals(11, $sumResult->getSum());
+        static::assertEquals(11, $sum->getSum());
     }
 
     public function testCreateVersioning(): void
@@ -371,7 +367,7 @@ DROP TABLE IF EXISTS `root_sub_many`;
         static::assertSame('updated sub', $sub->get('name'));
     }
 
-    public function testItInvalidatesTheCacheOnBothSides()
+    public function testItInvalidatesTheCacheOnBothSides(): void
     {
         $idRoot = Uuid::randomHex();
         $idSub = Uuid::randomHex();

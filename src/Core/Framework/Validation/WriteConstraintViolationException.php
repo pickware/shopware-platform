@@ -45,6 +45,11 @@ class WriteConstraintViolationException extends ShopwareHttpException implements
         return $this->constraintViolationList;
     }
 
+    public function setPath(string $path): void
+    {
+        $this->path = $path;
+    }
+
     public function getPath(): string
     {
         return $this->path;
@@ -64,5 +69,30 @@ class WriteConstraintViolationException extends ShopwareHttpException implements
         }
 
         return $result;
+    }
+
+    public function getErrors(bool $withTrace = false): \Generator
+    {
+        foreach ($this->getViolations() as $violation) {
+            $path = $this->getPath() . $violation->getPropertyPath();
+            $error = [
+                'code' => $violation->getCode() ?? $this->getErrorCode(),
+                'status' => (string) $this->getStatusCode(),
+                'detail' => $violation->getMessage(),
+                'template' => $violation->getMessageTemplate(),
+                'meta' => [
+                    'parameters' => $violation->getParameters(),
+                ],
+                'source' => [
+                    'pointer' => $path,
+                ],
+            ];
+
+            if ($withTrace) {
+                $error['trace'] = $this->getTrace();
+            }
+
+            yield $error;
+        }
     }
 }

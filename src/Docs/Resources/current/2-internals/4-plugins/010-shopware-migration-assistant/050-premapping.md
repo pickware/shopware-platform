@@ -3,8 +3,9 @@
 The premapping will use the normal [Mapping](./070-converter-and-mapping.md) to store the old identifier with the equivalent new one.
 All premapping readers provide the information for the mapping choices and are registered like this:
 ```xml
-<service id="SwagMigrationNext\Profile\Shopware55\Premapping\SalutationReader">
+<service id="SwagMigrationAssistant\Profile\Shopware\Premapping\SalutationReader">
     <argument type="service" id="salutation.repository" />
+    <argument type="service" id="SwagMigrationAssistant\Migration\Gateway\GatewayRegistry"/>
     <tag name="shopware.migration.pre_mapping_reader"/>
 </service>
 ```
@@ -71,36 +72,37 @@ To get the associated new identifier, you can make use of the `MappingService` s
 
 /* ... */
 
-private function getSalutation(string $salutation): ?string
+protected function getSalutation(string $salutation): ?string
 {
-    // Get Shopware 6 salutation id
-    $salutationUuid = $this->mappingService->getUuid(
+    $mapping = $this->mappingService->getMapping(
         $this->connectionId,
         SalutationReader::getMappingName(),
-        $salutation, // This is the id of the source system salutation
+        $salutation,
         $this->context
     );
 
-    if ($salutationUuid === null) {
-        $this->loggingService->addWarning(
+    if ($mapping === null) {
+        $this->loggingService->addLogEntry(new UnknownEntityLog(
             $this->runId,
-            Shopware55LogTypes::UNKNOWN_CUSTOMER_SALUTATION,
-            'Cannot find customer salutation',
-            'Customer-Entity could not be converted cause of unknown salutation',
-            [
-                'id' => $this->oldCustomerId,
-                'entity' => DefaultEntities::CUSTOMER,
-                'salutation' => $salutation,
-            ]
-        );
-    }
+            DefaultEntities::SALUTATION,
+            $salutation,
+            DefaultEntities::CUSTOMER,
+            $this->oldCustomerId
+        ));
 
-    return $salutationUuid;
+        return null;
+    }
+    $this->mappingIds[] = $mapping['id'];
+
+    return $mapping['entityUuid'];
 }
 
 /* ... */
 ```
-The `getUuid` method used in the mapping service looks up the `swag_migration_mapping` table for the combination of
-old identifier and entity name stored in the current connection. Then it returns the new Shopware 6 identifier.
-With this identifier it is possible to map your converted entity to your premapping choice. If `getUuid` returns null,
-then no valid mapping is available and you have to log this with the `LoggingService`.
+The `getMapping` method used in the mapping service looks up the `swag_migration_mapping` table for the combination of
+old identifier and entity name stored in the current connection.
+Then it returns the mapping object, which contains the new Shopware 6 identifier.
+With this identifier it is possible to map your converted entity to your premapping choice. If `getMapping` returns null,
+then no valid mapping is available and you have to log this with [LoggingService](./071-logging.md). The mapping object has
+two keys: `id` and `entityUuid`. The `id` key is the identifier of the `swag_migration_mapping` entry
+and have to be inserted in the `mappingIds`, if the mapping should be preloaded. The `entityUuid` key is the UUID of the mapped entity.

@@ -3,7 +3,8 @@
 namespace Shopware\Core\Content\Cms;
 
 use Shopware\Core\Content\Category\CategoryCollection;
-use Shopware\Core\Content\Cms\Aggregate\CmsBlock\CmsBlockCollection;
+use Shopware\Core\Content\Cms\Aggregate\CmsSection\CmsSectionCollection;
+use Shopware\Core\Content\Cms\Aggregate\CmsSlot\CmsSlotEntity;
 use Shopware\Core\Content\Media\MediaEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
@@ -29,9 +30,9 @@ class CmsPageEntity extends Entity
     protected $entity;
 
     /**
-     * @var CmsBlockCollection|null
+     * @var CmsSectionCollection|null
      */
-    protected $blocks;
+    protected $sections;
 
     /**
      * @var EntityCollection|null
@@ -98,14 +99,14 @@ class CmsPageEntity extends Entity
         $this->entity = $entity;
     }
 
-    public function getBlocks(): ?CmsBlockCollection
+    public function getSections(): ?CmsSectionCollection
     {
-        return $this->blocks;
+        return $this->sections;
     }
 
-    public function setBlocks(CmsBlockCollection $blocks): void
+    public function setSections(CmsSectionCollection $sections): void
     {
-        $this->blocks = $blocks;
+        $this->sections = $sections;
     }
 
     public function getTranslations(): ?EntityCollection
@@ -176,5 +177,34 @@ class CmsPageEntity extends Entity
     public function setLocked(bool $locked): void
     {
         $this->locked = $locked;
+    }
+
+    public function getFirstElementOfType(string $type): ?CmsSlotEntity
+    {
+        $elements = $this->getElementsOfType($type);
+
+        return array_shift($elements);
+    }
+
+    public function getElementsOfType(string $type): array
+    {
+        $elements = [];
+        if (!$this->getSections()) {
+            return $elements;
+        }
+
+        foreach ($this->getSections()->getBlocks() as $block) {
+            if (!$block->getSlots()) {
+                continue;
+            }
+
+            foreach ($block->getSlots() as $slot) {
+                if ($slot->getType() === $type) {
+                    $elements[] = $slot;
+                }
+            }
+        }
+
+        return $elements;
     }
 }

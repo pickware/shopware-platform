@@ -13,6 +13,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\EntitySearcherInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
+use Shopware\Core\Framework\DataAbstractionLayer\Version\Aggregate\VersionCommitData\VersionCommitDataDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityWriter;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityWriterInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteContext;
@@ -23,7 +24,6 @@ use Shopware\Core\Framework\Test\TestCaseBase\CacheTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Framework\Validation\WriteConstraintViolationException;
-use Shopware\Core\Framework\Version\Aggregate\VersionCommitData\VersionCommitDataDefinition;
 
 class JsonFieldTest extends TestCase
 {
@@ -127,6 +127,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(ProductDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -136,8 +137,10 @@ EOF;
         static::assertCount(1, $ex->getExceptions());
 
         $fieldException = $ex->getExceptions()[0];
+
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
         static::assertEquals('/0/price', $fieldException->getPath());
+        static::assertEquals('/0/net', $fieldException->getViolations()->get(0)->getPropertyPath());
     }
 
     public function testMultipleMissingProperties(): void
@@ -161,6 +164,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(ProductDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -175,16 +179,16 @@ EOF;
         $violations = $fieldException->getViolations();
 
         $violation = $violations->get(0);
-        static::assertEquals('price/0/currencyId', $violation->getPropertyPath());
+        static::assertEquals('/0/currencyId', $violation->getPropertyPath());
 
         $violation = $violations->get(1);
-        static::assertEquals('price/0/gross', $violation->getPropertyPath());
+        static::assertEquals('/0/gross', $violation->getPropertyPath());
 
         $violation = $violations->get(2);
-        static::assertEquals('price/0/net', $violation->getPropertyPath());
+        static::assertEquals('/0/net', $violation->getPropertyPath());
 
         $violation = $violations->get(3);
-        static::assertEquals('price/0/foo', $violation->getPropertyPath());
+        static::assertEquals('/0/foo', $violation->getPropertyPath());
     }
 
     public function testPropertyTypes(): void
@@ -206,6 +210,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(ProductDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -238,6 +243,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(ProductDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -299,6 +305,7 @@ EOF;
         ];
 
         $ex = null;
+
         try {
             $this->getWriter()->insert($this->registerDefinition(NestedDefinition::class), [$data], $context);
         } catch (WriteException $ex) {
@@ -309,15 +316,18 @@ EOF;
 
         $fieldException = $ex->getExceptions()[0];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/gross', $fieldException->getPath());
+        static::assertEquals('/0/data', $fieldException->getPath());
+        static::assertEquals('/gross', $fieldException->getViolations()->get(0)->getPropertyPath());
 
         $fieldException = $ex->getExceptions()[1];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/foo/bar', $fieldException->getPath());
+        static::assertEquals('/0/data/foo', $fieldException->getPath());
+        static::assertEquals('/bar', $fieldException->getViolations()->get(0)->getPropertyPath());
 
         $fieldException = $ex->getExceptions()[2];
         static::assertEquals(WriteConstraintViolationException::class, \get_class($fieldException));
-        static::assertEquals('/0/data/foo/baz/deep', $fieldException->getPath());
+        static::assertEquals('/0/data/foo/baz', $fieldException->getPath());
+        static::assertEquals('/deep', $fieldException->getViolations()->get(0)->getPropertyPath());
     }
 
     public function testWriteUtf8(): void
@@ -330,9 +340,9 @@ EOF;
 
         $written = $this->getWriter()->insert($this->registerDefinition(JsonDefinition::class), $data, $context);
 
-        static::assertArrayHasKey(JsonDefinition::class, $written);
-        static::assertCount(1, $written[JsonDefinition::class]);
-        $payload = $written[JsonDefinition::class][0]->getPayload();
+        static::assertArrayHasKey(JsonDefinition::ENTITY_NAME, $written);
+        static::assertCount(1, $written[JsonDefinition::ENTITY_NAME]);
+        $payload = $written[JsonDefinition::ENTITY_NAME][0]->getPayload();
 
         static::assertArrayHasKey('data', $payload);
         static::assertArrayHasKey('a', $payload['data']);
@@ -348,7 +358,7 @@ EOF;
             ['id' => Uuid::randomHex(), 'data' => [$randomKey => 'bar']],
         ];
         $written = $this->getWriter()->insert($this->registerDefinition(JsonDefinition::class), $data, $context);
-        static::assertCount(1, $written[JsonDefinition::class]);
+        static::assertCount(1, $written[JsonDefinition::ENTITY_NAME]);
 
         $context = $context->getContext();
 
@@ -403,10 +413,10 @@ EOF;
         ];
         $written = $this->getWriter()->insert($this->registerDefinition(JsonDefinition::class), [$insert], $context);
         static::assertCount(1, $written);
-        static::assertCount(1, $written[JsonDefinition::class]);
+        static::assertCount(1, $written[JsonDefinition::ENTITY_NAME]);
 
         /** @var EntityWriteResult $event */
-        $event = $written[JsonDefinition::class][0];
+        $event = $written[JsonDefinition::ENTITY_NAME][0];
         static::assertEquals($insertTime->format(\DateTime::ATOM), $event->getPayload()['root']['child']['childDateTime']);
         static::assertEquals($insertTime->format(Defaults::STORAGE_DATE_FORMAT), $event->getPayload()['root']['child']['childDate']);
 
@@ -421,10 +431,10 @@ EOF;
         ];
         $written = $this->getWriter()->update($this->registerDefinition(JsonDefinition::class), [$update], $context);
         static::assertCount(1, $written);
-        static::assertCount(1, $written[JsonDefinition::class]);
+        static::assertCount(1, $written[JsonDefinition::ENTITY_NAME]);
 
         /** @var EntityWriteResult $event */
-        $event = $written[JsonDefinition::class][0];
+        $event = $written[JsonDefinition::ENTITY_NAME][0];
         static::assertEquals($updateTime->format(\DateTime::ATOM), $event->getPayload()['root']['child']['childDateTime']);
         static::assertEquals($updateTime->format(Defaults::STORAGE_DATE_FORMAT), $event->getPayload()['root']['child']['childDate']);
     }

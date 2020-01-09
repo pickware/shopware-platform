@@ -7,19 +7,20 @@ use Shopware\Core\Checkout\Cart\Price\PriceRounding;
 use Shopware\Core\Content\Product\Aggregate\ProductPrice\ProductPriceDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
+use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityDeletedEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\ListingPrice;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\ListingPriceCollection;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\Price;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
-use Shopware\Core\Framework\Pricing\ListingPrice;
-use Shopware\Core\Framework\Pricing\ListingPriceCollection;
-use Shopware\Core\Framework\Pricing\Price;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class ProductListingPriceIndexer implements IndexerInterface
@@ -50,7 +51,7 @@ class ProductListingPriceIndexer implements IndexerInterface
     private $cacheKeyGenerator;
 
     /**
-     * @var TagAwareAdapterInterface
+     * @var CacheClearer
      */
     private $cache;
 
@@ -75,7 +76,7 @@ class ProductListingPriceIndexer implements IndexerInterface
         IteratorFactory $iteratorFactory,
         ProductDefinition $productDefinition,
         EntityCacheKeyGenerator $cacheKeyGenerator,
-        TagAwareAdapterInterface $cache,
+        CacheClearer $cache,
         PriceRounding $priceRounding
     ) {
         $this->eventDispatcher = $eventDispatcher;
@@ -113,29 +114,42 @@ class ProductListingPriceIndexer implements IndexerInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $iterator = $this->iteratorFactory->createIterator($this->productDefinition, $lastId);
+
+        $ids = $iterator->fetch();
+
+        if (empty($ids)) {
+            return null;
+        }
+        $this->update($ids);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $productIds = [];
+        $nested = $event->getEventByEntityName(ProductPriceDefinition::ENTITY_NAME);
 
-        $products = $event->getEventByDefinition(ProductDefinition::class);
-        if ($products) {
-            foreach ($products->getIds() as $id) {
-                $productIds[] = $id;
-            }
+        if (!$nested) {
+            return;
         }
 
-        $prices = $event->getEventByDefinition(ProductPriceDefinition::class);
-        if ($prices) {
-            $priceIds = $this->fetchProductPriceIds($prices->getIds());
-
-            foreach ($priceIds as $id) {
-                $productIds[] = $id;
-            }
+        if (!$nested instanceof EntityDeletedEvent) {
+            $ids = $this->fetchProductPriceIds($nested->getIds());
+            $this->update(array_unique($ids));
         }
 
-        $productIds = array_filter(array_keys(array_flip($productIds)));
+        $nested = $event->getEventByEntityName(ProductDefinition::ENTITY_NAME);
+        if ($nested) {
+            $this->update(array_unique($nested->getIds()));
+        }
+    }
 
-        $this->update($productIds);
+    public static function getName(): string
+    {
+        return 'Swag.ProductListingPriceIndexer';
     }
 
     private function update(array $ids): void
@@ -166,7 +180,7 @@ class ProductListingPriceIndexer implements IndexerInterface
             $listingPrices = [];
 
             foreach ($ruleIds as $ruleId) {
-                foreach ($currencies as $currencyId => $currency) {
+                foreach ($currencies as $currencyId => $_currency) {
                     $range = $this->calculatePriceRange($currencyId, $ruleId, $productPrices);
 
                     $currencyKey = 'c' . $currencyId;

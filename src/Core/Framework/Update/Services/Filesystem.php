@@ -40,7 +40,6 @@ class Filesystem
         if (!empty($errors)) {
             return $errors;
         }
-        /** @var \DirectoryIterator $fileInfo */
         foreach (new \DirectoryIterator($directory) as $fileInfo) {
             if ($fileInfo->isDot()) {
                 continue;
@@ -52,6 +51,7 @@ class Filesystem
                 if (!$fileInfo->isWritable()) {
                     $errors[] = $fileInfo->getPathname();
                 }
+
                 continue;
             }
             // skip VCS dirs
@@ -63,6 +63,7 @@ class Filesystem
             }
             if (!$fileInfo->isWritable()) {
                 $errors[] = $fileInfo->getPathname();
+
                 continue;
             }
             $errors = array_merge($errors, $this->checkDirectoryPermissions($fileInfo->getPathname(), $fixPermission));
@@ -74,7 +75,7 @@ class Filesystem
     private function fixDirectoryPermission(\SplFileInfo $fileInfo): void
     {
         try {
-            $permission = substr(sprintf('%o', $fileInfo->getPerms()), -4);
+            $permission = mb_substr(sprintf('%o', $fileInfo->getPerms()), -4);
         } catch (\Exception $e) {
             // cannot get permissions...
             return;
@@ -92,7 +93,7 @@ class Filesystem
     private function fixFilePermission(\SplFileInfo $fileInfo): void
     {
         try {
-            $permission = substr(sprintf('%o', $fileInfo->getPerms()), -4);
+            $permission = mb_substr(sprintf('%o', $fileInfo->getPerms()), -4);
         } catch (\Exception $e) {
             // cannot get permissions...
             return;

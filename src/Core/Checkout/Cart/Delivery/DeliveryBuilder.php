@@ -100,7 +100,6 @@ class DeliveryBuilder
         // this function is only called if the provided collection contains a deliverable line item
         $max = $positions->first()->getDeliveryDate();
 
-        /** @var DeliveryPosition $position */
         foreach ($positions as $position) {
             $date = $position->getDeliveryDate();
 
@@ -111,7 +110,7 @@ class DeliveryBuilder
 
             // if earliest and latest is same date, add one day buffer
             if ($earliest->format('Y-m-d') === $latest->format('Y-m-d')) {
-                $latest->add(new \DateInterval('P1D'));
+                $latest = $latest->add(new \DateInterval('P1D'));
             }
 
             $max = new DeliveryDate($earliest, $latest);

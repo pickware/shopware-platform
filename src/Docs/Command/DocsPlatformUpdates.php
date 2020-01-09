@@ -17,9 +17,12 @@ class DocsPlatformUpdates extends Command
 [titleEn]: <>(Recent updates)
 [__RAW__]: <>(__RAW__)
 
-<p>Here you can find recent information about technical updates and news regarding <a href="https://github.com/shopware/platform">shopware platform</a>.</p>
+<p class="alert is--warning" Recent information about technical updates and news regarding <a href="https://github.com/shopware/platform">shopware platform</a>
+    are now located in the changelog and upgrade file of the respective version in the github repository. For example <a href="https://github.com/shopware/platform/blob/6.1/CHANGELOG-6.0.md">CHANGELOG-6.0.md</a> 
+    and <a href="https://github.com/shopware/platform/blob/6.1/UPGRADE-6.1.md">UPGRADE-6.1.md</a>
+</p>
 
-<p><strong>New: Our public admin component library for easy scaffolding of your admin modules</strong></p>
+<p><strong>Our public admin component library for easy scaffolding of your admin modules</strong></p>
 
 <p><a href="https://component-library.shopware.com/">https://component-library.shopware.com</a></p>
 
@@ -33,6 +36,8 @@ EOD;
 <h3>%s: %s</h3>
 
 EOD;
+
+    protected static $defaultName = 'docs:dump-platform-updates';
 
     /**
      * @var string
@@ -52,11 +57,10 @@ EOD;
     protected function configure(): void
     {
         $this
-            ->setName('docs:dump-platform-updates')
             ->setDescription('Dumps all Shopware 6 updates into a single file for the sync.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
@@ -107,7 +111,6 @@ EOD;
                 \DateTimeImmutable::createFromFormat('Y-m', $month)->format('F Y')
             );
 
-            /** @var PlatformUpdatesDocument $document */
             foreach ($documents as $document) {
                 $rendered[] = sprintf(
                     self::TEMPLATE_HEADLINE,
@@ -130,5 +133,7 @@ EOD;
         file_put_contents($this->targetFile, $fileContents);
 
         $io->success('Done');
+
+        return 0;
     }
 }

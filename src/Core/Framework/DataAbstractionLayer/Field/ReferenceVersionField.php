@@ -5,7 +5,7 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldSerializer\ReferenceVersionFieldSerializer;
-use Shopware\Core\Framework\Version\VersionDefinition;
+use Shopware\Core\Framework\DataAbstractionLayer\Version\VersionDefinition;
 
 class ReferenceVersionField extends FkField
 {
@@ -55,6 +55,11 @@ class ReferenceVersionField extends FkField
     public function getVersionReferenceDefinition(): EntityDefinition
     {
         return $this->versionReferenceDefinition;
+    }
+
+    public function getVersionReferenceClass(): string
+    {
+        return $this->versionReferenceClass;
     }
 
     protected function getSerializerClass(): string

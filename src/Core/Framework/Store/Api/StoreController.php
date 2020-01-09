@@ -3,16 +3,19 @@
 namespace Shopware\Core\Framework\Store\Api;
 
 use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ConnectException;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
+use Shopware\Core\Framework\Api\Context\Exception\InvalidContextSourceException;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
-use Shopware\Core\Framework\Context\Exception\InvalidContextSourceException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\RequestCriteriaBuilder;
 use Shopware\Core\Framework\Plugin\PluginCollection;
 use Shopware\Core\Framework\Plugin\PluginEntity;
 use Shopware\Core\Framework\Plugin\PluginLifecycleService;
 use Shopware\Core\Framework\Plugin\PluginManagementService;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Store\Exception\CanNotDownloadPluginManagedByComposerException;
 use Shopware\Core\Framework\Store\Exception\StoreApiException;
 use Shopware\Core\Framework\Store\Exception\StoreInvalidCredentialsException;
@@ -29,6 +32,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class StoreController extends AbstractController
 {
     /**
@@ -61,13 +67,19 @@ class StoreController extends AbstractController
      */
     private $configService;
 
+    /**
+     * @var RequestCriteriaBuilder
+     */
+    private $searchCriteriaBuilder;
+
     public function __construct(
         StoreClient $storeClient,
         EntityRepositoryInterface $pluginRepo,
         PluginManagementService $pluginManagementService,
         PluginLifecycleService $pluginLifecycleService,
         EntityRepositoryInterface $userRepository,
-        SystemConfigService $configService
+        SystemConfigService $configService,
+        RequestCriteriaBuilder $searchCriteriaBuilder
     ) {
         $this->storeClient = $storeClient;
         $this->pluginRepo = $pluginRepo;
@@ -75,6 +87,7 @@ class StoreController extends AbstractController
         $this->pluginLifecycleService = $pluginLifecycleService;
         $this->userRepository = $userRepository;
         $this->configService = $configService;
+        $this->searchCriteriaBuilder = $searchCriteriaBuilder;
     }
 
     /**
@@ -84,7 +97,7 @@ class StoreController extends AbstractController
     {
         try {
             $this->storeClient->ping();
-        } catch (ClientException $exception) {
+        } catch (ClientException | ConnectException $exception) {
             throw new StoreNotAvailableException();
         }
 
@@ -196,6 +209,7 @@ class StoreController extends AbstractController
 
         /** @var PluginCollection $plugins */
         $plugins = $this->pluginRepo->search(new Criteria(), $context)->getEntities();
+
         try {
             $storeToken = $this->getUserStoreToken($context);
         } catch (StoreTokenMissingException $e) {
@@ -257,6 +271,66 @@ class StoreController extends AbstractController
         }
 
         return new JsonResponse();
+    }
+
+    /**
+     * @Route("/api/v{version}/_action/store/license-violations", name="api.custom.store.license-violations", methods={"POST"})
+     */
+    public function getLicenseViolations(Request $request, Context $context): JsonResponse
+    {
+        $language = $request->query->get('language', '');
+
+        /** @var PluginCollection $plugins */
+        $plugins = $this->pluginRepo->search(new Criteria(), $context)->getEntities();
+
+        try {
+            $storeToken = $this->getUserStoreToken($context);
+        } catch (StoreTokenMissingException $e) {
+            $storeToken = null;
+        }
+
+        try {
+            $violations = $this->storeClient->getLicenseViolations($storeToken, $plugins, $language, $request->getHost(), $context);
+        } catch (ClientException $exception) {
+            throw new StoreApiException($exception);
+        }
+
+        return new JsonResponse([
+            'items' => $violations,
+            'total' => count($violations),
+        ]);
+    }
+
+    /**
+     * @Route("/api/v{version}/_action/store/plugin/search", name="api.action.store.plugin.search", methods={"POST"})
+     */
+    public function searchPlugins(Request $request, Context $context): Response
+    {
+        $definition = $this->pluginRepo->getDefinition();
+        $criteria = $this->searchCriteriaBuilder->handleRequest($request, new Criteria(), $definition, $context);
+        $searchResult = $this->pluginRepo->search($criteria, $context);
+
+        /** @var PluginCollection $plugins */
+        $plugins = $searchResult->getEntities();
+
+        try {
+            $language = $request->query->get('language', 'en-GB');
+
+            try {
+                $storeToken = $this->getUserStoreToken($context);
+            } catch (StoreTokenMissingException $e) {
+                $storeToken = null;
+            }
+
+            $this->storeClient->checkForViolations($storeToken, $plugins, $language, $request->getHost(), $context);
+        } catch (\Exception $e) {
+            // plugin list should always work
+        }
+
+        return new JsonResponse([
+            'total' => $searchResult->count(),
+            'items' => $plugins,
+        ]);
     }
 
     private function getUserStoreToken(Context $context): string

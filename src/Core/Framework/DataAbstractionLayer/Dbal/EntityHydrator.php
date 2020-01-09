@@ -19,6 +19,11 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\WriteCommandQueue;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\DataStack\KeyValuePair;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteContext;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteParameterBag;
 use Shopware\Core\Framework\Struct\ArrayEntity;
 
 /**
@@ -42,11 +47,59 @@ class EntityHydrator
         return $collection;
     }
 
+    public static function buildUniqueIdentifier(EntityDefinition $definition, array $row, string $root): array
+    {
+        $primaryKeyFields = $definition->getPrimaryKeys();
+        $primaryKey = [];
+
+        /** @var Field $field */
+        foreach ($primaryKeyFields as $field) {
+            if ($field instanceof VersionField || $field instanceof ReferenceVersionField) {
+                continue;
+            }
+            $accessor = $root . '.' . $field->getPropertyName();
+
+            $primaryKey[$field->getPropertyName()] = $field->getSerializer()->decode($field, $row[$accessor]);
+        }
+
+        return $primaryKey;
+    }
+
+    public static function encodePrimaryKey(EntityDefinition $definition, array $primaryKey, Context $context): array
+    {
+        $fields = $definition->getPrimaryKeys();
+
+        $mapped = [];
+
+        $existence = new EntityExistence($definition->getEntityName(), [], true, false, false, []);
+
+        $params = new WriteParameterBag($definition, WriteContext::createFromContext($context), '', new WriteCommandQueue());
+
+        /** @var Field $field */
+        foreach ($fields as $field) {
+            if ($field instanceof VersionField || $field instanceof ReferenceVersionField) {
+                $value = $context->getVersionId();
+            } else {
+                $value = $primaryKey[$field->getPropertyName()];
+            }
+
+            $kvPair = new KeyValuePair($field->getPropertyName(), $value, true);
+
+            $encoded = $field->getSerializer()->encode($field, $existence, $kvPair, $params);
+
+            foreach ($encoded as $key => $value) {
+                $mapped[$key] = $value;
+            }
+        }
+
+        return $mapped;
+    }
+
     private function hydrateEntity(Entity $entity, EntityDefinition $definition, array $row, string $root, Context $context): Entity
     {
         $fields = $definition->getFields();
 
-        $identifier = $this->buildPrimaryKey($definition, $row, $root);
+        $identifier = self::buildUniqueIdentifier($definition, $row, $root);
         $identifier = implode('-', $identifier);
 
         $entity->setUniqueIdentifier($identifier);
@@ -58,6 +111,9 @@ class EntityHydrator
 
         $mappingStorage = new ArrayEntity([]);
         $entity->addExtension(EntityReader::INTERNAL_MAPPING_STORAGE, $mappingStorage);
+
+        $foreignKeys = new ArrayEntity([]);
+        $entity->addExtension(EntityReader::FOREIGN_KEYS, $foreignKeys);
 
         /** @var Field $field */
         foreach ($fields as $field) {
@@ -116,6 +172,7 @@ class EntityHydrator
 
             if ($typedField instanceof CustomFields) {
                 $this->hydrateCustomFields($root, $field, $typedField, $entity, $row, $context);
+
                 continue;
             }
 
@@ -133,7 +190,12 @@ class EntityHydrator
             }
 
             $decoded = $field->getSerializer()->decode($field, $value);
-            $entity->assign([$propertyName => $decoded]);
+
+            if ($field->is(Extension::class)) {
+                $foreignKeys->set($propertyName, $decoded);
+            } else {
+                $entity->assign([$propertyName => $decoded]);
+            }
         }
 
         //write object cache key to prevent multiple hydration for the same entity
@@ -147,7 +209,7 @@ class EntityHydrator
     /**
      * @param string[] $jsonStrings
      */
-    private function mergeJson(array $jsonStrings): ?string
+    private function mergeJson(array $jsonStrings): string
     {
         $merged = [];
         foreach ($jsonStrings as $string) {
@@ -179,27 +241,8 @@ class EntityHydrator
         return array_map('strtolower', array_filter($ids));
     }
 
-    private function buildPrimaryKey(EntityDefinition $definition, array $row, string $root): array
-    {
-        $primaryKeyFields = $definition->getPrimaryKeys();
-        $primaryKey = [];
-
-        /** @var Field $field */
-        foreach ($primaryKeyFields as $field) {
-            if ($field instanceof VersionField || $field instanceof ReferenceVersionField) {
-                continue;
-            }
-            $accessor = $root . '.' . $field->getPropertyName();
-
-            $primaryKey[$field->getPropertyName()] = $field->getSerializer()->decode($field, $row[$accessor]);
-        }
-
-        return $primaryKey;
-    }
-
     private function hydrateManyToOne(array $row, string $root, Context $context, AssociationField $field): ?Entity
     {
-        /** @var OneToOneAssociationField $field */
         if (!$field instanceof OneToOneAssociationField && !$field instanceof ManyToOneAssociationField) {
             return null;
         }

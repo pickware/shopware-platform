@@ -43,7 +43,7 @@ class LineItemOfTypeRule extends Rule
                 return strcasecmp($scope->getLineItem()->getType(), $this->lineItemType) !== 0;
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -51,7 +51,7 @@ class LineItemOfTypeRule extends Rule
     {
         return [
             'lineItemType' => [new NotBlank(), new Type('string')],
-            'operator' => [new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
         ];
     }
 

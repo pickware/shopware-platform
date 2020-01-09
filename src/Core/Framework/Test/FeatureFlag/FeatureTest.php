@@ -3,15 +3,15 @@
 namespace Shopware\Core\Framework\Test\FeatureFlag;
 
 use PHPUnit\Framework\TestCase;
+use Shopware\Core\Framework\Adapter\Twig\FeatureFlagExtension;
 use Shopware\Core\Framework\FeatureFlag\FeatureConfig;
 use Shopware\Core\Framework\FeatureFlag\FeatureFlagGenerator;
-use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\ifNextFix101;
-use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\ifNextFix101Call;
-use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\nextFix102;
-use Shopware\Core\Framework\Twig\FeatureFlagExtension;
 use Twig\Environment;
 use Twig\Error\RuntimeError;
 use Twig\Loader\FilesystemLoader;
+use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\ifNextFix101;
+use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\ifNextFix101Call;
+use function Shopware\Core\Framework\Test\FeatureFlag\_fixture\nextFix102;
 
 class FeatureTest extends TestCase
 {
@@ -63,7 +63,7 @@ class FeatureTest extends TestCase
     public function testABoolGetsReturned(): void
     {
         static::assertFalse(nextFix102());
-        putenv('FEATURE_NEXT_FIX_102=1');
+        $_SERVER['FEATURE_NEXT_FIX_102'] = '1';
         static::assertTrue(nextFix102());
     }
 
@@ -71,14 +71,14 @@ class FeatureTest extends TestCase
     {
         FeatureConfig::registerFlag('nextFix101', __METHOD__);
         $indicator = false;
-        ifNextFix101(function () use (&$indicator) {
+        ifNextFix101(function () use (&$indicator): void {
             $indicator = true;
         });
         static::assertFalse($indicator);
 
-        putenv(__METHOD__ . '=1');
+        $_SERVER[__METHOD__] = '1';
 
-        ifNextFix101(function () use (&$indicator) {
+        ifNextFix101(function () use (&$indicator): void {
             $indicator = true;
         });
         static::assertTrue($indicator);
@@ -92,7 +92,7 @@ class FeatureTest extends TestCase
         ifNextFix101Call($this, 'indicate');
         static::assertNull($this->indicator);
 
-        putenv(__METHOD__ . '=1');
+        $_SERVER[__METHOD__] = '1';
 
         ifNextFix101Call($this, 'indicate', new \stdClass());
         static::assertInstanceOf(\stdClass::class, $this->indicator);
@@ -108,7 +108,7 @@ class FeatureTest extends TestCase
         $configAfterRegistration = FeatureConfig::getAll();
         static::assertFalse($configAfterRegistration[__METHOD__]);
 
-        putenv(__METHOD__ . '=1');
+        $_SERVER[__METHOD__] = '1';
         $activatedFlagConfig = FeatureConfig::getAll();
         static::assertTrue($activatedFlagConfig[__METHOD__]);
     }
@@ -123,9 +123,9 @@ class FeatureTest extends TestCase
         ]);
         $twig->addExtension(new FeatureFlagExtension());
         $template = $twig->loadTemplate('featuretest.html.twig');
-        putenv(__METHOD__ . '=1');
+        $_SERVER[__METHOD__] = '1';
         static::assertSame('FeatureIsActive', $template->render([]));
-        putenv(__METHOD__ . '=0');
+        $_SERVER[__METHOD__] = '0';
         static::assertSame('FeatureIsInactive', $template->render([]));
     }
 

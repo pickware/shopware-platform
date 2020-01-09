@@ -37,7 +37,7 @@ class ConnectionProfiler implements DataCollectorInterface
     /**
      * {@inheritdoc}
      */
-    public function collect(Request $request, Response $response, ?\Exception $exception = null)
+    public function collect(Request $request, Response $response, ?\Exception $exception = null): void
     {
         if (!$this->logger || !$this->logger instanceof DebugStack) {
             $this->data['queries'] = [];
@@ -50,7 +50,7 @@ class ConnectionProfiler implements DataCollectorInterface
         $this->data = ['queries' => $queries];
     }
 
-    public function reset()
+    public function reset(): void
     {
         $this->data = [
             'queries' => [],
@@ -83,7 +83,7 @@ class ConnectionProfiler implements DataCollectorInterface
         return $time;
     }
 
-    private function sanitizeQueries($queries)
+    private function sanitizeQueries(array $queries)
     {
         foreach ($queries as $i => $query) {
             $queries[$i] = $this->sanitizeQuery($query);
@@ -110,6 +110,7 @@ class ConnectionProfiler implements DataCollectorInterface
                 }
                 if ($type instanceof Type) {
                     $query['types'][$j] = $type->getBindingType();
+
                     try {
                         $param = $type->convertToDatabaseValue($param, Kernel::getConnection()->getDatabasePlatform());
                     } catch (\TypeError $e) {

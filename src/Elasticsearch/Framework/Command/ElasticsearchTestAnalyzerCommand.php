@@ -3,7 +3,7 @@
 namespace Shopware\Elasticsearch\Framework\Command;
 
 use Elasticsearch\Client;
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -11,6 +11,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class ElasticsearchTestAnalyzerCommand extends Command
 {
+    protected static $defaultName = 'es:test:analyzer';
+
     /**
      * @var Client
      */
@@ -33,12 +35,11 @@ class ElasticsearchTestAnalyzerCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('es:test:analyzer')
             ->addArgument('term', InputArgument::REQUIRED)
             ->setDescription('Allows to test an elasticsearch analyzer');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new ShopwareStyle($input, $output);
 
@@ -70,6 +71,8 @@ class ElasticsearchTestAnalyzerCommand extends Command
         }
 
         $this->io->table(['Analyzer', 'Tokens'], $rows);
+
+        return 0;
     }
 
     protected function getAnalyzers(): array

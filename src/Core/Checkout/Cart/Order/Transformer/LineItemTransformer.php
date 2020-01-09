@@ -17,14 +17,16 @@ class LineItemTransformer
     public static function transformCollection(LineItemCollection $lineItems, ?string $parentId = null): array
     {
         $output = [];
+        $position = 1;
         foreach ($lineItems as $lineItem) {
-            $output = array_replace($output, self::transform($lineItem, $parentId));
+            $output = array_replace($output, self::transform($lineItem, $parentId, $position));
+            ++$position;
         }
 
         return $output;
     }
 
-    public static function transform(LineItem $lineItem, ?string $parentId = null): array
+    public static function transform(LineItem $lineItem, ?string $parentId = null, int $position = 1): array
     {
         $output = [];
         /** @var IdStruct|null $idStruct */
@@ -35,9 +37,15 @@ class LineItemTransformer
             $id = Uuid::randomHex();
         }
 
+        $productId = null;
+        if ($lineItem->getType() === LineItem::PRODUCT_LINE_ITEM_TYPE) {
+            $productId = $lineItem->getReferencedId();
+        }
+
         $data = [
             'id' => $id,
             'identifier' => $lineItem->getId(),
+            'productId' => $productId,
             'referencedId' => $lineItem->getReferencedId(),
             'quantity' => $lineItem->getQuantity(),
             'type' => $lineItem->getType(),
@@ -46,6 +54,7 @@ class LineItemTransformer
             'good' => $lineItem->isGood(),
             'removable' => $lineItem->isRemovable(),
             'stackable' => $lineItem->isStackable(),
+            'position' => $position,
             'price' => $lineItem->getPrice(),
             'priceDefinition' => $lineItem->getPriceDefinition(),
             'parentId' => $parentId,
@@ -66,22 +75,22 @@ class LineItemTransformer
 
     public static function transformFlatToNested(OrderLineItemCollection $lineItems): LineItemCollection
     {
+        $lineItems->sortByPosition();
         $index = [];
         $root = new LineItemCollection();
 
-        /** @var OrderLineItemEntity $lineItem */
         foreach ($lineItems as $id => $lineItem) {
             if (!array_key_exists($id, $index)) {
                 $index[$id] = new LineItem($lineItem->getIdentifier(), self::LINE_ITEM_PLACEHOLDER);
             }
 
-            /** @var LineItem $currentLineItem */
             $currentLineItem = $index[$id];
 
             self::updateLineItem($currentLineItem, $lineItem, $id);
 
             if ($lineItem->getParentId() === null) {
                 $root->add($currentLineItem);
+
                 continue;
             }
 

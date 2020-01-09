@@ -69,18 +69,21 @@ class SupportedFeaturesService
         if (is_numeric($value)) {
             return (int) $value;
         }
-        $length = strlen($value);
-        $qty = (int) substr($value, 0, $length - 1);
-        $unit = strtolower(substr($value, $length - 1));
+        $length = mb_strlen($value);
+        $qty = (int) mb_substr($value, 0, $length - 1);
+        $unit = mb_strtolower(mb_substr($value, $length - 1));
         switch ($unit) {
             case 'k':
                 $qty *= 1024;
+
                 break;
             case 'm':
                 $qty *= 1048576;
+
                 break;
             case 'g':
                 $qty *= 1073741824;
+
                 break;
         }
 

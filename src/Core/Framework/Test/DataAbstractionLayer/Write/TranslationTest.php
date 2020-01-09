@@ -15,20 +15,20 @@ use Shopware\Core\Content\Product\Aggregate\ProductMedia\ProductMediaDefinition;
 use Shopware\Core\Content\Product\Aggregate\ProductTranslation\ProductTranslationDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\SystemSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\MissingTranslationLanguageException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\WriteException;
-use Shopware\Core\Framework\Language\LanguageDefinition;
 use Shopware\Core\Framework\Routing\Exception\LanguageNotFoundException;
 use Shopware\Core\Framework\Test\TestCaseBase\AssertArraySubsetBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\Currency\Aggregate\CurrencyTranslation\CurrencyTranslationDefinition;
 use Shopware\Core\System\Currency\CurrencyDefinition;
+use Shopware\Core\System\Language\LanguageDefinition;
 use Shopware\Core\System\Tax\TaxDefinition;
 
 class TranslationTest extends TestCase
@@ -55,6 +55,7 @@ class TranslationTest extends TestCase
      * @var Connection
      */
     private $connection;
+
     /**
      * @var Context
      */
@@ -79,27 +80,27 @@ class TranslationTest extends TestCase
     public function testCurrencyWithTranslationViaLocale(): void
     {
         $name = 'US Dollar';
-        $shortName = 'USD';
+        $shortName = 'FOO';
 
         $data = [
             'factor' => 1,
             'symbol' => '$',
             'decimalPrecision' => 2,
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 'en-GB' => [
                     'name' => 'US Dollar',
-                    'shortName' => 'USD',
+                    'shortName' => 'FOO',
                 ],
             ],
         ];
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -112,29 +113,29 @@ class TranslationTest extends TestCase
     public function testCurrencyWithTranslationViaLanguageIdSimpleNotation(): void
     {
         $name = 'US Dollar';
-        $shortName = 'USD';
+        $shortName = 'FOO';
 
         $data = [
             'factor' => 1,
             'decimalPrecision' => 2,
             'symbol' => '$',
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 [
                     'languageId' => Defaults::LANGUAGE_SYSTEM,
                     'name' => 'US Dollar',
-                    'shortName' => 'USD',
-                    'isoCode' => 'USD',
+                    'shortName' => 'FOO',
+                    'isoCode' => 'FOO',
                 ],
             ],
         ];
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -147,13 +148,13 @@ class TranslationTest extends TestCase
     public function testCurrencyWithTranslationMergeViaLocaleAndLanguageId(): void
     {
         $name = 'US Dollar';
-        $shortName = 'USD';
+        $shortName = 'FOO';
 
         $data = [
             'factor' => 1,
             'decimalPrecision' => 2,
             'symbol' => '$',
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 'en-GB' => [
                     'name' => $name,
@@ -167,10 +168,10 @@ class TranslationTest extends TestCase
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -183,13 +184,13 @@ class TranslationTest extends TestCase
     public function testCurrencyWithTranslationMergeOverwriteViaLocaleAndLanguageId(): void
     {
         $name = 'US Dollar';
-        $shortName = 'USD';
+        $shortName = 'FOO';
 
         $data = [
             'factor' => 1,
             'decimalPrecision' => 2,
             'symbol' => '$',
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 'en-GB' => [
                     'name' => $name,
@@ -204,10 +205,10 @@ class TranslationTest extends TestCase
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -223,7 +224,7 @@ class TranslationTest extends TestCase
         $germanName = 'Amerikanischer Dollar';
         $germanShortName = 'US Dollar Deutsch';
         $englishName = 'US Dollar';
-        $englishShortName = 'USD';
+        $englishShortName = 'FOO';
 
         $this->languageRepository->create(
             [[
@@ -249,7 +250,7 @@ class TranslationTest extends TestCase
             'factor' => 1,
             'decimalPrecision' => 2,
             'symbol' => '$',
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 'en-GB' => [
                     'name' => $englishName,
@@ -265,10 +266,10 @@ class TranslationTest extends TestCase
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(2, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains($germanLanguageId, $languageIds);
@@ -297,13 +298,13 @@ class TranslationTest extends TestCase
     public function testCurrencyTranslationWithCachingAndInvalidation(): void
     {
         $englishName = 'US Dollar';
-        $englishShortName = 'USD';
+        $englishShortName = 'FOO';
 
         $data = [
             'factor' => 1,
             'symbol' => '$',
             'decimalPrecision' => 2,
-            'isoCode' => 'USD',
+            'isoCode' => 'FOO',
             'translations' => [
                 'en-GB' => [
                     'name' => $englishName,
@@ -314,10 +315,10 @@ class TranslationTest extends TestCase
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -347,7 +348,7 @@ class TranslationTest extends TestCase
             'factor' => 1,
             'symbol' => '$',
             'decimalPrecision' => 2,
-            'isoCode' => 'USD',
+            'isoCode' => 'BAR',
             'translations' => [
                 Defaults::LANGUAGE_SYSTEM => [
                     'name' => 'default',
@@ -362,10 +363,10 @@ class TranslationTest extends TestCase
 
         $result = $this->currencyRepository->create([$data], $this->context);
 
-        $currencies = $result->getEventByDefinition(CurrencyDefinition::class);
+        $currencies = $result->getEventByEntityName(CurrencyDefinition::ENTITY_NAME);
         static::assertCount(1, $currencies->getIds());
 
-        $translations = $result->getEventByDefinition(CurrencyTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(CurrencyTranslationDefinition::ENTITY_NAME);
         static::assertCount(2, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains($germanLanguageId, $languageIds);
@@ -387,7 +388,7 @@ class TranslationTest extends TestCase
             'translations' => [
                 'en-UK' => [
                     'name' => 'US Dollar',
-                    'shortName' => 'USD',
+                    'shortName' => 'FOO',
                 ],
             ],
         ];
@@ -420,7 +421,7 @@ class TranslationTest extends TestCase
             $this->context
         );
 
-        $languages = $result->getEventByDefinition(LanguageDefinition::class);
+        $languages = $result->getEventByEntityName(LanguageDefinition::ENTITY_NAME);
         static::assertCount(1, array_unique($languages->getIds()));
         static::assertContains($germanLanguageId, $languages->getIds());
 
@@ -477,15 +478,15 @@ class TranslationTest extends TestCase
 
         $result = $this->productRepository->create($data, $this->context);
 
-        $products = $result->getEventByDefinition(ProductDefinition::class);
+        $products = $result->getEventByEntityName(ProductDefinition::ENTITY_NAME);
         static::assertCount(1, $products->getIds());
 
-        $translations = $result->getEventByDefinition(ProductManufacturerTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(ProductManufacturerTranslationDefinition::ENTITY_NAME);
         static::assertCount(1, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
 
-        $translations = $result->getEventByDefinition(ProductTranslationDefinition::class);
+        $translations = $result->getEventByEntityName(ProductTranslationDefinition::ENTITY_NAME);
         static::assertCount(2, $translations->getIds());
         $languageIds = array_column($translations->getPayloads(), 'languageId');
         static::assertContains(Defaults::LANGUAGE_SYSTEM, $languageIds);
@@ -593,18 +594,18 @@ class TranslationTest extends TestCase
         $productRepo = $this->getContainer()->get('product.repository');
         $affected = $productRepo->upsert($data, Context::createDefaultContext());
 
-        static::assertNotNull($affected->getEventByDefinition(LanguageDefinition::class));
+        static::assertNotNull($affected->getEventByEntityName(LanguageDefinition::ENTITY_NAME));
 
-        static::assertNotNull($affected->getEventByDefinition(ProductDefinition::class));
-        static::assertNotNull($affected->getEventByDefinition(ProductTranslationDefinition::class));
+        static::assertNotNull($affected->getEventByEntityName(ProductDefinition::ENTITY_NAME));
+        static::assertNotNull($affected->getEventByEntityName(ProductTranslationDefinition::ENTITY_NAME));
 
-        static::assertNotNull($affected->getEventByDefinition(TaxDefinition::class));
+        static::assertNotNull($affected->getEventByEntityName(TaxDefinition::ENTITY_NAME));
 
-        static::assertNotNull($affected->getEventByDefinition(ProductManufacturerDefinition::class));
-        static::assertNotNull($affected->getEventByDefinition(ProductManufacturerTranslationDefinition::class));
+        static::assertNotNull($affected->getEventByEntityName(ProductManufacturerDefinition::ENTITY_NAME));
+        static::assertNotNull($affected->getEventByEntityName(ProductManufacturerTranslationDefinition::ENTITY_NAME));
 
-        static::assertNotNull($affected->getEventByDefinition(ProductMediaDefinition::class));
-        static::assertNotNull($affected->getEventByDefinition(MediaDefinition::class));
+        static::assertNotNull($affected->getEventByEntityName(ProductMediaDefinition::ENTITY_NAME));
+        static::assertNotNull($affected->getEventByEntityName(MediaDefinition::ENTITY_NAME));
     }
 
     public function testMissingTranslationLanguageViolation(): void
@@ -619,6 +620,7 @@ class TranslationTest extends TestCase
         ];
         /* @var WriteException|null $exception */
         $exception = null;
+
         try {
             $categoryRepository->create([$cat], $this->context);
         } catch (WriteException $e) {
@@ -637,32 +639,38 @@ class TranslationTest extends TestCase
 
         $page = [
             'type' => 'landing_page',
-            'blocks' => [
+            'sections' => [
                 [
-                    'type' => 'foo',
-                    'position' => 1,
-                    'slots' => [
+                    'type' => 'default',
+                    'position' => 0,
+                    'blocks' => [
                         [
-                            'id' => Uuid::randomHex(),
                             'type' => 'foo',
-                            'slot' => 'bar',
-                            'config' => [],
-                        ],
-                        [
-                            'id' => Uuid::randomHex(),
-                            'type' => 'foo',
-                            'slot' => 'bar',
-                            'config' => [
-                                'var1' => [
-                                    'source' => FieldConfig::SOURCE_MAPPED,
-                                    'value' => 'foo',
+                            'position' => 1,
+                            'slots' => [
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
+                                    'config' => [],
+                                ],
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
+                                    'config' => [
+                                        'var1' => [
+                                            'source' => FieldConfig::SOURCE_MAPPED,
+                                            'value' => 'foo',
+                                        ],
+                                    ],
+                                ],
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
                                 ],
                             ],
-                        ],
-                        [
-                            'id' => Uuid::randomHex(),
-                            'type' => 'foo',
-                            'slot' => 'bar',
                         ],
                     ],
                 ],
@@ -671,7 +679,7 @@ class TranslationTest extends TestCase
 
         $result = $pageRepository->create([$page], $this->context);
 
-        $events = $result->getEventByDefinition(CmsSlotDefinition::class);
+        $events = $result->getEventByEntityName(CmsSlotDefinition::ENTITY_NAME);
         $ids = $events->getIds();
 
         static::assertCount(3, $ids);
@@ -679,15 +687,15 @@ class TranslationTest extends TestCase
         $searchResult = $slotRepository->search(new Criteria($ids), $this->context);
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][0]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][0]['id']);
         static::assertEquals([], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][1]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][1]['id']);
         static::assertEquals(['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'foo']], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][2]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][2]['id']);
         static::assertNull($slot->getConfig());
     }
 
@@ -698,33 +706,39 @@ class TranslationTest extends TestCase
 
         $page = [
             'type' => 'landing_page',
-            'blocks' => [
+            'sections' => [
                 [
-                    'type' => 'foo',
-                    'position' => 1,
-                    'slots' => [
+                    'type' => 'default',
+                    'position' => 0,
+                    'blocks' => [
                         [
-                            'id' => Uuid::randomHex(),
                             'type' => 'foo',
-                            'slot' => 'bar',
-                            'translations' => [
-                                Defaults::LANGUAGE_SYSTEM => ['config' => []],
-                                $this->deLanguageId => ['config' => []],
+                            'position' => 1,
+                            'slots' => [
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
+                                    'translations' => [
+                                        Defaults::LANGUAGE_SYSTEM => ['config' => []],
+                                        $this->deLanguageId => ['config' => []],
+                                    ],
+                                ],
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
+                                    'translations' => [
+                                        Defaults::LANGUAGE_SYSTEM => ['config' => ['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'en']]],
+                                        $this->deLanguageId => ['config' => ['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'de']]],
+                                    ],
+                                ],
+                                [
+                                    'id' => Uuid::randomHex(),
+                                    'type' => 'foo',
+                                    'slot' => 'bar',
+                                ],
                             ],
-                        ],
-                        [
-                            'id' => Uuid::randomHex(),
-                            'type' => 'foo',
-                            'slot' => 'bar',
-                            'translations' => [
-                                Defaults::LANGUAGE_SYSTEM => ['config' => ['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'en']]],
-                                $this->deLanguageId => ['config' => ['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'de']]],
-                            ],
-                        ],
-                        [
-                            'id' => Uuid::randomHex(),
-                            'type' => 'foo',
-                            'slot' => 'bar',
                         ],
                     ],
                 ],
@@ -733,7 +747,7 @@ class TranslationTest extends TestCase
 
         $result = $pageRepository->create([$page], $this->context);
 
-        $events = $result->getEventByDefinition(CmsSlotDefinition::class);
+        $events = $result->getEventByEntityName(CmsSlotDefinition::ENTITY_NAME);
         $ids = $events->getIds();
 
         static::assertCount(3, $ids);
@@ -743,15 +757,15 @@ class TranslationTest extends TestCase
         $searchResult = $slotRepository->search(new Criteria($ids), $this->context);
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][0]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][0]['id']);
         static::assertEquals([], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][1]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][1]['id']);
         static::assertEquals(['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'en']], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][2]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][2]['id']);
         static::assertNull($slot->getConfig());
 
         // validate german translations
@@ -760,15 +774,15 @@ class TranslationTest extends TestCase
         $searchResult = $slotRepository->search(new Criteria($ids), $germanContext);
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][0]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][0]['id']);
         static::assertEquals([], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][1]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][1]['id']);
         static::assertEquals(['var1' => ['source' => FieldConfig::SOURCE_MAPPED, 'value' => 'de']], $slot->getConfig());
 
         /** @var CmsSlotEntity $slot */
-        $slot = $searchResult->getEntities()->get($page['blocks'][0]['slots'][2]['id']);
+        $slot = $searchResult->getEntities()->get($page['sections'][0]['blocks'][0]['slots'][2]['id']);
         static::assertNull($slot->getConfig());
     }
 }

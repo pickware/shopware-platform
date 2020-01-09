@@ -11,13 +11,15 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\Language\LanguageEntity;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Struct\ArrayEntity;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\DataAbstractionLayerFieldTestBehaviour;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ExtendedProductDefinition;
 use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ProductExtension;
+use Shopware\Core\Framework\Test\DataAbstractionLayer\Field\TestDefinition\ProductExtensionSelfReferenced;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Language\LanguageEntity;
 
 class EntityExtensionReadTest extends TestCase
 {
@@ -45,7 +47,7 @@ class EntityExtensionReadTest extends TestCase
         $this->connection = $this->getContainer()->get(Connection::class);
 
         $this->registerDefinition(ExtendedProductDefinition::class);
-        $this->registerDefinitionWithExtensions(ProductDefinition::class, ProductExtension::class);
+        $this->registerDefinitionWithExtensions(ProductDefinition::class, ProductExtension::class, ProductExtensionSelfReferenced::class);
 
         $this->productRepository = $this->getContainer()->get('product.repository');
         $this->salesChannelRepository = $this->getContainer()->get('sales_channel.repository');
@@ -67,6 +69,10 @@ class EntityExtensionReadTest extends TestCase
             )
         ');
 
+        $this->connection->executeQuery('
+            ALTER TABLE `product` ADD COLUMN `linked_product_id` binary(16) NULL, ADD COLUMN `linked_product_version_id` binary(16) NULL
+        ');
+
         $this->connection->beginTransaction();
     }
 
@@ -74,11 +80,64 @@ class EntityExtensionReadTest extends TestCase
     {
         $this->connection->rollBack();
         $this->connection->executeQuery('DROP TABLE `extended_product`');
+        $this->connection->executeQuery('
+            ALTER TABLE `product` DROP COLUMN `linked_product_id`, DROP COLUMN `linked_product_version_id`;
+        ');
         $this->connection->beginTransaction();
 
         $this->removeExtension(ProductExtension::class);
+        $this->removeExtension(ProductExtensionSelfReferenced::class);
 
         parent::tearDown();
+    }
+
+    public function testICanAddAManyToOneAsExtension(): void
+    {
+        $productId = Uuid::randomHex();
+
+        $this->productRepository->create([
+            [
+                'id' => $productId,
+                'productNumber' => Uuid::randomHex(),
+                'stock' => 1,
+                'name' => 'Test product',
+                'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 10, 'net' => 8.10, 'linked' => false]],
+                'tax' => ['name' => 'test', 'taxRate' => 5],
+                'manyToOne' => [
+                    'productId' => $productId,
+                    'name' => 'test',
+                ],
+            ],
+        ], Context::createDefaultContext());
+
+        $created = $this->connection->fetchAll('SELECT * FROM extended_product');
+
+        static::assertCount(1, $created);
+        $reference = array_shift($created);
+        static::assertSame($productId, Uuid::fromBytesToHex($reference['product_id']));
+
+        $criteria = new Criteria();
+        $criteria->addAssociation('manyToOne');
+
+        $product = $this->productRepository->search($criteria, Context::createDefaultContext())->first();
+
+        static::assertInstanceOf(ProductEntity::class, $product);
+        /** @var ProductEntity $product */
+        static::assertSame($productId, $product->getId());
+
+        static::assertTrue($product->hasExtension('manyToOne'));
+        $extension = $product->getExtension('manyToOne');
+
+        /** @var ArrayEntity $extension */
+        static::assertInstanceOf(ArrayEntity::class, $extension);
+        static::assertEquals('test', $extension->get('name'));
+
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('manyToOne.name', 'test'));
+        $criteria->addExtension('test', new ArrayEntity());
+
+        $products = $this->productRepository->searchIds($criteria, Context::createDefaultContext());
+        static::assertTrue($products->has($productId));
     }
 
     public function testICanReadNestedAssociationsFromToOneExtensions(): void
@@ -105,7 +164,7 @@ class EntityExtensionReadTest extends TestCase
         ], Context::createDefaultContext());
 
         $criteria = new Criteria([$productId]);
-        $criteria->addAssociationPath('toOne.toOne');
+        $criteria->addAssociation('toOne.toOne');
 
         /** @var ProductEntity $product */
         $product = $this->productRepository->search($criteria, Context::createDefaultContext())->get($productId);
@@ -141,7 +200,7 @@ class EntityExtensionReadTest extends TestCase
         ], Context::createDefaultContext());
 
         $criteria = new Criteria([$productId]);
-        $criteria->addAssociationPath('oneToMany.language');
+        $criteria->addAssociation('oneToMany.language');
 
         /** @var ProductEntity $product */
         $product = $this->productRepository->search($criteria, Context::createDefaultContext())->get($productId);
@@ -155,5 +214,59 @@ class EntityExtensionReadTest extends TestCase
 
         $productExtension = $productExtensions->first();
         static::assertInstanceOf(LanguageEntity::class, $productExtension->get('language'));
+    }
+
+    public function testReadSelfReferencedAssociationsFromToManyExtensions(): void
+    {
+        $linkedProductId = Uuid::randomHex();
+
+        $this->productRepository->create([
+            [
+                'id' => $linkedProductId,
+                'productNumber' => Uuid::randomHex(),
+                'stock' => 1,
+                'name' => 'Test product',
+                'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 10, 'net' => 8.10, 'linked' => false]],
+                'tax' => ['name' => 'test', 'taxRate' => 5],
+                'manufacturer' => [
+                    'id' => Uuid::randomHex(),
+                    'name' => 'shopware AG',
+                    'link' => 'https://shopware.com',
+                ],
+            ],
+        ], Context::createDefaultContext());
+
+        $productId = Uuid::randomHex();
+
+        $this->productRepository->create([
+            [
+                'id' => $productId,
+                'productNumber' => Uuid::randomHex(),
+                'stock' => 1,
+                'name' => 'Test product',
+                'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 10, 'net' => 8.10, 'linked' => false]],
+                'tax' => ['name' => 'test', 'taxRate' => 5],
+                'manufacturer' => [
+                    'id' => Uuid::randomHex(),
+                    'name' => 'shopware AG',
+                    'link' => 'https://shopware.com',
+                ],
+                'linkedProductId' => $linkedProductId,
+            ],
+        ], Context::createDefaultContext());
+
+        $criteria = new Criteria([$productId]);
+        $criteria->addAssociation('ManyToOneSelfReference');
+        $criteria->addAssociation('ManyToOneSelfReferenceAutoload');
+
+        /** @var ProductEntity $product */
+        $product = $this->productRepository->search($criteria, Context::createDefaultContext())->get($productId);
+
+        // Self Reference without autoload should be loaded
+        static::assertTrue($product->hasExtension('ManyToOneSelfReference'));
+        // Self Reference with autoload should NOT be loaded
+        static::assertFalse($product->hasExtension('ManyToOneSelfReferenceAutoload'));
+
+        static::assertEquals($linkedProductId, $product->getExtension('ManyToOneSelfReference')->getVars()['id']);
     }
 }

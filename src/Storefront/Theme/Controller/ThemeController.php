@@ -3,13 +3,16 @@
 namespace Shopware\Storefront\Theme\Controller;
 
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Translation\Translator;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Storefront\Theme\ThemeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class ThemeController extends AbstractController
 {
     /**
@@ -17,16 +20,8 @@ class ThemeController extends AbstractController
      */
     private $themeService;
 
-    /**
-     * @var Translator
-     */
-    private $translator;
-
-    public function __construct(
-        ThemeService $themeService,
-        Translator $translator
-    ) {
-        $this->translator = $translator;
+    public function __construct(ThemeService $themeService)
+    {
         $this->themeService = $themeService;
     }
 

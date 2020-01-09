@@ -8,18 +8,21 @@ use Shopware\Core\Content\Product\Aggregate\ProductSearchKeyword\ProductSearchKe
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityDeletedEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\Doctrine\MultiInsertQueryQueue;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
-use Shopware\Core\Framework\Language\LanguageEntity;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Language\LanguageEntity;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class ProductSearchKeywordIndexer implements IndexerInterface
@@ -91,7 +94,7 @@ class ProductSearchKeywordIndexer implements IndexerInterface
         /** @var LanguageEntity $language */
         foreach ($languages as $language) {
             $context = new Context(
-                new Context\SystemSource(),
+                new SystemSource(),
                 [],
                 Defaults::CURRENCY,
                 [$language->getId(), $language->getParentId(), Defaults::LANGUAGE_SYSTEM],
@@ -129,15 +132,87 @@ class ProductSearchKeywordIndexer implements IndexerInterface
         }
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $criteria = new Criteria();
+        $criteria->addSorting(new FieldSorting('id'));
+
+        $languages = $this->languageRepository->search($criteria, Context::createDefaultContext());
+
+        $languages = array_values($languages->getEntities()->getElements());
+
+        $languageOffset = 0;
+        $productOffset = null;
+        if ($lastId !== null) {
+            $languageOffset = $lastId['languageOffset'];
+            $productOffset = $lastId['productOffset'];
+        }
+        if (!isset($languages[$languageOffset])) {
+            return null;
+        }
+
+        $language = $languages[$languageOffset];
+        $context = new Context(
+            new SystemSource(),
+            [],
+            Defaults::CURRENCY,
+            [$language->getId(), $language->getParentId(), Defaults::LANGUAGE_SYSTEM],
+            Defaults::LIVE_VERSION
+        );
+
+        $iterator = $this->iteratorFactory->createIterator($this->productRepository->getDefinition(), $productOffset);
+
+        $ids = $iterator->fetch();
+
+        if (empty($ids)) {
+            ++$languageOffset;
+
+            return [
+                'languageOffset' => $languageOffset,
+                'productOffset' => null,
+            ];
+        }
+
+        $this->connection->executeUpdate(
+            'DELETE FROM product_search_keyword WHERE product_id IN (:ids) AND language_id = :language',
+            ['ids' => Uuid::fromHexToBytesList($ids), 'language' => Uuid::fromHexToBytes($language->getId())],
+            ['ids' => Connection::PARAM_STR_ARRAY]
+        );
+
+        $this->update($ids, $context);
+
+        return [
+            'languageOffset' => $languageOffset,
+            'productOffset' => $iterator->getOffset(),
+        ];
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $products = $event->getEventByDefinition(ProductDefinition::class);
+        $products = $event->getEventByEntityName(ProductDefinition::ENTITY_NAME);
 
         if (!$products) {
             return;
         }
 
-        $this->update($products->getIds(), $event->getContext());
+        if ($products instanceof EntityDeletedEvent) {
+            $this->delete($products->getIds(), $event->getContext()->getLanguageId(), $event->getContext()->getVersionId());
+
+            return;
+        }
+
+        $ids = $products->getIds();
+
+        $children = $this->connection->fetchAll(
+            'SELECT LOWER(HEX(id)) as id FROM product WHERE parent_id IN (:ids)',
+            ['ids' => Uuid::fromHexToBytesList($ids)],
+            ['ids' => Connection::PARAM_STR_ARRAY]
+        );
+        $children = array_column($children, 'id');
+
+        $ids = array_unique(array_merge($children, $ids));
+
+        $this->update($ids, $event->getContext());
     }
 
     public function update(array $ids, Context $context): void
@@ -191,20 +266,44 @@ class ProductSearchKeywordIndexer implements IndexerInterface
             }
         }
 
-        $this->connection->transactional(
-            function () use ($insert, $ids, $languageId) {
-                $bytes = array_map(function ($id) {
-                    return Uuid::fromHexToBytes($id);
-                }, $ids);
+        $this->connection->beginTransaction();
 
-                $this->connection->executeUpdate(
-                    'DELETE FROM product_search_keyword WHERE product_id IN (:ids) AND language_id = :language',
-                    ['ids' => $bytes, 'language' => $languageId],
-                    ['ids' => Connection::PARAM_STR_ARRAY]
-                );
+        try {
+            $this->delete($ids, $context->getLanguageId(), $context->getVersionId());
 
-                $insert->execute();
-            }
+            $insert->execute();
+        } catch (\Exception $e) {
+            $this->connection->rollBack();
+
+            throw $e;
+        }
+        // Only commit if transaction not marked as rollback
+        if (!$this->connection->isRollbackOnly()) {
+            $this->connection->commit();
+        } else {
+            $this->connection->rollBack();
+        }
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.ProductSearchKeywordIndexer';
+    }
+
+    private function delete(array $ids, string $languageId, string $versionId): void
+    {
+        $bytes = array_map(function ($id) {
+            return Uuid::fromHexToBytes($id);
+        }, $ids);
+
+        $this->connection->executeUpdate(
+            'DELETE FROM product_search_keyword WHERE product_id IN (:ids) AND language_id = :language AND version_id = :versionId',
+            [
+                'ids' => $bytes,
+                'language' => Uuid::fromHexToBytes($languageId),
+                'versionId' => Uuid::fromHexToBytes($versionId),
+            ],
+            ['ids' => Connection::PARAM_STR_ARRAY]
         );
     }
 }

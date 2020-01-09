@@ -6,12 +6,16 @@ use Doctrine\DBAL\Connection;
 use Shopware\Core\Content\Product\Aggregate\ProductCategory\ProductCategoryDefinition;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
+use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
+use Shopware\Core\Framework\DataAbstractionLayer\Indexing\Indexer\InheritanceIndexer;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
-use Shopware\Core\Framework\Doctrine\MultiInsertQueryQueue;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
@@ -40,16 +44,37 @@ class ProductCategoryTreeIndexer implements IndexerInterface
      */
     private $productDefinition;
 
+    /**
+     * @var InheritanceIndexer
+     */
+    private $inheritanceIndexer;
+
+    /**
+     * @var CacheClearer
+     */
+    private $cacheClearer;
+
+    /**
+     * @var EntityCacheKeyGenerator
+     */
+    private $cacheKeyGenerator;
+
     public function __construct(
         Connection $connection,
         EventDispatcherInterface $eventDispatcher,
         IteratorFactory $iteratorFactory,
-        ProductDefinition $productDefinition
+        ProductDefinition $productDefinition,
+        CacheClearer $cacheClearer,
+        EntityCacheKeyGenerator $cacheKeyGenerator,
+        InheritanceIndexer $inheritanceIndexer
     ) {
         $this->eventDispatcher = $eventDispatcher;
         $this->connection = $connection;
         $this->iteratorFactory = $iteratorFactory;
         $this->productDefinition = $productDefinition;
+        $this->inheritanceIndexer = $inheritanceIndexer;
+        $this->cacheClearer = $cacheClearer;
+        $this->cacheKeyGenerator = $cacheKeyGenerator;
     }
 
     public function index(\DateTimeInterface $timestamp): void
@@ -78,16 +103,32 @@ class ProductCategoryTreeIndexer implements IndexerInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+
+        $iterator = $this->iteratorFactory->createIterator($this->productDefinition, $lastId);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            return null;
+        }
+
+        $this->update($ids, $context);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
         $ids = [];
 
-        $nested = $event->getEventByDefinition(ProductDefinition::class);
+        $nested = $event->getEventByEntityName(ProductDefinition::ENTITY_NAME);
         if ($nested) {
             $ids = $nested->getIds();
         }
 
-        $nested = $event->getEventByDefinition(ProductCategoryDefinition::class);
+        $nested = $event->getEventByEntityName(ProductCategoryDefinition::ENTITY_NAME);
         if ($nested) {
             foreach ($nested->getIds() as $id) {
                 $ids[] = $id['productId'];
@@ -97,20 +138,39 @@ class ProductCategoryTreeIndexer implements IndexerInterface
         $this->update($ids, $event->getContext());
     }
 
+    public static function getName(): string
+    {
+        return 'Swag.ProductCategoryTreeIndexer';
+    }
+
     private function update(array $ids, Context $context): void
     {
         if (empty($ids)) {
             return;
         }
 
+        $ids = array_unique($ids);
+
         $categories = $this->fetchCategories($ids, $context);
+
+        $this->inheritanceIndexer->updateToManyAssociations(
+            $this->productDefinition,
+            array_keys($categories),
+            new FieldCollection([
+                $this->productDefinition->getField('categories'),
+            ]),
+            $context
+        );
 
         $query = new MultiInsertQueryQueue($this->connection, 250, false, true);
 
         $versionId = Uuid::fromHexToBytes($context->getVersionId());
         $liveVersionId = Uuid::fromHexToBytes(Defaults::LIVE_VERSION);
 
+        $tags = ['product.id'];
         foreach ($categories as $productId => $mapping) {
+            $tags[] = $this->cacheKeyGenerator->getEntityTag($productId, $this->productDefinition);
+
             $productId = Uuid::fromHexToBytes($productId);
 
             $categoryIds = $this->mapCategories($mapping);
@@ -152,15 +212,17 @@ class ProductCategoryTreeIndexer implements IndexerInterface
         );
 
         $query->execute();
+
+        $this->cacheClearer->invalidateTags($tags);
     }
 
     private function fetchCategories(array $ids, Context $context): array
     {
         $query = $this->connection->createQueryBuilder();
         $query->select([
-            'HEX(product.id) as product_id',
-            "GROUP_CONCAT(category.path SEPARATOR '|') as paths",
-            "GROUP_CONCAT(HEX(category.id) SEPARATOR '||') as ids",
+            'LOWER(HEX(product.id)) as product_id',
+            "GROUP_CONCAT(category.path SEPARATOR '') as paths",
+            "GROUP_CONCAT(LOWER(HEX(category.id)) SEPARATOR '|') as ids",
         ]);
         $query->from('product');
         $query->leftJoin(
@@ -178,7 +240,7 @@ class ProductCategoryTreeIndexer implements IndexerInterface
 
         $query->addGroupBy('product.id');
 
-        $query->andWhere('product.id IN (:ids)');
+        $query->andWhere('product.id IN (:ids) OR product.parent_id IN (:ids)');
         $query->andWhere('product.version_id = :version');
 
         $query->setParameter('version', Uuid::fromHexToBytes($context->getVersionId()));
@@ -197,7 +259,7 @@ class ProductCategoryTreeIndexer implements IndexerInterface
 
     private function mapCategories(array $mapping): array
     {
-        $categoryIds = array_filter(explode('||', (string) $mapping['ids']));
+        $categoryIds = array_filter(explode('|', (string) $mapping['ids']));
         $categoryIds = array_merge(
             explode('|', (string) $mapping['paths']),
             $categoryIds

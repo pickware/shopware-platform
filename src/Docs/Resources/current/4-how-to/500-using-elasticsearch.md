@@ -1,12 +1,12 @@
 [titleEn]: <>(Using elasticsearch)
 
-As soon as several thousand data sets are used in a project it makes sense to deal with Elasticsearch.
+As soon as several thousand data sets are used in a project it makes sense to deal with Elasticsearch. Elasticsearch 7.1 or newer is required.
 The Elasticsearch integration for shopware is in the `shopware/elasticsearch` bundle. If this is not available in your project you can simply add it via `composer require shopware/elasticsearch`.
 
 To activate Elasticsearch the following environment variables have to be set:
-* `SHOPWARE_SES_HOSTS` A comma separated list of Elasticsearch hosts. You can find the possible formats [here](https://www.elastic.co/guide/en/elasticsearch/client/php-api/current/configuration.html#_inline_host_configuration)
-* `SHOPWARE_SES_ENABLED` This variable activates the search via Elasticsearch. (Possible values `1` & `0`)
-* `SHOPWARE_SES_INDEXING_ENABLED` This variable activates the indexing to Elasticsearch. (Possible values `1` & `0`)
+* `SHOPWARE_ES_HOSTS` A comma separated list of Elasticsearch hosts. You can find the possible formats [here](https://www.elastic.co/guide/en/elasticsearch/client/php-api/current/configuration.html#_inline_host_configuration)
+* `SHOPWARE_ES_ENABLED` This variable activates the search via Elasticsearch. (Possible values `1` & `0`)
+* `SHOPWARE_ES_INDEXING_ENABLED` This variable activates the indexing to Elasticsearch. (Possible values `1` & `0`)
 
 To start the indexing you have to execute the following commands:
 1. `php bin/console dal:refresh:index`

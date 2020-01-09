@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Content\ImportExport\Controller;
 
+use Shopware\Core\Content\ImportExport\Aggregate\ImportExportLog\ImportExportLogDefinition;
 use Shopware\Core\Content\ImportExport\Exception\ProfileNotFoundException;
 use Shopware\Core\Content\ImportExport\Exception\UnexpectedFileTypeException;
 use Shopware\Core\Content\ImportExport\ImportExportProfileEntity;
@@ -9,9 +10,11 @@ use Shopware\Core\Content\ImportExport\Service\DownloadService;
 use Shopware\Core\Content\ImportExport\Service\InitiationService;
 use Shopware\Core\Content\ImportExport\Service\ProcessingService;
 use Shopware\Core\Content\ImportExport\Service\SupportedFeaturesService;
+use Shopware\Core\Framework\Api\Converter\ApiVersionConverter;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Validation\DataValidationDefinition;
 use Shopware\Core\Framework\Validation\DataValidator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,6 +26,9 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Type;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class ImportExportActionController extends AbstractController
 {
     /**
@@ -60,6 +66,16 @@ class ImportExportActionController extends AbstractController
      */
     private $processingBatchSize;
 
+    /**
+     * @var ImportExportLogDefinition
+     */
+    private $logDefinition;
+
+    /**
+     * @var ApiVersionConverter
+     */
+    private $apiVersionConverter;
+
     public function __construct(
         SupportedFeaturesService $supportedFeaturesService,
         InitiationService $initiationService,
@@ -67,6 +83,8 @@ class ImportExportActionController extends AbstractController
         DownloadService $downloadService,
         EntityRepositoryInterface $profileRepository,
         DataValidator $dataValidator,
+        ImportExportLogDefinition $logDefinition,
+        ApiVersionConverter $apiVersionConverter,
         int $processingBatchSize
     ) {
         $this->supportedFeaturesService = $supportedFeaturesService;
@@ -76,6 +94,8 @@ class ImportExportActionController extends AbstractController
         $this->profileRepository = $profileRepository;
         $this->dataValidator = $dataValidator;
         $this->processingBatchSize = $processingBatchSize;
+        $this->logDefinition = $logDefinition;
+        $this->apiVersionConverter = $apiVersionConverter;
     }
 
     /**
@@ -93,7 +113,7 @@ class ImportExportActionController extends AbstractController
     /**
      * @Route("/api/v{version}/_action/import-export/initiate", name="api.action.import_export.initiate", methods={"POST"})
      */
-    public function initiate(Request $request, Context $context): JsonResponse
+    public function initiate(int $version, Request $request, Context $context): JsonResponse
     {
         $params = $request->request->all();
         $definition = new DataValidationDefinition();
@@ -125,7 +145,7 @@ class ImportExportActionController extends AbstractController
             $log = $this->initiationService->initiate($context, 'export', $profile, $expireDate);
         }
 
-        return new JsonResponse(['log' => $log]);
+        return new JsonResponse(['log' => $this->apiVersionConverter->convertEntity($this->logDefinition, $log, $version)]);
     }
 
     /**

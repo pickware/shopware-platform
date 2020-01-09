@@ -24,7 +24,12 @@ class DefinitionInstanceRegistry
     /**
      * @var array
      */
-    private $definitions;
+    protected $definitions;
+
+    /**
+     * @var array
+     */
+    protected $entityClassMapping;
 
     /**
      * @param array $definitionMap array of $entityName => $definitionServiceId,
@@ -98,5 +103,57 @@ class DefinitionInstanceRegistry
         $fieldAccessorBuilder = $this->container->get($accessorBuilderClass);
 
         return $fieldAccessorBuilder;
+    }
+
+    public function getByEntityClass(Entity $entity): ?EntityDefinition
+    {
+        $map = $this->loadClassMapping();
+
+        $source = get_class($entity);
+
+        return $map[$source] ?? null;
+    }
+
+    public function register(EntityDefinition $definition): void
+    {
+        $class = get_class($definition);
+        if (!$this->container->has($class)) {
+            $this->container->set($class, $definition);
+        }
+
+        if ($this->entityClassMapping !== null) {
+            $this->entityClassMapping[$definition->getEntityClass()] = $definition;
+        }
+
+        $this->definitions[$definition->getEntityName()] = $class;
+
+        $definition->compile($this);
+    }
+
+    private function loadClassMapping(): array
+    {
+        if ($this->entityClassMapping !== null) {
+            return $this->entityClassMapping;
+        }
+
+        $this->entityClassMapping = [];
+
+        foreach ($this->definitions as $element) {
+            $definition = $this->container->get($element);
+
+            if (!$definition) {
+                continue;
+            }
+
+            try {
+                $class = $definition->getEntityClass();
+
+                $this->entityClassMapping[$class] = $definition;
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        return $this->entityClassMapping;
     }
 }

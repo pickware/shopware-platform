@@ -21,8 +21,8 @@ class ImportEntityCommandTest extends TestCase
 {
     use IntegrationTestBehaviour;
 
-    const DEFAULT_CUSTOMER_IMPORT_PROFILE = 'Default customer';
-    const TEST_IMPORT_FILE_PATH = '/tmp/file.csv';
+    private const DEFAULT_CUSTOMER_IMPORT_PROFILE = 'Default customer';
+    private const TEST_IMPORT_FILE_PATH = '/tmp/file.csv';
 
     /**
      * @var EntityRepositoryInterface
@@ -132,6 +132,7 @@ class ImportEntityCommandTest extends TestCase
             'expireDate' => date('d.m.Y'),
         ];
         $commandTester->setInputs([self::DEFAULT_CUSTOMER_IMPORT_PROFILE]);
+
         try {
             $commandTester->execute($args);
             static::fail('Expected exception not thrown.');
@@ -158,6 +159,7 @@ class ImportEntityCommandTest extends TestCase
             'expireDate' => date('d.m.Y'),
         ];
         $commandTester->setInputs([self::DEFAULT_CUSTOMER_IMPORT_PROFILE]);
+
         try {
             $commandTester->execute($args);
             static::fail('Expected exception not thrown.');
@@ -166,7 +168,7 @@ class ImportEntityCommandTest extends TestCase
         }
     }
 
-    protected function prepareCustomerImportData(ImportExportProfileEntity $profile, $num = 1): array
+    protected function prepareCustomerImportData(ImportExportProfileEntity $profile, int $num = 1): array
     {
         $mapping = $this->getMappings($profile);
         $payment = $mapping['defaultPaymentMethodId'];

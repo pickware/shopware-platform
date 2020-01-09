@@ -5,20 +5,27 @@ namespace Shopware\Core\Content\Product\DataAbstractionLayer\Indexing;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Checkout\Cart\Event\CheckoutOrderPlacedEvent;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
+use Shopware\Core\Checkout\Order\Aggregate\OrderLineItem\OrderLineItemDefinition;
+use Shopware\Core\Checkout\Order\OrderEvents;
 use Shopware\Core\Checkout\Order\OrderStates;
 use Shopware\Core\Content\Product\ProductDefinition;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
+use Shopware\Core\Framework\DataAbstractionLayer\EntityWriteResult;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
+use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\ChangeSetAware;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\DeleteCommand;
+use Shopware\Core\Framework\DataAbstractionLayer\Write\Validation\PreWriteValidationEvent;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\StateMachine\Event\StateMachineTransitionEvent;
-use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -45,7 +52,7 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
     private $eventDispatcher;
 
     /**
-     * @var TagAwareAdapterInterface
+     * @var CacheClearer
      */
     private $cache;
 
@@ -59,7 +66,7 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         IteratorFactory $iteratorFactory,
         ProductDefinition $definition,
         EventDispatcherInterface $eventDispatcher,
-        TagAwareAdapterInterface $cache,
+        CacheClearer $cache,
         EntityCacheKeyGenerator $cacheKeyGenerator
     ) {
         $this->connection = $connection;
@@ -70,6 +77,11 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         $this->cacheKeyGenerator = $cacheKeyGenerator;
     }
 
+    public static function getName(): string
+    {
+        return 'Swag.ProductStockIndexer';
+    }
+
     /**
      * Returns a list of custom business events to listen where the product maybe changed
      */
@@ -78,6 +90,9 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         return [
             CheckoutOrderPlacedEvent::class => 'orderPlaced',
             StateMachineTransitionEvent::class => 'stateChanged',
+            PreWriteValidationEvent::class => 'triggerChangeSet',
+            OrderEvents::ORDER_LINE_ITEM_WRITTEN_EVENT => 'lineItemWritten',
+            OrderEvents::ORDER_LINE_ITEM_DELETED_EVENT => 'lineItemWritten',
         ];
     }
 
@@ -108,9 +123,26 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+        $iterator = $this->iteratorFactory->createIterator($this->definition, $lastId);
+
+        $ids = $iterator->fetch();
+
+        if (empty($ids)) {
+            return null;
+        }
+
+        $this->updateAvailableStock($ids, $context);
+        $this->updateAvailableFlag($ids, $context);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $products = $event->getEventByDefinition(ProductDefinition::class);
+        $products = $event->getEventByEntityName(ProductDefinition::ENTITY_NAME);
 
         $ids = [];
         if ($products) {
@@ -122,7 +154,73 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         $this->updateAvailableFlag($ids, $event->getContext());
     }
 
-    public function stateChanged(StateMachineTransitionEvent $event)
+    public function triggerChangeSet(PreWriteValidationEvent $event): void
+    {
+        foreach ($event->getCommands() as $command) {
+            if (!$command instanceof ChangeSetAware) {
+                continue;
+            }
+            if ($command->getDefinition()->getEntityName() !== OrderLineItemDefinition::ENTITY_NAME) {
+                continue;
+            }
+            if ($command instanceof DeleteCommand) {
+                $command->requestChangeSet();
+
+                continue;
+            }
+            if ($command->hasField('referenced_id') || $command->hasField('product_id') || $command->hasField('quantity')) {
+                $command->requestChangeSet();
+
+                continue;
+            }
+        }
+    }
+
+    /**
+     * If the product of an order item changed, the stocks of the old product and the new product must be updated.
+     */
+    public function lineItemWritten(EntityWrittenEvent $event): void
+    {
+        $ids = [];
+
+        foreach ($event->getWriteResults() as $result) {
+            if ($result->getOperation() === EntityWriteResult::OPERATION_INSERT) {
+                continue;
+            }
+
+            $changeSet = $result->getChangeSet();
+            if (!$changeSet) {
+                continue;
+            }
+
+            $type = $changeSet->getBefore('type');
+
+            if ($type !== LineItem::PRODUCT_LINE_ITEM_TYPE) {
+                continue;
+            }
+
+            if (!$changeSet->hasChanged('referenced_id') && !$changeSet->hasChanged('quantity')) {
+                continue;
+            }
+
+            $ids[] = $changeSet->getBefore('referenced_id');
+            $ids[] = $changeSet->getAfter('referenced_id');
+        }
+
+        $ids = array_filter(array_unique($ids));
+
+        if (empty($ids)) {
+            return;
+        }
+
+        $this->updateAvailableStock($ids, $event->getContext());
+
+        $this->updateAvailableFlag($ids, $event->getContext());
+
+        $this->clearCache($ids);
+    }
+
+    public function stateChanged(StateMachineTransitionEvent $event): void
     {
         if ($event->getEntityName() !== 'order') {
             return;
@@ -154,7 +252,7 @@ class ProductStockIndexer implements IndexerInterface, EventSubscriberInterface
         $this->clearCache($ids);
     }
 
-    public function orderPlaced(CheckoutOrderPlacedEvent $event)
+    public function orderPlaced(CheckoutOrderPlacedEvent $event): void
     {
         $ids = [];
         foreach ($event->getOrder()->getLineItems() as $lineItem) {
@@ -215,7 +313,7 @@ WHERE product.id IN (:ids);
         );
     }
 
-    private function updateStock(array $products, int $multiplier)
+    private function updateStock(array $products, int $multiplier): void
     {
         $query = $this->connection->prepare('UPDATE product SET stock = stock + :quantity WHERE id = :id AND version_id = :version');
 
@@ -272,7 +370,7 @@ WHERE product.id IN (:ids);
         return $query->execute()->fetchAll(\PDO::FETCH_ASSOC);
     }
 
-    private function clearCache(array $ids)
+    private function clearCache(array $ids): void
     {
         $tags = [];
         foreach ($ids as $id) {

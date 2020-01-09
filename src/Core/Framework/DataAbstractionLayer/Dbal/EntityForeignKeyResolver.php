@@ -5,20 +5,23 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Dbal;
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\AssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\CascadeDelete;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\RestrictDelete;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\SetNullOnDelete;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\WriteProtected;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslationsAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
-use Shopware\Core\Framework\Language\LanguageDefinition;
 use Shopware\Core\Framework\Uuid\Exception\InvalidUuidException;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\Language\LanguageDefinition;
 
 /**
  * Determines all associated data for a definition.
@@ -57,7 +60,6 @@ class EntityForeignKeyResolver
      *      ]
      *  ]
      *
-     *
      * @throws \RuntimeException
      */
     public function getAffectedDeleteRestrictions(EntityDefinition $definition, array $ids, Context $context): array
@@ -80,12 +82,33 @@ class EntityForeignKeyResolver
      *      ]
      *  ]
      *
-     *
      * @throws \RuntimeException
      */
     public function getAffectedDeletes(EntityDefinition $definition, array $ids, Context $context): array
     {
         return $this->fetch($definition, $ids, CascadeDelete::class, $context);
+    }
+
+    /**
+     * Returns an associated nested array which contains all affected set null on delete entities.
+     * Example:
+     *  [
+     *      [
+     *          'pk' => '43c6baad756140d8aabbbca533a8284f'
+     *          restrictions => [
+     *              'Shopware\Core\Content\Product\ProductDefinition' => [
+     *                  '1ffd7ea958c643558256927aae8efb07' => ['category_id'],
+     *                  '1ffd7ea958c643558256927aae8efb07' => ['category_id', 'main_category_id']
+     *              ]
+     *          ]
+     *      ]
+     *  ]
+     *
+     * @throws \RuntimeException
+     */
+    public function getAffectedSetNulls(EntityDefinition $definition, array $ids, Context $context): array
+    {
+        return $this->fetch($definition, $ids, SetNullOnDelete::class, $context);
     }
 
     /**
@@ -106,6 +129,14 @@ class EntityForeignKeyResolver
             return [];
         }
 
+        $cascades = $definition->getFields()->filter(static function (Field $field) use ($class) {
+            return $field->is($class) && !$field->is(WriteProtected::class);
+        });
+
+        if ($cascades->count() === 0) {
+            return [];
+        }
+
         $query = new QueryBuilder($this->connection);
 
         $root = $definition->getEntityName();
@@ -113,8 +144,6 @@ class EntityForeignKeyResolver
 
         $query->from(EntityDefinitionQueryHelper::escape($definition->getEntityName()), $rootAlias);
         $query->addSelect($rootAlias . '.id as root');
-
-        $cascades = $definition->getFields()->filterByFlag($class);
 
         $this->joinCascades($definition, $cascades, $root, $query, $class, $context);
 
@@ -126,7 +155,11 @@ class EntityForeignKeyResolver
         $result = $query->execute()->fetchAll();
         $result = FetchModeHelper::groupUnique($result);
 
-        return $this->extractValues($definition, $result, $root);
+        if ($class === SetNullOnDelete::class) {
+            return $this->extractValuesForUpdate($definition, $result, $root);
+        }
+
+        return $this->extractValuesForDelete($definition, $result, $root);
     }
 
     private function joinCascades(EntityDefinition $definition, FieldCollection $cascades, string $root, QueryBuilder $query, string $class, Context $context): void
@@ -148,6 +181,7 @@ class EntityForeignKeyResolver
                     . ')'
                     . ' SEPARATOR \'||\')  as ' . EntityDefinitionQueryHelper::escape($alias)
                 );
+
                 continue;
             }
 
@@ -159,6 +193,7 @@ class EntityForeignKeyResolver
                     . EntityDefinitionQueryHelper::escape($alias) . '.`id`)'
                     . ' SEPARATOR \'||\')  as ' . EntityDefinitionQueryHelper::escape($alias)
                 );
+
                 continue;
             }
 
@@ -172,10 +207,11 @@ class EntityForeignKeyResolver
                     . EntityDefinitionQueryHelper::escape($mappingAlias) . '.' . $cascade->getMappingReferenceColumn()
                     . ') SEPARATOR \'||\')  as ' . EntityDefinitionQueryHelper::escape($alias)
                 );
+
                 continue;
             }
 
-            if ($cascade instanceof ManyToOneAssociationField) {
+            if ($cascade instanceof ManyToOneAssociationField || $cascade instanceof OneToOneAssociationField) {
                 $this->queryHelper->resolveField($cascade, $definition, $root, $query, $context);
 
                 $query->addSelect(
@@ -224,7 +260,7 @@ class EntityForeignKeyResolver
         }
     }
 
-    private function extractValues(EntityDefinition $definition, array $result, string $root): array
+    private function extractValuesForDelete(EntityDefinition $definition, array $result, string $root): array
     {
         $mapped = [];
 
@@ -251,8 +287,8 @@ class EntityForeignKeyResolver
                 if ($field instanceof ManyToManyAssociationField) {
                     $referenceDefinition = $field->getReferenceDefinition();
 
-                    if (!array_key_exists($referenceDefinition->getClass(), $restrictions)) {
-                        $restrictions[$referenceDefinition->getClass()] = [];
+                    if (!array_key_exists($referenceDefinition->getEntityName(), $restrictions)) {
+                        $restrictions[$referenceDefinition->getEntityName()] = [];
                     }
 
                     $sourceProperty = $referenceDefinition->getFields()->getByStorageName(
@@ -263,7 +299,7 @@ class EntityForeignKeyResolver
                     );
 
                     foreach ($value as $nested) {
-                        $restrictions[$referenceDefinition->getClass()][] = [
+                        $restrictions[$referenceDefinition->getEntityName()][] = [
                             $sourceProperty->getPropertyName() => $pk,
                             $targetProperty->getPropertyName() => $nested,
                         ];
@@ -276,13 +312,79 @@ class EntityForeignKeyResolver
                     continue;
                 }
 
-                $class = $field->getReferenceDefinition()->getClass();
+                $class = $field->getReferenceDefinition()->getEntityName();
 
                 if (!array_key_exists($class, $restrictions)) {
                     $restrictions[$class] = [];
                 }
 
+                if ($field instanceof TranslationsAssociationField) {
+                    $targetProperty = $field->getReferenceDefinition()->getFields()->getByStorageName($field->getReferenceField());
+
+                    $value = array_map(function ($key) use ($targetProperty) {
+                        $key = explode('-', $key);
+
+                        return [
+                            $targetProperty->getPropertyName() => $key[0],
+                            'languageId' => $key[1],
+                        ];
+                    }, $value);
+                }
+
                 $restrictions[$class] = array_merge_recursive($restrictions[$class], $value);
+            }
+
+            if (empty($restrictions)) {
+                continue;
+            }
+            $mapped[] = ['pk' => $pk, 'restrictions' => $restrictions];
+        }
+
+        return array_values($mapped);
+    }
+
+    private function extractValuesForUpdate(EntityDefinition $definition, array $result, string $root): array
+    {
+        $mapped = [];
+
+        foreach ($result as $pk => $row) {
+            $pk = Uuid::fromBytesToHex($pk);
+
+            $restrictions = [];
+
+            foreach ($row as $key => $value) {
+                $value = array_filter(explode('||', (string) $value));
+                if (empty($value)) {
+                    continue;
+                }
+
+                /** @var AssociationField|null $field */
+                $field = $this->queryHelper->getField($key, $definition, $root);
+
+                if (!$field) {
+                    throw new \RuntimeException(sprintf('Field by key %s not found', $key));
+                }
+
+                if ($field instanceof ManyToManyAssociationField) {
+                    continue;
+                }
+
+                if (!$field instanceof AssociationField) {
+                    continue;
+                }
+
+                $values = [];
+                foreach ($value as $id) {
+                    $values[mb_strtolower($id)] = [$field->getReferenceField()];
+                }
+
+                $class = $field->getReferenceDefinition()->getEntityName();
+
+                if (!array_key_exists($class, $restrictions)) {
+                    $restrictions[$class] = [];
+                }
+
+                $restrictions[$class] = array_merge_recursive($restrictions[$class], $values);
             }
 
             if (empty($restrictions)) {

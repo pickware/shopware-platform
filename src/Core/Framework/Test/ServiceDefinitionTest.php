@@ -5,6 +5,8 @@ namespace Shopware\Core\Framework\Test;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelLifecycleManager;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Finder\Finder;
 
@@ -22,9 +24,9 @@ class ServiceDefinitionTest extends TestCase
         parent::__construct();
     }
 
-    public function testEverythingIsInstantiatable()
+    public function testEverythingIsInstantiatable(): void
     {
-        $seperateKernel = KernelLifecycleManager::createKernel();
+        $seperateKernel = KernelLifecycleManager::createKernel(TestKernel::class);
         $seperateKernel->boot();
 
         $testContainer = $seperateKernel->getContainer()->get('test.service_container');
@@ -63,6 +65,23 @@ class ServiceDefinitionTest extends TestCase
         $errorMessage = 'Found some issues in the following files:' . PHP_EOL . PHP_EOL . print_r($errors, true);
 
         static::assertCount(0, $errors, $errorMessage);
+    }
+
+    public function testContainerLintCommand(): void
+    {
+        $command = $this->getContainer()->get('console.command.container_lint');
+        $command->setApplication(new Application(KernelLifecycleManager::getKernel()));
+        $commandTester = new CommandTester($command);
+
+        set_error_handler(function (): void {/* ignore symfony deprecations */}, E_USER_DEPRECATED);
+        $commandTester->execute([]);
+        restore_error_handler();
+
+        static::assertEquals(
+            0,
+            $commandTester->getStatusCode(),
+            "\"bin/console lint:container\" returned errors:\n" . $commandTester->getDisplay()
+        );
     }
 
     private function checkArgumentOrder(string $content): array
@@ -125,6 +144,6 @@ class ServiceDefinitionTest extends TestCase
     {
         list($before) = str_split($content, $position);
 
-        return strlen($before) - strlen(str_replace(PHP_EOL, '', $before)) + 1;
+        return mb_strlen($before) - mb_strlen(str_replace(PHP_EOL, '', $before)) + 1;
     }
 }

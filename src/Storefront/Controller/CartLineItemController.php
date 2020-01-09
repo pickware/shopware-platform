@@ -18,6 +18,7 @@ use Shopware\Core\Content\Product\Exception\ProductNotFoundException;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaIdsException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Routing\Exception\MissingRequestParameterException;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelRepositoryInterface;
@@ -26,6 +27,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"storefront"})
+ */
 class CartLineItemController extends StorefrontController
 {
     /**
@@ -99,12 +103,10 @@ class CartLineItemController extends StorefrontController
                 throw new \InvalidArgumentException('Code is required');
             }
 
-            /** @var LineItem $lineItem */
             $lineItem = $this->promotionItemBuilder->buildPlaceholderItem($code, $salesChannelContext->getContext()->getCurrencyPrecision());
 
             $initialCartState = md5(json_encode($cart));
 
-            /** @var Cart $cart */
             $cart = $this->cartService->add($cart, $lineItem, $salesChannelContext);
 
             $this->traceErrors($cart);

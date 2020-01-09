@@ -123,7 +123,11 @@ class RecalculationService
 
         $orderData = $this->orderConverter->convertToOrder($recalculatedCart, $salesChannelContext, $conversionContext);
         $orderData['id'] = $order->getId();
-        $this->orderRepository->upsert([$orderData], $context);
+
+        // change scope to be able to write protected state fields of transactions and deliveries
+        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($orderData): void {
+            $this->orderRepository->upsert([$orderData], $context);
+        });
     }
 
     /**
@@ -208,10 +212,10 @@ class RecalculationService
         $criteria = (new Criteria([$orderId]))
             ->addAssociation('lineItems')
             ->addAssociation('transactions')
-            ->addAssociationPath('deliveries.shippingMethod')
-            ->addAssociationPath('deliveries.positions.orderLineItem')
-            ->addAssociationPath('deliveries.shippingOrderAddress.country')
-            ->addAssociationPath('deliveries.shippingOrderAddress.countryState');
+            ->addAssociation('deliveries.shippingMethod')
+            ->addAssociation('deliveries.positions.orderLineItem')
+            ->addAssociation('deliveries.shippingOrderAddress.country')
+            ->addAssociation('deliveries.shippingOrderAddress.countryState');
 
         /* @var OrderEntity|null $order */
         return $this->orderRepository

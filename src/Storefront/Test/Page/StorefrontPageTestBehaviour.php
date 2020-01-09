@@ -16,21 +16,24 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Routing\Exception\MissingRequestParameterException;
 use Shopware\Core\Framework\Struct\Struct;
+use Shopware\Core\Framework\Test\TestCaseBase\TaxAddToSalesChannelTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseHelper\ReflectionHelper;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelRepositoryInterface;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
+use Shopware\Storefront\Page\PageLoadedEvent;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Contracts\EventDispatcher\Event;
 
 trait StorefrontPageTestBehaviour
 {
+    use TaxAddToSalesChannelTestBehaviour;
+
     public static function assertPageEvent(
         string $expectedClass,
-        Event $event,
+        PageLoadedEvent $event,
         SalesChannelContext $salesChannelContext,
         Request $request,
         Struct $page
@@ -86,7 +89,7 @@ trait StorefrontPageTestBehaviour
             'name' => StorefrontPageTestConstants::PRODUCT_NAME,
             'price' => [['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false]],
             'manufacturer' => ['name' => 'test'],
-            'tax' => ['name' => 'test', 'taxRate' => 15],
+            'tax' => ['id' => Uuid::randomHex(), 'name' => 'test', 'taxRate' => 15],
             'active' => true,
             'categories' => [
                 ['id' => Uuid::randomHex(), 'name' => 'asd'],
@@ -97,6 +100,7 @@ trait StorefrontPageTestBehaviour
         ];
 
         $productRepository->create([$data], $context->getContext());
+        $this->addTaxDataToSalesChannel($context, $data['tax']);
 
         /** @var SalesChannelRepositoryInterface $storefrontProductRepository */
         $storefrontProductRepository = $this->getContainer()->get('sales_channel.product.repository');
@@ -213,7 +217,7 @@ trait StorefrontPageTestBehaviour
 
     protected function catchEvent(string $eventName, &$eventResult): void
     {
-        $this->getContainer()->get('event_dispatcher')->addListener($eventName, function ($event) use (&$eventResult) {
+        $this->getContainer()->get('event_dispatcher')->addListener($eventName, static function ($event) use (&$eventResult): void {
             $eventResult = $event;
         });
     }
@@ -234,7 +238,7 @@ trait StorefrontPageTestBehaviour
                     'firstName' => 'Max',
                     'lastName' => 'Mustermann',
                     'street' => 'Musterstraße 1',
-                    'city' => 'Schoöppingen',
+                    'city' => 'Schöppingen',
                     'zipcode' => '12345',
                     'salutationId' => $this->getValidSalutationId(),
                     'country' => ['name' => 'Germany'],

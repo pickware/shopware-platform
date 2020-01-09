@@ -6,11 +6,11 @@ use Psr\Log\LoggerInterface;
 use Shopware\Core\Content\MailTemplate\Exception\SalesChannelNotFoundException;
 use Shopware\Core\Content\MailTemplate\Service\Event\MailSentEvent;
 use Shopware\Core\Content\Media\MediaCollection;
+use Shopware\Core\Framework\Adapter\Twig\StringTemplateRenderer;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Validation\EntityExists;
-use Shopware\Core\Framework\Twig\StringTemplateRenderer;
 use Shopware\Core\Framework\Validation\DataValidationDefinition;
 use Shopware\Core\Framework\Validation\DataValidator;
 use Shopware\Core\System\SalesChannel\SalesChannelDefinition;
@@ -104,7 +104,7 @@ class MailService
         $salesChannelId = $data['salesChannelId'];
         $salesChannel = null;
 
-        if ($salesChannelId !== null) {
+        if ($salesChannelId !== null && !isset($templateData['salesChannel'])) {
             $criteria = new Criteria([$salesChannelId]);
             $criteria->addAssociation('mailHeaderFooter');
             /** @var SalesChannelEntity|null $salesChannel */
@@ -113,29 +113,32 @@ class MailService
             if ($salesChannel === null) {
                 throw new SalesChannelNotFoundException($salesChannelId);
             }
+
+            $templateData['salesChannel'] = $salesChannel;
         }
 
         $senderEmail = $this->systemConfigService->get('core.basicInformation.email', $salesChannelId);
+
+        $senderEmail = $senderEmail ?? $this->systemConfigService->get('core.mailerSettings.senderAddress');
+
         if ($senderEmail === null) {
             $this->logger->error('senderMail not configured for salesChannel: ' . $salesChannelId . '. Please check system_config \'core.basicInformation.email\'');
 
             return null;
         }
 
-        $templateData['salesChannel'] = $salesChannel;
-
         $contents = $this->buildContents($data, $salesChannel);
         foreach ($contents as $index => $template) {
             try {
-                if (isset($data['testMode']) && $data['testMode'] === true) {
+                if (isset($data['testMode']) && (bool) $data['testMode'] === true) {
                     $this->templateRenderer->enableTestMode();
                 }
 
-                $contents[$index] = $this->templateRenderer->render($template, $templateData);
-                $data['subject'] = $this->templateRenderer->render($data['subject'], $templateData);
-                $data['senderName'] = $this->templateRenderer->render($data['senderName'], $templateData);
+                $contents[$index] = $this->templateRenderer->render($template, $templateData, $context);
+                $data['subject'] = $this->templateRenderer->render($data['subject'], $templateData, $context);
+                $data['senderName'] = $this->templateRenderer->render($data['senderName'], $templateData, $context);
 
-                if (isset($data['testMode']) && $data['testMode'] === true) {
+                if (isset($data['testMode']) && (bool) $data['testMode'] === true) {
                     $this->templateRenderer->disableTestMode();
                 }
             } catch (\Exception $e) {
@@ -146,21 +149,24 @@ class MailService
                     . 'Template source:'
                     . $template . "\n"
                     . "Template data: \n"
-                    . print_r($templateData, true) . "\n"
+                    . json_encode($templateData) . "\n"
                 );
 
                 return null;
             }
         }
 
-        $mediaUrls = $this->getMediaUrls($data['mediaIds'], $context);
+        $mediaUrls = $this->getMediaUrls($data, $context);
+
+        $binAttachments = $data['binAttachments'] ?? null;
 
         $message = $this->messageFactory->createMessage(
             $data['subject'],
             [$senderEmail => $data['senderName']],
             $recipients,
             $contents,
-            $mediaUrls
+            $mediaUrls,
+            $binAttachments
         );
 
         $this->mailSender->send($message);
@@ -207,16 +213,18 @@ class MailService
         return $definition;
     }
 
-    private function getMediaUrls(array $mediaIds, Context $context): array
+    private function getMediaUrls(array $data, Context $context): array
     {
-        if (empty($mediaIds)) {
+        if (!isset($data['mediaIds']) || empty($data['mediaIds'])) {
             return [];
         }
-
-        $criteria = new Criteria($mediaIds);
-
-        /** @var MediaCollection $media */
-        $media = $this->mediaRepository->search($criteria, $context)->getElements();
+        $criteria = new Criteria($data['mediaIds']);
+        $media = null;
+        $mediaRepository = $this->mediaRepository;
+        $context->scope(Context::SYSTEM_SCOPE, static function (Context $context) use ($criteria, $mediaRepository, &$media): void {
+            /** @var MediaCollection $media */
+            $media = $mediaRepository->search($criteria, $context)->getElements();
+        });
 
         $urls = [];
         foreach ($media as $mediaItem) {

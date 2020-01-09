@@ -5,13 +5,13 @@ namespace Shopware\Core\Framework\Test\DataAbstractionLayer\Search;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Product\ProductDefinition;
+use Shopware\Core\Framework\Api\Converter\ApiVersionConverter;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\SearchRequestException;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Parser\AggregationParser;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\RequestCriteriaBuilder;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\EntityScoreQueryBuilder;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\SearchTermInterpreter;
 use Shopware\Core\Framework\Test\TestCaseBase\AdminFunctionalTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\PlatformRequest;
@@ -84,7 +84,9 @@ class SearchCriteriaBuilderTest extends TestCase
         $this->createManufacturer(['link' => 'b', 'description' => $filterId]);
         $this->createManufacturer(['link' => 'c', 'description' => $filterId]);
 
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => 'product_manufacturer.link',
                 'filter' => ['description' => $filterId],
@@ -105,7 +107,9 @@ class SearchCriteriaBuilderTest extends TestCase
         $this->createManufacturer(['link' => 'b', 'description' => $filterId]);
         $this->createManufacturer(['link' => 'c', 'description' => $filterId]);
 
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => '-product_manufacturer.link',
                 'filter' => ['description' => $filterId],
@@ -129,7 +133,9 @@ class SearchCriteriaBuilderTest extends TestCase
         /*
          * Sort by stock ASC, minStock ASC
          */
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => 'product_manufacturer.link,product_manufacturer.description',
                 'filter' => [['field' => 'description', 'type' => 'contains', 'value' => $filterid]],
@@ -146,7 +152,9 @@ class SearchCriteriaBuilderTest extends TestCase
         /*
          * Sort by stock ASC, minStock DESC
          */
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => 'product_manufacturer.link,-product_manufacturer.description',
                 'filter' => [['field' => 'description', 'type' => 'contains', 'value' => $filterid]],
@@ -163,7 +171,9 @@ class SearchCriteriaBuilderTest extends TestCase
         /*
          * Sort by stock DESC, minStock ASC
          */
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => '-product_manufacturer.link,product_manufacturer.description',
                 'filter' => [['field' => 'description', 'type' => 'contains', 'value' => $filterid]],
@@ -180,7 +190,9 @@ class SearchCriteriaBuilderTest extends TestCase
         /*
          * Sort by stock DESC, minStock DESC
          */
-        $this->getBrowser()->request('GET', $this->url . '/product-manufacturer',
+        $this->getBrowser()->request(
+            'GET',
+            $this->url . '/product-manufacturer',
             [
                 'sort' => '-product_manufacturer.link,-product_manufacturer.description',
                 'filter' => [['field' => 'description', 'type' => 'contains', 'value' => $filterid]],
@@ -377,6 +389,7 @@ class SearchCriteriaBuilderTest extends TestCase
         ];
 
         $gotError = false;
+
         try {
             $this->fakeHandleRequest($maxLimit, [], $params);
         } catch (SearchRequestException $e) {
@@ -400,6 +413,7 @@ class SearchCriteriaBuilderTest extends TestCase
         ];
 
         $gotError = false;
+
         try {
             $this->fakeHandleRequest(0, $allowedLimits, $params);
         } catch (SearchRequestException $e) {
@@ -443,11 +457,11 @@ class SearchCriteriaBuilderTest extends TestCase
         static::assertEquals('/filter/2/queries/1/field', $content['errors'][5]['source']['pointer']);
     }
 
-    private function fakeHandleRequest($maxLimit = 0, array $allowedLimits = [], $params = []): Criteria
+    private function fakeHandleRequest(int $maxLimit = 0, array $allowedLimits = [], array $params = []): Criteria
     {
-        $interpreter = $this->getContainer()->get(SearchTermInterpreter::class);
-        $scoreBuilder = $this->getContainer()->get(EntityScoreQueryBuilder::class);
-        $requestBuilder = new RequestCriteriaBuilder($maxLimit, $allowedLimits);
+        $parser = $this->getContainer()->get(AggregationParser::class);
+        $apiVersionConverter = $this->getContainer()->get(ApiVersionConverter::class);
+        $requestBuilder = new RequestCriteriaBuilder($parser, $apiVersionConverter, $maxLimit, $allowedLimits);
         $context = Context::createDefaultContext();
         $definition = $this->getContainer()->get(ProductDefinition::class);
 

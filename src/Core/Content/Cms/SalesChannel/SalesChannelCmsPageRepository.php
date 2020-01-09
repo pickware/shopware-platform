@@ -2,11 +2,12 @@
 
 namespace Shopware\Core\Content\Cms\SalesChannel;
 
+use Shopware\Core\Content\Cms\Aggregate\CmsBlock\CmsBlockEntity;
+use Shopware\Core\Content\Cms\Aggregate\CmsSection\CmsSectionEntity;
 use Shopware\Core\Content\Cms\CmsPageCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 
 class SalesChannelCmsPageRepository
@@ -25,14 +26,24 @@ class SalesChannelCmsPageRepository
     {
         $criteria = new Criteria($ids);
 
-        $blockCriteria = new Criteria();
-        $blockCriteria->addAssociation('slots');
-        $blockCriteria->addAssociation('backgroundMedia');
-        $blockCriteria->addSorting(new FieldSorting('position', 'ASC'));
-        $criteria->addAssociation('blocks', $blockCriteria);
+        $criteria->addAssociation('sections.backgroundMedia')
+            ->addAssociation('sections.blocks.backgroundMedia')
+            ->addAssociation('sections.blocks.slots');
 
         /** @var CmsPageCollection $pages */
         $pages = $this->cmsPageRepository->search($criteria, $context->getContext())->getEntities();
+
+        foreach ($pages as $page) {
+            $page->getSections()->sort(function (CmsBlockEntity $a, CmsBlockEntity $b) {
+                return $a->getPosition() <=> $b->getPosition();
+            });
+
+            foreach ($page->getSections() as $section) {
+                $section->getBlocks()->sort(function (CmsBlockEntity $a, CmsBlockEntity $b) {
+                    return $a->getPosition() <=> $b->getPosition();
+                });
+            }
+        }
 
         return $pages;
     }
@@ -42,14 +53,24 @@ class SalesChannelCmsPageRepository
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('cms_page.type', $type));
 
-        $blockCriteria = new Criteria();
-        $blockCriteria->addAssociation('slots');
-        $blockCriteria->addAssociation('backgroundMedia');
-        $blockCriteria->addSorting(new FieldSorting('position', 'ASC'));
-        $criteria->addAssociation('blocks', $blockCriteria);
+        $criteria->addAssociation('sections.backgroundMedia')
+            ->addAssociation('sections.blocks.backgroundMedia')
+            ->addAssociation('sections.blocks.slots');
 
         /** @var CmsPageCollection $pages */
         $pages = $this->cmsPageRepository->search($criteria, $context->getContext())->getEntities();
+
+        foreach ($pages as $page) {
+            $page->getSections()->sort(function (CmsSectionEntity $a, CmsSectionEntity $b) {
+                return $a->getPosition() <=> $b->getPosition();
+            });
+
+            foreach ($page->getSections() as $section) {
+                $section->getBlocks()->sort(function (CmsBlockEntity $a, CmsBlockEntity $b) {
+                    return $a->getPosition() <=> $b->getPosition();
+                });
+            }
+        }
 
         return $pages;
     }

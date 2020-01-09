@@ -119,7 +119,8 @@ class ProcessingService
             }
             $writer->flush();
 
-            if (++$lastIndex >= $logEntity->getRecords()) {
+            ++$lastIndex;
+            if ($lastIndex >= $logEntity->getRecords()) {
                 $writer->finish();
                 $this->updateState($context, $logEntity->getId(), ImportExportLogEntity::STATE_SUCCEEDED);
             }
@@ -154,7 +155,7 @@ class ProcessingService
             'id' => $logId,
             'state' => $newState,
         ];
-        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($logData) {
+        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($logData): void {
             $this->logRepository->update([$logData], $context);
         });
     }

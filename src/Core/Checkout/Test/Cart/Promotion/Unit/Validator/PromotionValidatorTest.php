@@ -7,7 +7,7 @@ use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscount\PromotionDiscou
 use Shopware\Core\Checkout\Promotion\Aggregate\PromotionDiscount\PromotionDiscountEntity;
 use Shopware\Core\Checkout\Promotion\PromotionDefinition;
 use Shopware\Core\Checkout\Promotion\Validator\PromotionValidator;
-use Shopware\Core\Checkout\Test\Cart\Promotion\Fakes\FakeConnection;
+use Shopware\Core\Checkout\Test\Cart\Promotion\Helpers\Fakes\FakeConnection;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\Command\InsertCommand;
 use Shopware\Core\Framework\DataAbstractionLayer\Write\EntityExistence;
@@ -35,7 +35,6 @@ class PromotionValidatorTest extends TestCase
         $this->context = WriteContext::createFromContext(Context::createDefaultContext());
 
         $this->promotionDefinition = new PromotionDefinition();
-
         $this->discountDefinition = new PromotionDiscountDefinition();
     }
 
@@ -48,7 +47,7 @@ class PromotionValidatorTest extends TestCase
      * @test
      * @group promotions
      */
-    public function testPromotionCodeRequired()
+    public function testPromotionCodeRequired(): void
     {
         $this->expectException(WriteException::class);
 
@@ -56,10 +55,12 @@ class PromotionValidatorTest extends TestCase
             $this->promotionDefinition,
             [
                 'use_codes' => true,
+                'use_individual_codes' => false,
                 'code' => ' ',
             ],
             ['id' => 'D1'],
-            $this->createMock(EntityExistence::class)
+            $this->createMock(EntityExistence::class),
+            '/0'
         );
 
         $fakeConnection = new FakeConnection($this->getPromotionDbRows());
@@ -74,6 +75,7 @@ class PromotionValidatorTest extends TestCase
         } catch (WriteException $e) {
             static::assertEquals(WriteConstraintViolationException::class, get_class($e->getExceptions()[0]));
             static::assertEquals('/0/code', $e->getExceptions()[0]->getViolations()[0]->getPropertyPath());
+
             throw $e;
         }
     }
@@ -85,7 +87,7 @@ class PromotionValidatorTest extends TestCase
      * @test
      * @group promotions
      */
-    public function testPromotionValidUntilAfterFrom()
+    public function testPromotionValidUntilAfterFrom(): void
     {
         $this->expectException(WriteException::class);
 
@@ -96,7 +98,8 @@ class PromotionValidatorTest extends TestCase
                 'valid_until' => '2019-02-25 11:59:59',
             ],
             ['id' => 'D1'],
-            $this->createMock(EntityExistence::class)
+            $this->createMock(EntityExistence::class),
+            '/0'
         );
 
         $fakeConnection = new FakeConnection($this->getPromotionDbRows());
@@ -110,8 +113,40 @@ class PromotionValidatorTest extends TestCase
             static::fail('Validation with invalid until was not triggered.');
         } catch (WriteException $e) {
             static::assertEquals(WriteConstraintViolationException::class, get_class($e->getExceptions()[0]));
+
             throw $e;
         }
+    }
+
+    /**
+     * This test verifies that we do not require a global code
+     * if we have individual codes turned on.
+     *
+     * @test
+     * @group promotions
+     */
+    public function testPromotionIndividualDoesNotRequireCode(): void
+    {
+        $commands[] = new InsertCommand(
+            $this->promotionDefinition,
+            [
+                'use_codes' => true,
+                'use_individual_codes' => true,
+                'code' => ' ',
+            ],
+            ['id' => 'D1'],
+            $this->createMock(EntityExistence::class),
+            '/0'
+        );
+
+        $fakeConnection = new FakeConnection($this->getPromotionDbRows());
+
+        $event = new PreWriteValidationEvent($this->context, $commands);
+
+        $validator = new PromotionValidator($fakeConnection);
+        $validator->preValidate($event);
+
+        static::assertTrue(true);
     }
 
     /**
@@ -131,7 +166,7 @@ class PromotionValidatorTest extends TestCase
      * @throws InvalidUuidLengthException
      * @throws WriteConstraintViolationException
      */
-    public function testDiscountValueInvalid(string $type, float $value)
+    public function testDiscountValueInvalid(string $type, float $value): void
     {
         $this->expectException(WriteException::class);
 
@@ -142,7 +177,8 @@ class PromotionValidatorTest extends TestCase
                 'value' => $value,
             ],
             ['id' => 'D1'],
-            $this->createMock(EntityExistence::class)
+            $this->createMock(EntityExistence::class),
+            '/0'
         );
 
         $fakeConnection = new FakeConnection($this->getPromotionDbRows());
@@ -156,6 +192,7 @@ class PromotionValidatorTest extends TestCase
             static::fail('Validation with invalid until was not triggered.');
         } catch (WriteException $e) {
             static::assertEquals(WriteConstraintViolationException::class, get_class($e->getExceptions()[0]));
+
             throw $e;
         }
     }
@@ -177,7 +214,7 @@ class PromotionValidatorTest extends TestCase
      * @throws InvalidUuidLengthException
      * @throws WriteConstraintViolationException
      */
-    public function testDiscountValueValid(string $type, float $value)
+    public function testDiscountValueValid(string $type, float $value): void
     {
         $commands[] = new InsertCommand(
             $this->discountDefinition,
@@ -186,7 +223,8 @@ class PromotionValidatorTest extends TestCase
                 'value' => $value,
             ],
             ['id' => 'D1'],
-            $this->createMock(EntityExistence::class)
+            $this->createMock(EntityExistence::class),
+            '/0'
         );
 
         $fakeConnection = new FakeConnection($this->getPromotionDbRows());

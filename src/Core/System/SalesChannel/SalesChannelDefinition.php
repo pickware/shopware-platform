@@ -13,16 +13,26 @@ use Shopware\Core\Content\Category\CategoryDefinition;
 use Shopware\Core\Content\MailTemplate\Aggregate\MailHeaderFooter\MailHeaderFooterDefinition;
 use Shopware\Core\Content\MailTemplate\Aggregate\MailTemplateSalesChannel\MailTemplateSalesChannelDefinition;
 use Shopware\Core\Content\Newsletter\Aggregate\NewsletterRecipient\NewsletterRecipientDefinition;
+use Shopware\Core\Content\Product\Aggregate\ProductReview\ProductReviewDefinition;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
+use Shopware\Core\Content\ProductExport\ProductExportDefinition;
+use Shopware\Core\Content\Seo\MainCategory\MainCategoryDefinition;
+use Shopware\Core\Content\Seo\SeoUrl\SeoUrlDefinition;
+use Shopware\Core\Content\Seo\SeoUrlTemplate\SeoUrlTemplateDefinition;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\BoolField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\CascadeDelete;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\PrimaryKey;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\ReadProtected;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\JsonField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\ListField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyIdField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
@@ -30,9 +40,9 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslationsAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
-use Shopware\Core\Framework\Language\LanguageDefinition;
 use Shopware\Core\System\Country\CountryDefinition;
 use Shopware\Core\System\Currency\CurrencyDefinition;
+use Shopware\Core\System\Language\LanguageDefinition;
 use Shopware\Core\System\NumberRange\Aggregate\NumberRangeSalesChannel\NumberRangeSalesChannelDefinition;
 use Shopware\Core\System\SalesChannel\Aggregate\SalesChannelCountry\SalesChannelCountryDefinition;
 use Shopware\Core\System\SalesChannel\Aggregate\SalesChannelCurrency\SalesChannelCurrencyDefinition;
@@ -77,6 +87,7 @@ class SalesChannelDefinition extends EntityDefinition
 
             (new FkField('navigation_category_id', 'navigationCategoryId', CategoryDefinition::class))->addFlags(new Required()),
             (new ReferenceVersionField(CategoryDefinition::class, 'navigation_category_version_id'))->addFlags(new Required()),
+            new IntField('navigation_category_depth', 'navigationCategoryDepth', 1),
 
             new FkField('footer_category_id', 'footerCategoryId', CategoryDefinition::class),
             new ReferenceVersionField(CategoryDefinition::class, 'footer_category_version_id'),
@@ -90,12 +101,15 @@ class SalesChannelDefinition extends EntityDefinition
             (new StringField('access_key', 'accessKey'))->addFlags(new Required()),
             new JsonField('configuration', 'configuration'),
             new BoolField('active', 'active'),
+            new BoolField('maintenance', 'maintenance'),
+            new ListField('maintenance_ip_whitelist', 'maintenanceIpWhitelist'),
             new TranslatedField('customFields'),
             (new TranslationsAssociationField(SalesChannelTranslationDefinition::class, 'sales_channel_id'))->addFlags(new Required()),
             new ManyToManyAssociationField('currencies', CurrencyDefinition::class, SalesChannelCurrencyDefinition::class, 'sales_channel_id', 'currency_id'),
             new ManyToManyAssociationField('languages', LanguageDefinition::class, SalesChannelLanguageDefinition::class, 'sales_channel_id', 'language_id'),
             new ManyToManyAssociationField('countries', CountryDefinition::class, SalesChannelCountryDefinition::class, 'sales_channel_id', 'country_id'),
             new ManyToManyAssociationField('paymentMethods', PaymentMethodDefinition::class, SalesChannelPaymentMethodDefinition::class, 'sales_channel_id', 'payment_method_id'),
+            new ManyToManyIdField('payment_method_ids', 'paymentMethodIds', 'paymentMethods'),
             new ManyToManyAssociationField('shippingMethods', ShippingMethodDefinition::class, SalesChannelShippingMethodDefinition::class, 'sales_channel_id', 'shipping_method_id'),
             new ManyToOneAssociationField('type', 'type_id', SalesChannelTypeDefinition::class, 'id', false),
             new ManyToOneAssociationField('language', 'language_id', LanguageDefinition::class, 'id', false),
@@ -105,19 +119,33 @@ class SalesChannelDefinition extends EntityDefinition
             new ManyToOneAssociationField('shippingMethod', 'shipping_method_id', ShippingMethodDefinition::class, 'id', false),
             new ManyToOneAssociationField('country', 'country_id', CountryDefinition::class, 'id', false),
             new OneToManyAssociationField('orders', OrderDefinition::class, 'sales_channel_id', 'id'),
-            new OneToManyAssociationField('customers', CustomerDefinition::class, 'sales_channel_id', 'id'),
-            (new OneToManyAssociationField('domains', SalesChannelDomainDefinition::class, 'sales_channel_id', 'id'))->addFlags(new CascadeDelete()),
-            (new OneToManyAssociationField('systemConfigs', SystemConfigDefinition::class, 'sales_channel_id'))->addFlags(new CascadeDelete()),
+
+            (new OneToManyAssociationField('customers', CustomerDefinition::class, 'sales_channel_id', 'id'))
+                ->addFlags(new ReadProtected(SalesChannelApiSource::class)),
+
+            (new OneToManyAssociationField('domains', SalesChannelDomainDefinition::class, 'sales_channel_id', 'id'))
+                ->addFlags(new CascadeDelete()),
+
+            (new OneToManyAssociationField('systemConfigs', SystemConfigDefinition::class, 'sales_channel_id'))
+                ->addFlags(new CascadeDelete()),
+
             new ManyToOneAssociationField('navigationCategory', 'navigation_category_id', CategoryDefinition::class, 'id', false),
             new ManyToOneAssociationField('footerCategory', 'footer_category_id', CategoryDefinition::class, 'id', false),
             new ManyToOneAssociationField('serviceCategory', 'service_category_id', CategoryDefinition::class, 'id', false),
-            (new OneToManyAssociationField('productVisibilities', ProductVisibilityDefinition::class, 'sales_channel_id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('productVisibilities', ProductVisibilityDefinition::class, 'sales_channel_id'))
+                ->addFlags(new CascadeDelete()),
+
             new ManyToOneAssociationField('mailHeaderFooter', 'mail_header_footer_id', MailHeaderFooterDefinition::class, 'id', false),
             new OneToManyAssociationField('newsletterRecipients', NewsletterRecipientDefinition::class, 'sales_channel_id', 'id'),
-            new OneToManyAssociationField('mailTemplates', MailTemplateSalesChannelDefinition::class, 'sales_channel_id', 'id'),
-            new OneToManyAssociationField('numberRangeSalesChannels', NumberRangeSalesChannelDefinition::class, 'sales_channel_id'),
-            new OneToManyAssociationField('promotionSalesChannels', PromotionSalesChannelDefinition::class, 'sales_channel_id', 'id'),
-            new OneToManyAssociationField('documentBaseConfigSalesChannels', DocumentBaseConfigSalesChannelDefinition::class, 'sales_channel_id', 'id'),
+            (new OneToManyAssociationField('mailTemplates', MailTemplateSalesChannelDefinition::class, 'sales_channel_id', 'id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('numberRangeSalesChannels', NumberRangeSalesChannelDefinition::class, 'sales_channel_id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('promotionSalesChannels', PromotionSalesChannelDefinition::class, 'sales_channel_id', 'id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('documentBaseConfigSalesChannels', DocumentBaseConfigSalesChannelDefinition::class, 'sales_channel_id', 'id'))->addFlags(new CascadeDelete()),
+            new OneToManyAssociationField('productReviews', ProductReviewDefinition::class, 'sales_channel_id', 'id'),
+            (new OneToManyAssociationField('seoUrls', SeoUrlDefinition::class, 'sales_channel_id', 'id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('seoUrlTemplates', SeoUrlTemplateDefinition::class, 'sales_channel_id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('mainCategories', MainCategoryDefinition::class, 'sales_channel_id'))->addFlags(new CascadeDelete()),
+            (new OneToManyAssociationField('productExports', ProductExportDefinition::class, 'sales_channel_id', 'id'))->addFlags(new ReadProtected(SalesChannelApiSource::class)),
         ]);
     }
 }

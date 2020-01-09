@@ -8,6 +8,8 @@ use Shopware\Core\Content\Category\CategoryCollection;
 use Shopware\Core\Content\Category\CategoryDefinition;
 use Shopware\Core\Content\Category\Exception\CategoryNotFoundException;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
+use Shopware\Core\Framework\Api\Context\SystemSource;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
@@ -19,9 +21,8 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
-use Shopware\Core\Framework\Language\LanguageEntity;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
+use Shopware\Core\System\Language\LanguageEntity;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class BreadcrumbIndexer implements IndexerInterface
@@ -52,7 +53,7 @@ class BreadcrumbIndexer implements IndexerInterface
     private $iteratorFactory;
 
     /**
-     * @var TagAwareAdapterInterface
+     * @var CacheClearer
      */
     private $cache;
 
@@ -67,7 +68,7 @@ class BreadcrumbIndexer implements IndexerInterface
         Connection $connection,
         EventDispatcherInterface $eventDispatcher,
         IteratorFactory $iteratorFactory,
-        TagAwareAdapterInterface $cache,
+        CacheClearer $cache,
         EntityCacheKeyGenerator $cacheKeyGenerator
     ) {
         $this->languageRepository = $languageRepository;
@@ -86,7 +87,7 @@ class BreadcrumbIndexer implements IndexerInterface
         /** @var LanguageEntity $language */
         foreach ($languages as $language) {
             $context = new Context(
-                new Context\SystemSource(),
+                new SystemSource(),
                 [],
                 Defaults::CURRENCY,
                 [$language->getId(), $language->getParentId(), Defaults::LANGUAGE_SYSTEM],
@@ -119,9 +120,56 @@ class BreadcrumbIndexer implements IndexerInterface
         }
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $languages = $this->languageRepository->search(new Criteria(), Context::createDefaultContext());
+        $languages = array_values($languages->getElements());
+
+        $languageOffset = 0;
+        $dataOffset = null;
+        if ($lastId) {
+            $dataOffset = $lastId['dataOffset'];
+            $languageOffset = $lastId['languageOffset'];
+        }
+
+        if (!isset($languages[$languageOffset])) {
+            return null;
+        }
+
+        /** @var LanguageEntity $language */
+        $language = $languages[$languageOffset];
+
+        $context = new Context(
+            new SystemSource(),
+            [],
+            Defaults::CURRENCY,
+            [$language->getId(), $language->getParentId(), Defaults::LANGUAGE_SYSTEM],
+            Defaults::LIVE_VERSION
+        );
+
+        $iterator = $this->iteratorFactory->createIterator($this->categoryRepository->getDefinition(), $dataOffset);
+
+        $ids = $iterator->fetch();
+        if (empty($ids)) {
+            ++$languageOffset;
+
+            return [
+                'dataOffset' => $iterator->getOffset(),
+                'languageOffset' => $languageOffset,
+            ];
+        }
+
+        $this->update($ids, $context);
+
+        return [
+            'dataOffset' => $iterator->getOffset(),
+            'languageOffset' => $languageOffset,
+        ];
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $categories = $event->getEventByDefinition(CategoryDefinition::class);
+        $categories = $event->getEventByEntityName(CategoryDefinition::ENTITY_NAME);
 
         if (!$categories || $categories instanceof EntityDeletedEvent) {
             return;
@@ -131,7 +179,7 @@ class BreadcrumbIndexer implements IndexerInterface
 
         $languageIds = [$event->getContext()->getLanguageId()];
 
-        $translations = $event->getEventByDefinition(CategoryTranslationDefinition::class);
+        $translations = $event->getEventByEntityName(CategoryTranslationDefinition::ENTITY_NAME);
 
         if ($translations) {
             $languageIds = array_merge($languageIds, array_column($translations->getIds(), 'languageId'));
@@ -149,7 +197,7 @@ class BreadcrumbIndexer implements IndexerInterface
         /** @var LanguageEntity $language */
         foreach ($languages as $language) {
             $context = new Context(
-                new Context\SystemSource(),
+                new SystemSource(),
                 [],
                 Defaults::CURRENCY,
                 [$language->getId(), $language->getParentId(), Defaults::LANGUAGE_SYSTEM],
@@ -203,15 +251,17 @@ class BreadcrumbIndexer implements IndexerInterface
             $path = $this->buildBreadcrumb($id, $categories);
 
             $this->connection->executeUpdate(
-                'UPDATE category_translation SET breadcrumb = :breadcrumb 
-                 WHERE category_id = :categoryId 
-                 AND language_id = :languageId
-                 AND category_version_id = :versionId',
+                '
+                    INSERT INTO `category_translation`
+                        (`category_id`, `category_version_id`, `language_id`, `breadcrumb`, `created_at`)
+                    VALUES
+                        (:categoryId, :versionId, :languageId, :breadcrumb, DATE(NOW()))
+                    ON DUPLICATE KEY UPDATE `breadcrumb` = :breadcrumb',
                 [
-                    'breadcrumb' => json_encode($path),
                     'categoryId' => Uuid::fromHexToBytes($id),
                     'versionId' => $versionId,
                     'languageId' => $languageId,
+                    'breadcrumb' => json_encode($path),
                 ]
             );
 
@@ -219,6 +269,11 @@ class BreadcrumbIndexer implements IndexerInterface
         }
 
         $this->cache->invalidateTags($tags);
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.BreadcrumbIndexer';
     }
 
     private function buildBreadcrumb(string $id, CategoryCollection $categories): array
@@ -234,7 +289,7 @@ class BreadcrumbIndexer implements IndexerInterface
             $breadcrumb = $this->buildBreadcrumb($category->getParentId(), $categories);
         }
 
-        $breadcrumb[] = $category->getTranslation('name');
+        $breadcrumb[$category->getId()] = $category->getTranslation('name');
 
         return $breadcrumb;
     }

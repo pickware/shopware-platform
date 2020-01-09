@@ -20,8 +20,8 @@ use Shopware\Core\Content\Media\Metadata\MetadataLoader;
 use Shopware\Core\Content\Media\Pathname\UrlGeneratorInterface;
 use Shopware\Core\Content\Media\Thumbnail\ThumbnailService;
 use Shopware\Core\Content\Media\TypeDetector\TypeDetector;
+use Shopware\Core\Framework\Api\Context\AdminApiSource;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\AdminApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
@@ -212,7 +212,7 @@ class FileSaver
         ];
 
         try {
-            $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($updateData) {
+            $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($updateData): void {
                 $this->mediaRepository->update([$updateData], $context);
             });
         } catch (\Exception $e) {
@@ -233,13 +233,11 @@ class FileSaver
         return $this->renameFile(
             $this->urlGenerator->getRelativeThumbnailUrl(
                 $currentMedia,
-                $thumbnail->getWidth(),
-                $thumbnail->getHeight()
+                $thumbnail
             ),
             $this->urlGenerator->getRelativeThumbnailUrl(
                 $updatedMedia,
-                $thumbnail->getWidth(),
-                $thumbnail->getHeight()
+                $thumbnail
             ),
             $this->getFileSystem($currentMedia)
         );
@@ -252,6 +250,7 @@ class FileSaver
         }
 
         $oldMediaFilePath = $this->urlGenerator->getRelativeMediaUrl($media);
+
         try {
             $this->getFileSystem($media)->delete($oldMediaFilePath);
         } catch (FileNotFoundException $e) {
@@ -265,6 +264,7 @@ class FileSaver
     {
         $stream = fopen($mediaFile->getFileName(), 'rb');
         $path = $this->urlGenerator->getRelativeMediaUrl($media);
+
         try {
             $this->getFileSystem($media)->putStream($path, $stream);
         } finally {
@@ -305,7 +305,7 @@ class FileSaver
             'uploadedAt' => new \DateTime(),
         ];
 
-        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($data) {
+        $context->scope(Context::SYSTEM_SCOPE, function (Context $context) use ($data): void {
             $this->mediaRepository->update([$data], $context);
         });
 
@@ -319,7 +319,7 @@ class FileSaver
      * @throws FileExistsException
      * @throws FileNotFoundException
      */
-    private function renameFile($source, $destination, FilesystemInterface $filesystem): array
+    private function renameFile(string $source, string $destination, FilesystemInterface $filesystem): array
     {
         $filesystem->rename($source, $destination);
 

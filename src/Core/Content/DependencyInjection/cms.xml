@@ -13,6 +13,10 @@
             <tag name="shopware.entity.definition" entity="cms_page_translation"/>
         </service>
 
+        <service id="Shopware\Core\Content\Cms\Aggregate\CmsSection\CmsSectionDefinition">
+            <tag name="shopware.entity.definition" entity="cms_section"/>
+        </service>
+
         <service id="Shopware\Core\Content\Cms\Aggregate\CmsBlock\CmsBlockDefinition">
             <tag name="shopware.entity.definition" entity="cms_block"/>
         </service>
@@ -41,6 +45,11 @@
             <tag name="shopware.cms.data_resolver"/>
         </service>
 
+        <service id="Shopware\Core\Content\Cms\DataResolver\Element\FormCmsElementResolver">
+            <tag name="shopware.cms.data_resolver"/>
+            <argument type="service" id="salutation.repository"/>
+        </service>
+
         <service id="Shopware\Core\Content\Cms\SalesChannel\SalesChannelCmsPageController" public="true">
             <argument type="service" id="Shopware\Core\Content\Cms\SalesChannel\SalesChannelCmsPageLoader"/>
             <argument type="service" id="Shopware\Core\Content\Cms\CmsPageDefinition" />
@@ -58,6 +67,7 @@
         <service id="Shopware\Core\Content\Cms\SalesChannel\SalesChannelCmsPageLoader">
             <argument type="service" id="cms_page.repository"/>
             <argument type="service" id="Shopware\Core\Content\Cms\DataResolver\CmsSlotsDataResolver"/>
+            <argument type="service" id="event_dispatcher"/>
         </service>
     </services>
 </container>

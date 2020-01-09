@@ -47,7 +47,7 @@ class CustomerGroupRule extends Rule
                 return $id !== null && !\in_array($id, $this->customerGroupIds, true);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -55,7 +55,7 @@ class CustomerGroupRule extends Rule
     {
         return [
             'customerGroupIds' => [new NotBlank(), new ArrayOfUuid()],
-            'operator' => [new Choice([Rule::OPERATOR_EQ, Rule::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([Rule::OPERATOR_EQ, Rule::OPERATOR_NEQ])],
         ];
     }
 

@@ -4,59 +4,52 @@ namespace Shopware\Storefront\Pagelet\Header;
 
 use Shopware\Core\Content\Category\CategoryCollection;
 use Shopware\Core\Content\Category\Tree\Tree;
-use Shopware\Core\Framework\Language\LanguageCollection;
-use Shopware\Core\Framework\Language\LanguageEntity;
 use Shopware\Core\Framework\Struct\Struct;
 use Shopware\Core\System\Currency\CurrencyCollection;
 use Shopware\Core\System\Currency\CurrencyEntity;
+use Shopware\Core\System\Language\LanguageCollection;
+use Shopware\Core\System\Language\LanguageEntity;
 
 class HeaderPagelet extends Struct
 {
     /**
      * @var Tree
      */
-    private $navigation;
-
-    /**
-     * @var Tree
-     */
-    private $offcanvasNavigation;
+    protected $navigation;
 
     /**
      * @var LanguageCollection
      */
-    private $languages;
+    protected $languages;
 
     /**
      * @var CurrencyCollection
      */
-    private $currencies;
+    protected $currencies;
 
     /**
      * @var LanguageEntity
      */
-    private $activeLanguage;
+    protected $activeLanguage;
 
     /**
      * @var CurrencyEntity
      */
-    private $activeCurrency;
+    protected $activeCurrency;
 
     /**
      * @var CategoryCollection
      */
-    private $serviceMenu;
+    protected $serviceMenu;
 
     public function __construct(
         Tree $navigation,
-        Tree $offcanvasNavigation,
         LanguageCollection $languages,
         CurrencyCollection $currencies,
         LanguageEntity $activeLanguage,
         CurrencyEntity $activeCurrency,
         CategoryCollection $serviceMenu
     ) {
-        $this->offcanvasNavigation = $offcanvasNavigation;
         $this->navigation = $navigation;
         $this->languages = $languages;
         $this->currencies = $currencies;
@@ -68,11 +61,6 @@ class HeaderPagelet extends Struct
     public function getNavigation(): Tree
     {
         return $this->navigation;
-    }
-
-    public function getOffcanvasNavigation(): Tree
-    {
-        return $this->offcanvasNavigation;
     }
 
     public function getLanguages(): LanguageCollection

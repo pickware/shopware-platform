@@ -16,20 +16,16 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class ListFieldSerializer extends AbstractFieldSerializer
 {
-    /**
-     * @var DefinitionInstanceRegistry
-     */
-    protected $compositeHandler;
-
     public function __construct(
         ValidatorInterface $validator,
-        DefinitionInstanceRegistry $compositeHandler
+        DefinitionInstanceRegistry $definitionRegistry
     ) {
-        parent::__construct($validator);
-
-        $this->compositeHandler = $compositeHandler;
+        parent::__construct($validator, $definitionRegistry);
     }
 
+    /**
+     * @throws InvalidSerializerFieldException
+     */
     public function encode(
         Field $field,
         EntityExistence $existence,
@@ -47,9 +43,7 @@ class ListFieldSerializer extends AbstractFieldSerializer
         if ($value !== null) {
             $value = array_values($value);
 
-            if ($field->getFieldType()) {
-                $this->validateTypes($field, $value, $parameters);
-            }
+            $this->validateTypes($field, $value, $parameters);
 
             $value = JsonFieldSerializer::encodeJson($value);
         }
@@ -74,12 +68,15 @@ class ListFieldSerializer extends AbstractFieldSerializer
     protected function validateTypes(ListField $field, array $values, WriteParameterBag $parameters): void
     {
         $fieldType = $field->getFieldType();
-        $exceptions = [];
+        if ($fieldType === null) {
+            return;
+        }
+
         $existence = new EntityExistence(null, [], false, false, false, []);
 
         /** @var Field $listField */
         $listField = new $fieldType('key', 'key');
-        $listField->compile($this->compositeHandler);
+        $listField->compile($this->definitionRegistry);
 
         $nestedParameters = $parameters->cloneForSubresource(
             $parameters->getDefinition(),

@@ -9,7 +9,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Read\EntityReaderInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Symfony\Component\Cache\Adapter\TagAwareAdapterInterface;
-use Symfony\Component\Cache\CacheItem;
+use Symfony\Contracts\Cache\ItemInterface;
 
 class CachedEntityReader implements EntityReaderInterface
 {
@@ -28,41 +28,23 @@ class CachedEntityReader implements EntityReaderInterface
      */
     private $cacheKeyGenerator;
 
-    /**
-     * @var bool
-     */
-    private $enabled;
-
-    /**
-     * @var int
-     */
-    private $expirationTime;
-
     public function __construct(
         TagAwareAdapterInterface $cache,
         EntityReaderInterface $decorated,
-        EntityCacheKeyGenerator $cacheKeyGenerator,
-        bool $enabled,
-        int $expirationTime
+        EntityCacheKeyGenerator $cacheKeyGenerator
     ) {
         $this->cache = $cache;
         $this->decorated = $decorated;
         $this->cacheKeyGenerator = $cacheKeyGenerator;
-        $this->enabled = $enabled;
-        $this->expirationTime = $expirationTime;
     }
 
     public function read(EntityDefinition $definition, Criteria $criteria, Context $context): EntityCollection
     {
-        if (!$this->enabled) {
-            return $this->decorated->read($definition, $criteria, $context);
-        }
-
         if (!$context->getUseCache()) {
             return $this->decorated->read($definition, $criteria, $context);
         }
 
-        if (in_array($definition->getClass(), CachedEntitySearcher::BLACKLIST, true)) {
+        if (\in_array($definition->getClass(), CachedEntitySearcher::BLACKLIST, true)) {
             return $this->decorated->read($definition, $criteria, $context);
         }
 
@@ -85,7 +67,7 @@ class CachedEntityReader implements EntityReaderInterface
         }
 
         // load full result from storage
-        $collection = $this->decorated->read($definition, $criteria, $context);
+        $collection = $this->decorated->read($definition, clone $criteria, $context);
 
         // cache the full result
         $this->cacheCollection($definition, $criteria, $context, $collection);
@@ -171,13 +153,16 @@ class CachedEntityReader implements EntityReaderInterface
     private function cacheEntity(EntityDefinition $definition, Context $context, Criteria $criteria, Entity $entity): void
     {
         $key = $this->cacheKeyGenerator->getEntityContextCacheKey(
-            $entity->getUniqueIdentifier(), $definition, $context, $criteria
+            $entity->getUniqueIdentifier(),
+            $definition,
+            $context,
+            $criteria
         );
-        /** @var CacheItem $item */
+
+        /** @var ItemInterface $item */
         $item = $this->cache->getItem($key);
         $item->set($entity);
         $item->tag($key);
-        $item->expiresAfter($this->expirationTime);
 
         $tags = $this->cacheKeyGenerator->getAssociatedTags($definition, $entity, $context);
 
@@ -194,14 +179,16 @@ class CachedEntityReader implements EntityReaderInterface
     private function cacheNull(EntityDefinition $definition, Context $context, string $id): void
     {
         $key = $this->cacheKeyGenerator->getEntityContextCacheKey(
-            $id, $definition, $context
+            $id,
+            $definition,
+            $context
         );
-        /** @var CacheItem $item */
-        $item = $this->cache->getItem($key);
 
+        /** @var ItemInterface $item */
+        $item = $this->cache->getItem($key);
         $item->set($id);
-        $item->tag($key);
-        $item->expiresAfter($this->expirationTime);
+        $entityTag = $definition->getEntityName() . '.id';
+        $item->tag([$key, $entityTag]);
 
         //deferred saves are persisted with the cache->commit()
         $this->cache->saveDeferred($item);
@@ -211,11 +198,10 @@ class CachedEntityReader implements EntityReaderInterface
     {
         $key = $this->cacheKeyGenerator->getReadCriteriaCacheKey($definition, $criteria, $context);
 
-        /** @var CacheItem $item */
+        /** @var ItemInterface $item */
         $item = $this->cache->getItem($key);
         $item->set($entityCollection);
         $item->tag($key);
-        $item->expiresAfter($this->expirationTime);
 
         $tagsOfTags = [[]];
         foreach ($entityCollection as $entity) {

@@ -9,6 +9,7 @@ use Shopware\Core\System\Tax\TaxEntity;
 trait TaxFixtures
 {
     use EntityFixturesBase;
+
     /**
      * @var array
      */
@@ -54,10 +55,13 @@ trait TaxFixtures
 
     private function getTaxFixture(string $fixtureName): TaxEntity
     {
-        return $this->createFixture(
+        /** @var TaxEntity $taxEntity */
+        $taxEntity = $this->createFixture(
             $fixtureName,
             $this->taxFixtures,
-            EntityFixturesBase::getFixtureRepository('tax')
+            self::getFixtureRepository('tax')
         );
+
+        return $taxEntity;
     }
 }

@@ -2,17 +2,18 @@
 
 namespace Shopware\Core\Framework\Plugin\Command\Lifecycle;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Plugin\Exception\PluginNotActivatedException;
 use Shopware\Core\Framework\Plugin\Exception\PluginNotInstalledException;
-use Shopware\Core\Framework\Plugin\PluginEntity;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 class PluginDeactivateCommand extends AbstractPluginLifecycleCommand
 {
     private const LIFECYCLE_METHOD = 'deactivate';
+
+    protected static $defaultName = 'plugin:deactivate';
 
     protected function configure(): void
     {
@@ -25,18 +26,17 @@ class PluginDeactivateCommand extends AbstractPluginLifecycleCommand
      * @throws PluginNotInstalledException
      * @throws PluginNotActivatedException
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new ShopwareStyle($input, $output);
         $context = Context::createDefaultContext();
         $plugins = $this->prepareExecution(self::LIFECYCLE_METHOD, $io, $input, $context);
 
         if ($plugins === null) {
-            return null;
+            return 0;
         }
 
         $deactivatedPluginCount = 0;
-        /** @var PluginEntity $plugin */
         foreach ($plugins as $plugin) {
             if ($plugin->getInstalledAt() === null) {
                 $io->note(sprintf('Plugin "%s" must be installed. Skipping.', $plugin->getName()));
@@ -61,5 +61,7 @@ class PluginDeactivateCommand extends AbstractPluginLifecycleCommand
         }
 
         $this->handleClearCacheOption($input, $io, 'deactivating');
+
+        return 0;
     }
 }

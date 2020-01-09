@@ -10,10 +10,12 @@ use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenEvent;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Inherited;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyIdField;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
+use Shopware\Core\Framework\DataAbstractionLayer\MappingEntityDefinition;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
 use Shopware\Core\Framework\Event\ProgressStartedEvent;
@@ -36,6 +38,7 @@ class ManyToManyIdFieldIndexer implements IndexerInterface
      * @var IteratorFactory
      */
     private $iteratorFactory;
+
     /**
      * @var EventDispatcherInterface
      */
@@ -90,6 +93,52 @@ class ManyToManyIdFieldIndexer implements IndexerInterface
         }
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+
+        $dataOffset = null;
+        $definitionOffset = 0;
+
+        if ($lastId) {
+            $dataOffset = $lastId['dataOffset'];
+            $definitionOffset = $lastId['definitionOffset'];
+        }
+
+        $definitions = array_values(array_filter(
+            $this->registry->getDefinitions(),
+            function (EntityDefinition $definition) {
+                return $definition->getFields()->filterInstance(ManyToManyIdField::class)->count() > 0;
+            }
+        ));
+
+        if (!isset($definitions[$definitionOffset])) {
+            return null;
+        }
+
+        $definition = $definitions[$definitionOffset];
+
+        $iterator = $this->iteratorFactory->createIterator($definition, $dataOffset);
+
+        $ids = $iterator->fetch();
+
+        if (empty($ids)) {
+            ++$definitionOffset;
+
+            return [
+                'dataOffset' => null,
+                'definitionOffset' => $definitionOffset,
+            ];
+        }
+
+        $this->update($definition, $ids, $context);
+
+        return [
+            'dataOffset' => $iterator->getOffset(),
+            'definitionOffset' => $definitionOffset,
+        ];
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
         $written = $event->getEvents();
@@ -99,13 +148,31 @@ class ManyToManyIdFieldIndexer implements IndexerInterface
 
         /** @var EntityWrittenEvent $nested */
         foreach ($written as $nested) {
-            $this->update($nested->getDefinition(), $nested->getIds(), $nested->getContext());
+            $definition = $this->registry->getByEntityName($nested->getEntityName());
+            $this->update($definition, $nested->getIds(), $nested->getContext());
         }
     }
 
-    private function update(EntityDefinition $definition, array $ids, Context $context)
+    public static function getName(): string
+    {
+        return 'Swag.ManyToManyIdFieldIndexer';
+    }
+
+    private function update(EntityDefinition $definition, array $ids, Context $context): void
     {
         if (empty($ids)) {
+            return;
+        }
+
+        if ($definition instanceof MappingEntityDefinition) {
+            $fkFields = $definition->getFields()->filterInstance(FkField::class);
+
+            /** @var FkField $field */
+            foreach ($fkFields as $field) {
+                $foreignKeys = array_column($ids, $field->getPropertyName());
+                $this->update($field->getReferenceDefinition(), $foreignKeys, $context);
+            }
+
             return;
         }
 
@@ -126,6 +193,15 @@ WHERE #mapping_table#.#mapping_column# = #table#.#join_column#
 AND #table#.id IN (:ids)
 #version_aware#
 SQL;
+
+        $resetTemplate = <<<SQL
+UPDATE #table# SET #table#.#storage_name# = NULL
+WHERE #table#.id IN (:ids)
+SQL;
+
+        if ($definition->isVersionAware()) {
+            $resetTemplate .= ' AND #table#.version_id = :version';
+        }
 
         $bytes = array_map(function ($id) {
             return Uuid::fromHexToBytes($id);
@@ -151,7 +227,7 @@ SQL;
             ];
 
             if ($definition->isInheritanceAware() && $association->is(Inherited::class)) {
-                $replacement['#join_column#'] = $association->getPropertyName();
+                $replacement['#join_column#'] = EntityDefinitionQueryHelper::escape($association->getPropertyName());
             }
             $versionCondition = '';
             if ($definition->isVersionAware()) {
@@ -167,6 +243,18 @@ SQL;
                 array_keys($replacement),
                 array_values($replacement),
                 $tableTemplate
+            );
+
+            $resetSql = str_replace(
+                array_keys($replacement),
+                array_values($replacement),
+                $resetTemplate
+            );
+
+            $this->connection->executeUpdate(
+                $resetSql,
+                $parameters,
+                ['ids' => Connection::PARAM_STR_ARRAY]
             );
 
             $this->connection->executeUpdate(

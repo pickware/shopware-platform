@@ -19,7 +19,6 @@ use Shopware\Core\Checkout\Document\GeneratedDocument;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Checkout\Test\Cart\Common\TrueRule;
 use Shopware\Core\Checkout\Test\Payment\Handler\SyncTestPaymentHandler;
-use Shopware\Core\Content\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
 use Shopware\Core\Content\Product\Cart\ProductLineItemFactory;
 use Shopware\Core\Defaults;
@@ -28,9 +27,11 @@ use Shopware\Core\Framework\DataAbstractionLayer\Exception\InconsistentCriteriaI
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Rule\Collector\RuleConditionRegistry;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
+use Shopware\Core\Framework\Test\TestCaseBase\TaxAddToSalesChannelTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseHelper\ReflectionHelper;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\Currency\CurrencyFormatter;
+use Shopware\Core\System\DeliveryTime\DeliveryTimeEntity;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
@@ -38,6 +39,7 @@ use Shopware\Core\System\SalesChannel\SalesChannelContext;
 class InvoiceServiceTest extends TestCase
 {
     use IntegrationTestBehaviour;
+    use TaxAddToSalesChannelTestBehaviour;
 
     /**
      * @var SalesChannelContext
@@ -85,7 +87,7 @@ class InvoiceServiceTest extends TestCase
         $this->salesChannelContext->setRuleIds([$priceRuleId]);
     }
 
-    public function testGenerateWithDifferentTaxes()
+    public function testGenerateWithDifferentTaxes(): void
     {
         /** @var InvoiceGenerator $invoiceService */
         $invoiceService = $this->getContainer()->get(InvoiceGenerator::class);
@@ -167,7 +169,7 @@ class InvoiceServiceTest extends TestCase
             $price = random_int(100, 200000) / 100.0;
 
             shuffle($keywords);
-            $name = ucfirst(implode($keywords, ' ') . ' product');
+            $name = ucfirst(implode(' ', $keywords) . ' product');
 
             $products[] = [
                 'id' => $id,
@@ -186,6 +188,7 @@ class InvoiceServiceTest extends TestCase
             ];
 
             $cart->add($factory->create($id));
+            $this->addTaxDataToSalesChannel($this->salesChannelContext, end($products)['tax']);
         }
 
         $this->getContainer()->get('product.repository')
@@ -322,6 +325,11 @@ class InvoiceServiceTest extends TestCase
                     ],
                 ],
             ],
+            'salesChannels' => [
+                [
+                    'id' => Defaults::SALES_CHANNEL,
+                ],
+            ],
         ];
 
         $repository->create([$data], $this->context);
@@ -339,7 +347,7 @@ class InvoiceServiceTest extends TestCase
         $criteria = (new Criteria([$orderId]))
             ->addAssociation('lineItems')
             ->addAssociation('currency')
-            ->addAssociationPath('language.locale')
+            ->addAssociation('language.locale')
             ->addAssociation('transactions');
 
         $order = $this->getContainer()->get('order.repository')

@@ -4,25 +4,28 @@ namespace Shopware\Core\Content\Media\Api;
 
 use Shopware\Core\Content\Media\Exception\EmptyMediaFilenameException;
 use Shopware\Core\Content\Media\Exception\MissingFileExtensionException;
-use Shopware\Core\Content\Media\Exception\UploadException;
-use Shopware\Core\Content\Media\File\FileFetcher;
 use Shopware\Core\Content\Media\File\FileNameProvider;
 use Shopware\Core\Content\Media\File\FileSaver;
-use Shopware\Core\Content\Media\File\MediaFile;
 use Shopware\Core\Content\Media\MediaDefinition;
+use Shopware\Core\Content\Media\MediaService;
 use Shopware\Core\Framework\Api\Response\ResponseFactoryInterface;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class MediaUploadController extends AbstractController
 {
     /**
-     * @var FileFetcher
+     * @var MediaService
      */
-    private $fileFetcher;
+    private $mediaService;
 
     /**
      * @var FileSaver
@@ -40,12 +43,12 @@ class MediaUploadController extends AbstractController
     private $mediaDefinition;
 
     public function __construct(
-        FileFetcher $fileFetcher,
+        MediaService $mediaService,
         FileSaver $fileSaver,
         FileNameProvider $fileNameProvider,
         MediaDefinition $mediaDefinition
     ) {
-        $this->fileFetcher = $fileFetcher;
+        $this->mediaService = $mediaService;
         $this->fileSaver = $fileSaver;
         $this->fileNameProvider = $fileNameProvider;
         $this->mediaDefinition = $mediaDefinition;
@@ -61,7 +64,7 @@ class MediaUploadController extends AbstractController
         $destination = $request->query->get('fileName', $mediaId);
 
         try {
-            $uploadedFile = $this->fetchFile($request, $tempFile);
+            $uploadedFile = $this->mediaService->fetchFile($request, $tempFile);
             $this->fileSaver->persistFileToMedia(
                 $uploadedFile,
                 $destination,
@@ -93,7 +96,7 @@ class MediaUploadController extends AbstractController
     /**
      * @Route("/api/v{version}/_action/media/provide-name", name="api.action.media.provide-name", methods={"GET"})
      */
-    public function provideName(Request $request, Context $context): Response
+    public function provideName(Request $request, Context $context): JsonResponse
     {
         $fileName = $request->query->get('fileName');
         $fileExtension = $request->query->get('extension');
@@ -108,20 +111,6 @@ class MediaUploadController extends AbstractController
 
         $name = $this->fileNameProvider->provide($fileName, $fileExtension, $mediaId, $context);
 
-        return new Response(json_encode(['fileName' => $name]));
-    }
-
-    /**
-     * @throws MissingFileExtensionException
-     * @throws UploadException
-     */
-    private function fetchFile(Request $request, string $tempFile): MediaFile
-    {
-        $contentType = $request->headers->get('content_type');
-        if ($contentType === 'application/json') {
-            return $this->fileFetcher->fetchFileFromURL($request, $tempFile);
-        }
-
-        return $this->fileFetcher->fetchRequestData($request, $tempFile);
+        return new JsonResponse(['fileName' => $name]);
     }
 }

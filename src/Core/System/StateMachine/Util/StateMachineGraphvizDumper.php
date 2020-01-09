@@ -2,8 +2,6 @@
 
 namespace Shopware\Core\System\StateMachine\Util;
 
-use Shopware\Core\System\StateMachine\Aggregation\StateMachineState\StateMachineStateEntity;
-use Shopware\Core\System\StateMachine\Aggregation\StateMachineTransition\StateMachineTransitionEntity;
 use Shopware\Core\System\StateMachine\StateMachineEntity;
 
 class StateMachineGraphvizDumper
@@ -40,7 +38,6 @@ class StateMachineGraphvizDumper
     {
         $states = [];
 
-        /** @var StateMachineStateEntity $state */
         foreach ($stateMachine->getStates() as $state) {
             $attributes = [];
             if ($state->getId() === $stateMachine->getInitialStateId()) {
@@ -68,7 +65,8 @@ class StateMachineGraphvizDumper
 
     private function startDot(array $options): string
     {
-        return sprintf("digraph workflow {\n  %s\n  node [%s];\n  edge [%s];\n\n",
+        return sprintf(
+            "digraph workflow {\n  %s\n  node [%s];\n  edge [%s];\n\n",
             $this->addOptions($options['graph']),
             $this->addOptions($options['node']),
             $this->addOptions($options['edge'])
@@ -94,7 +92,6 @@ class StateMachineGraphvizDumper
     {
         $edges = [];
 
-        /** @var StateMachineTransitionEntity $transition */
         foreach ($stateMachine->getTransitions() as $transition) {
             $edges[$transition->getFromStateMachineState()->getName()][] = [
                 'name' => $transition->getActionName(),

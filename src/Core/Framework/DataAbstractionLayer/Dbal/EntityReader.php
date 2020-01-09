@@ -4,6 +4,7 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Dbal;
 
 use Doctrine\DBAL\Connection;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
@@ -30,7 +31,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Parser\SqlQueryParser;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\EntityScoreQueryBuilder;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\SearchTermInterpreter;
-use Shopware\Core\Framework\Doctrine\FetchModeHelper;
 use Shopware\Core\Framework\Struct\ArrayEntity;
 use Shopware\Core\Framework\Uuid\Uuid;
 
@@ -39,6 +39,7 @@ class EntityReader implements EntityReaderInterface
     use CriteriaQueryHelper;
 
     public const INTERNAL_MAPPING_STORAGE = 'internal_mapping_storage';
+    public const FOREIGN_KEYS = 'foreignKeys';
 
     /**
      * @var Connection
@@ -181,11 +182,12 @@ class EntityReader implements EntityReaderInterface
             //translated fields are handled after loop all together
             if ($field instanceof TranslatedField) {
                 $this->queryHelper->resolveField($field, $definition, $root, $query, $context);
+
                 continue;
             }
 
-            //self references can not be resolved, otherwise we get an endless loop
-            if (!$field instanceof ParentAssociationField && $field instanceof AssociationField && $field->getReferenceDefinition() === $definition) {
+            //self references can not be resolved if set to autoload, otherwise we get an endless loop
+            if (!$field instanceof ParentAssociationField && $field instanceof AssociationField && $field->getAutoload() && $field->getReferenceDefinition() === $definition) {
                 continue;
             }
 
@@ -212,13 +214,14 @@ class EntityReader implements EntityReaderInterface
 
             //add sub select for many to many field
             if ($field instanceof ManyToManyAssociationField) {
-                if ($this->isAssociationRestricted($criteria, $definition, $field->getPropertyName())) {
+                if ($this->isAssociationRestricted($criteria, $field->getPropertyName())) {
                     continue;
                 }
 
                 //requested a paginated, filtered or sorted list
 
                 $this->addManyToManySelect($definition, $root, $field, $query, $context);
+
                 continue;
             }
 
@@ -287,19 +290,13 @@ class EntityReader implements EntityReaderInterface
         $this->joinBasic($definition, $context, $table, $query, $fields, $criteria);
 
         if (!empty($criteria->getIds())) {
-            $bytes = array_map(function (string $id) {
-                return Uuid::fromHexToBytes($id);
-            }, $criteria->getIds());
-
-            $query->andWhere(EntityDefinitionQueryHelper::escape($table) . '.`id` IN (:ids)');
-            $query->setParameter('ids', array_values($bytes), Connection::PARAM_STR_ARRAY);
+            $this->addIdCondition($criteria, $definition, $query);
         }
 
         return $query->execute()->fetchAll();
     }
 
     private function loadManyToMany(
-        EntityDefinition $definition,
         Criteria $criteria,
         ManyToManyAssociationField $association,
         Context $context,
@@ -308,7 +305,7 @@ class EntityReader implements EntityReaderInterface
         $associationCriteria = $criteria->getAssociation($association->getPropertyName()) ?? new Criteria();
 
         //check if the requested criteria is restricted (limit, offset, sorting, filtering)
-        if ($this->isAssociationRestricted($criteria, $definition, $association->getPropertyName())) {
+        if ($this->isAssociationRestricted($criteria, $association->getPropertyName())) {
             //if restricted load paginated list of many to many
             $this->loadManyToManyWithCriteria($associationCriteria, $association, $context, $collection);
 
@@ -476,6 +473,7 @@ class EntityReader implements EntityReaderInterface
 
             if ($association->is(Extension::class)) {
                 $entity->addExtension($association->getPropertyName(), $structData);
+
                 continue;
             }
             $entity->assign([$association->getPropertyName() => $structData]);
@@ -507,13 +505,12 @@ class EntityReader implements EntityReaderInterface
 
         $ids = [];
         foreach ($mapping as $associationIds) {
-            $associationIds = array_filter(explode(',', (string) $associationIds));
             foreach ($associationIds as $associationId) {
                 $ids[] = $associationId;
             }
         }
 
-        $fieldCriteria->setIds($ids);
+        $fieldCriteria->setIds(array_filter($ids));
         $fieldCriteria->resetSorting();
         $fieldCriteria->resetFilters();
         $fieldCriteria->resetPostFilters();
@@ -533,7 +530,7 @@ class EntityReader implements EntityReaderInterface
         /** @var Entity $entity */
         foreach ($collection as $entity) {
             //extract mapping ids for the current entity
-            $mappingIds = array_filter(explode(',', (string) $mapping[$entity->getUniqueIdentifier()]));
+            $mappingIds = $mapping[$entity->getUniqueIdentifier()];
 
             $structData = $data->getList($mappingIds);
 
@@ -551,7 +548,7 @@ class EntityReader implements EntityReaderInterface
             $parentId = $entity->get('parentId');
 
             //extract mapping ids for the current entity
-            $mappingIds = array_filter(explode(',', (string) $mapping[$parentId]));
+            $mappingIds = $mapping[$parentId];
 
             $structData = $data->getList($mappingIds);
 
@@ -623,6 +620,7 @@ class EntityReader implements EntityReaderInterface
             }
 
             $reference = $field;
+
             break;
         }
 
@@ -789,7 +787,7 @@ class EntityReader implements EntityReaderInterface
         $wrapper->select(
             [
                 'LOWER(HEX(' . $root . '.id)) as id',
-                'GROUP_CONCAT(LOWER(HEX(child.id))) as ids',
+                'LOWER(HEX(child.id)) as child_id',
             ]
         );
 
@@ -802,9 +800,6 @@ class EntityReader implements EntityReaderInterface
             'child',
             'child.' . $foreignKey . ' = ' . $root . '.id AND id_count >= :offset AND id_count <= :limit'
         );
-
-        //add group by to concat all association ids for each root
-        $wrapper->addGroupBy($root . '.id');
 
         //filter result to loaded root entities
         $wrapper->andWhere($root . '.id IN (:rootIds)');
@@ -833,7 +828,22 @@ class EntityReader implements EntityReaderInterface
 
         $rows = $wrapper->execute()->fetchAll();
 
-        return FetchModeHelper::keyPair($rows);
+        $grouped = [];
+        foreach ($rows as $row) {
+            $id = $row['id'];
+
+            if (!isset($grouped[$id])) {
+                $grouped[$id] = [];
+            }
+
+            if (empty($row['child_id'])) {
+                continue;
+            }
+
+            $grouped[$id][] = $row['child_id'];
+        }
+
+        return $grouped;
     }
 
     private function buildManyToManyLimitQuery(ManyToManyAssociationField $association): QueryBuilder
@@ -890,7 +900,7 @@ class EntityReader implements EntityReaderInterface
         return $reference->getEntityName() . '.' . $ref->getPropertyName();
     }
 
-    private function isAssociationRestricted(?Criteria $criteria, EntityDefinition $definition, string $accessor): bool
+    private function isAssociationRestricted(?Criteria $criteria, string $accessor): bool
     {
         if ($criteria === null) {
             return false;
@@ -900,7 +910,6 @@ class EntityReader implements EntityReaderInterface
             return false;
         }
 
-        /** @var Criteria $fieldCriteria */
         $fieldCriteria = $criteria->getAssociation($accessor);
 
         return $fieldCriteria->getOffset() !== null
@@ -916,13 +925,13 @@ class EntityReader implements EntityReaderInterface
         EntityDefinition $definition,
         FieldCollection $fields
     ): FieldCollection {
-        foreach ($criteria->getAssociations() as $fieldName => $fieldCriteria) {
+        foreach ($criteria->getAssociations() as $fieldName => $_fieldCriteria) {
             $regex = sprintf('#^(%s\.)?(extensions\.)?#i', $definition->getEntityName());
             $fieldName = preg_replace($regex, '', $fieldName);
 
-            $dotPosition = strpos($fieldName, '.');
+            $dotPosition = mb_strpos($fieldName, '.');
             if ($dotPosition !== false) {
-                $fieldName = substr($fieldName, 0, $dotPosition);
+                $fieldName = mb_substr($fieldName, 0, $dotPosition);
             }
 
             $field = $definition->getFields()->get($fieldName);
@@ -937,12 +946,11 @@ class EntityReader implements EntityReaderInterface
     }
 
     private function loadToOne(
-        EntityDefinition $definition,
         AssociationField $association,
         Context $context,
         EntityCollection $collection,
         Criteria $criteria
-    ) {
+    ): void {
         if (!$association instanceof OneToOneAssociationField && !$association instanceof ManyToOneAssociationField) {
             return;
         }
@@ -951,7 +959,6 @@ class EntityReader implements EntityReaderInterface
             return;
         }
 
-        /** @var Criteria $associationCriteria */
         $associationCriteria = $criteria->getAssociation($association->getPropertyName());
         if (!$associationCriteria->getAssociations()) {
             return;
@@ -982,34 +989,35 @@ class EntityReader implements EntityReaderInterface
         );
     }
 
-    private function fetchAssociations(Criteria $criteria, EntityDefinition $definition, Context $context, EntityCollection $collection, FieldCollection $fields): EntityCollection
-    {
+    private function fetchAssociations(
+        Criteria $criteria,
+        EntityDefinition $definition,
+        Context $context,
+        EntityCollection $collection,
+        FieldCollection $fields
+    ): EntityCollection {
         if ($collection->count() <= 0) {
             return $collection;
         }
 
-        /** @var AssociationField[] $associations */
-        $associations = $fields->filter(function (Field $field) {
+        $associations = $fields->filter(static function (Field $field) {
             return $field instanceof OneToOneAssociationField || $field instanceof ManyToOneAssociationField;
         });
 
         foreach ($associations as $association) {
-            $this->loadToOne($definition, $association, $context, $collection, $criteria);
+            $this->loadToOne($association, $context, $collection, $criteria);
         }
 
-        /** @var OneToManyAssociationField[] $associations */
         $associations = $fields->filterInstance(OneToManyAssociationField::class);
         foreach ($associations as $association) {
             $this->loadOneToMany($criteria, $definition, $association, $context, $collection);
         }
 
-        /** @var ManyToManyAssociationField[] $associations */
         $associations = $fields->filterInstance(ManyToManyAssociationField::class);
         foreach ($associations as $association) {
-            $this->loadManyToMany($definition, $criteria, $association, $context, $collection);
+            $this->loadManyToMany($criteria, $association, $context, $collection);
         }
 
-        /** @var Entity $struct */
         foreach ($collection as $struct) {
             $struct->removeExtension(self::INTERNAL_MAPPING_STORAGE);
         }

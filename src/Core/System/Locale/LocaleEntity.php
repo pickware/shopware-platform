@@ -4,13 +4,14 @@ namespace Shopware\Core\System\Locale;
 
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
-use Shopware\Core\Framework\Language\LanguageCollection;
+use Shopware\Core\System\Language\LanguageCollection;
 use Shopware\Core\System\Locale\Aggregate\LocaleTranslation\LocaleTranslationCollection;
 use Shopware\Core\System\User\UserCollection;
 
 class LocaleEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string
      */

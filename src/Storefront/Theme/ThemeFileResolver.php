@@ -24,29 +24,41 @@ class ThemeFileResolver
                 $themeConfig,
                 $configurationCollection,
                 $onlySourceFiles,
+                true,
                 function (StorefrontPluginConfiguration $configuration, bool $onlySourceFiles) {
                     $fileCollection = new FileCollection();
+                    $scriptFiles = $configuration->getScriptFiles();
 
-                    if ($configuration->getStorefrontEntryFilepath() && $onlySourceFiles) {
+                    $addSourceFile = $configuration->getStorefrontEntryFilepath() && $onlySourceFiles;
+
+                    // add source file at the beginning if no other theme is included first
+                    if ($addSourceFile && ($scriptFiles->count() === 0 || !$this->isInclude($scriptFiles->first()->getFilepath()))) {
                         $fileCollection->add(new File($configuration->getStorefrontEntryFilepath()));
                     }
 
-                    foreach ($configuration->getScriptFiles() as $scriptFile) {
-                        if (strpos($scriptFile->getFilepath(), '@') !== 0 && $onlySourceFiles) {
+                    foreach ($scriptFiles as $scriptFile) {
+                        if (!$this->isInclude($scriptFile->getFilepath()) && $onlySourceFiles) {
                             continue;
                         }
                         $fileCollection->add($scriptFile);
                     }
 
+                    if ($addSourceFile && $scriptFiles->count() > 0 && $this->isInclude($scriptFiles->first()->getFilepath())) {
+                        $fileCollection->add(new File($configuration->getStorefrontEntryFilepath()));
+                    }
+
                     return $fileCollection;
-                }),
+                }
+            ),
             self::STYLE_FILES => $this->resolve(
                 $themeConfig,
                 $configurationCollection,
                 $onlySourceFiles,
-                function (StorefrontPluginConfiguration $configuration, bool $onlySourceFiles) {
+                true,
+                function (StorefrontPluginConfiguration $configuration) {
                     return $configuration->getStyleFiles();
-                }),
+                }
+            ),
         ];
     }
 
@@ -54,6 +66,7 @@ class ThemeFileResolver
         StorefrontPluginConfiguration $themeConfig,
         StorefrontPluginConfigurationCollection $configurationCollection,
         bool $onlySourceFiles,
+        bool $considerPlugins,
         callable $configFileResolver
     ): FileCollection {
         /** @var FileCollection $files */
@@ -65,14 +78,15 @@ class ThemeFileResolver
 
         $resolvedFiles = new FileCollection();
 
-        /** @var File $file */
         foreach ($files as $file) {
             $filepath = $file->getFilepath();
-            if (strpos($filepath, '@') !== 0) {
+            if (!$this->isInclude($filepath)) {
                 if (file_exists($filepath)) {
                     $resolvedFiles->add($file);
+
                     continue;
                 }
+
                 throw new ThemeCompileException(
                     $themeConfig->getTechnicalName(),
                     sprintf('Unable to load file "%s". Did you forget to build the theme? Try running ./psh.phar storefront:build ', $filepath)
@@ -80,27 +94,39 @@ class ThemeFileResolver
             }
 
             if ($filepath === '@Plugins') {
+                if (!$considerPlugins) {
+                    continue;
+                }
+
+                $considerPlugins = false;
+
                 foreach ($configurationCollection->getNoneThemes() as $plugin) {
-                    foreach ($this->resolve($plugin, $configurationCollection, $onlySourceFiles, $configFileResolver) as $item) {
+                    foreach ($this->resolve($plugin, $configurationCollection, $onlySourceFiles, $considerPlugins, $configFileResolver) as $item) {
                         $resolvedFiles->add($item);
                     }
                 }
+
                 continue;
             }
 
             // Resolve @ dependencies
-            $name = substr($filepath, 1);
+            $name = mb_substr($filepath, 1);
             $configuration = $configurationCollection->getByTechnicalName($name);
 
             if (!$configuration) {
                 throw new InvalidThemeException($name);
             }
 
-            foreach ($this->resolve($configuration, $configurationCollection, $onlySourceFiles, $configFileResolver) as $item) {
+            foreach ($this->resolve($configuration, $configurationCollection, $onlySourceFiles, $considerPlugins, $configFileResolver) as $item) {
                 $resolvedFiles->add($item);
             }
         }
 
         return $resolvedFiles;
+    }
+
+    private function isInclude(string $file): bool
+    {
+        return mb_strpos($file, '@') === 0;
     }
 }

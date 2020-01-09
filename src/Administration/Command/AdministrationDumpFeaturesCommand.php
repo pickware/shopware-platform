@@ -2,7 +2,7 @@
 
 namespace Shopware\Administration\Command;
 
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\FeatureFlag\FeatureConfig;
 use Shopware\Core\Kernel;
 use Symfony\Component\Console\Command\Command;
@@ -11,6 +11,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class AdministrationDumpFeaturesCommand extends Command
 {
+    protected static $defaultName = 'administration:dump:features';
+
     /**
      * @var Kernel
      */
@@ -28,11 +30,10 @@ class AdministrationDumpFeaturesCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('administration:dump:features')
             ->setDescription('Creating json file with feature config for administration testing and hot reloading capabilities.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         file_put_contents(
             $this->kernel->getCacheDir() . '/../../config_administration_features.json',
@@ -41,5 +42,7 @@ class AdministrationDumpFeaturesCommand extends Command
 
         $style = new ShopwareStyle($input, $output);
         $style->success('Successfully dumped administration feature configuration');
+
+        return 0;
     }
 }

@@ -4,17 +4,18 @@ namespace Shopware\Core\Framework\Rule;
 
 use Symfony\Component\Validator\Constraints\DateTime as DateTimeConstraint;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\NotNull;
 use Symfony\Component\Validator\Constraints\Type;
 
 class DateRangeRule extends Rule
 {
     /**
-     * @var \DateTimeInterface|null
+     * @var \DateTimeInterface|string|null
      */
     protected $fromDate;
 
     /**
-     * @var \DateTimeInterface|null
+     * @var \DateTimeInterface|string|null
      */
     protected $toDate;
 
@@ -32,6 +33,16 @@ class DateRangeRule extends Rule
         $this->useTime = $useTime;
         $this->fromDate = $fromDate;
         $this->toDate = $toDate;
+    }
+
+    public function __wakeup(): void
+    {
+        if (is_string($this->fromDate)) {
+            $this->fromDate = new \DateTime($this->fromDate);
+        }
+        if (is_string($this->toDate)) {
+            $this->toDate = new \DateTime($this->toDate);
+        }
     }
 
     public function match(RuleScope $scope): bool
@@ -58,7 +69,7 @@ class DateRangeRule extends Rule
         return [
             'fromDate' => [new NotBlank(), new DateTimeConstraint(['format' => \DateTime::ATOM])],
             'toDate' => [new NotBlank(), new DateTimeConstraint(['format' => \DateTime::ATOM])],
-            'useTime' => [new Type('bool')],
+            'useTime' => [new NotNull(), new Type('bool')],
         ];
     }
 

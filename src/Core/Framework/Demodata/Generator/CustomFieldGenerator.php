@@ -5,13 +5,13 @@ namespace Shopware\Core\Framework\Demodata\Generator;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\FetchMode;
 use Faker\Generator;
-use Shopware\Core\Framework\CustomField\Aggregate\CustomFieldSet\CustomFieldSetDefinition;
-use Shopware\Core\Framework\CustomField\CustomFieldTypes;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\Demodata\DemodataContext;
 use Shopware\Core\Framework\Demodata\DemodataGeneratorInterface;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\CustomField\Aggregate\CustomFieldSet\CustomFieldSetDefinition;
+use Shopware\Core\System\CustomField\CustomFieldTypes;
 
 class CustomFieldGenerator implements DemodataGeneratorInterface
 {
@@ -85,7 +85,7 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
         $console->progressFinish();
     }
 
-    private function randomCustomField($prefix, DemodataContext $context): array
+    private function randomCustomField(string $prefix, DemodataContext $context): array
     {
         $types = [
             CustomFieldTypes::INT,
@@ -113,6 +113,7 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
                     ],
                     'customFieldPosition' => 1,
                 ];
+
                 break;
             case CustomFieldTypes::FLOAT:
                 $config = [
@@ -128,6 +129,7 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
                     ],
                     'customFieldPosition' => 1,
                 ];
+
                 break;
             case CustomFieldTypes::DATETIME:
                 $config = [
@@ -140,6 +142,7 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
                     ],
                     'customFieldPosition' => 1,
                 ];
+
                 break;
             case CustomFieldTypes::BOOL:
                 $config = [
@@ -151,6 +154,7 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
                     ],
                     'customFieldPosition' => 1,
                 ];
+
                 break;
             default:
                 $config = [
@@ -165,12 +169,13 @@ class CustomFieldGenerator implements DemodataGeneratorInterface
                     ],
                     'customFieldPosition' => 1,
                 ];
+
                 break;
         }
 
         return [
             'id' => Uuid::randomHex(),
-            'name' => strtolower($prefix) . '_' . str_replace(' ', '_', $name),
+            'name' => mb_strtolower($prefix) . '_' . str_replace(' ', '_', $name),
             'type' => $type,
             'config' => $config,
         ];

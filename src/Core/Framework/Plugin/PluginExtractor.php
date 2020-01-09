@@ -52,6 +52,7 @@ class PluginExtractor
             if ($backupFile !== '') {
                 $this->filesystem->rename($backupFile, $oldFile);
             }
+
             throw $e;
         }
 
@@ -97,7 +98,7 @@ class PluginExtractor
 
     private function assertPrefix(string $filename, string $prefix): void
     {
-        if (strpos($filename, $prefix) !== 0) {
+        if (mb_strpos($filename, $prefix) !== 0) {
             throw new PluginExtractionException(
                 sprintf(
                     'Detected invalid file/directory %s in the plugin zip: %s',
@@ -110,7 +111,7 @@ class PluginExtractor
 
     private function assertNoDirectoryTraversal(string $filename): void
     {
-        if (strpos($filename, '..' . DIRECTORY_SEPARATOR) !== false) {
+        if (mb_strpos($filename, '..' . DIRECTORY_SEPARATOR) !== false) {
             throw new PluginExtractionException('Directory Traversal detected');
         }
     }

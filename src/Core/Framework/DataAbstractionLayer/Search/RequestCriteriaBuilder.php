@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Search;
 
+use Shopware\Core\Framework\Api\Converter\ApiVersionConverter;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Exception\AssociationNotFoundException;
@@ -16,6 +17,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\AssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Grouping\FieldGrouping;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Parser\AggregationParser;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Parser\QueryStringParser;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Query\ScoreQuery;
@@ -34,19 +36,37 @@ class RequestCriteriaBuilder
      */
     private $allowedLimits;
 
-    public function __construct(int $maxLimit, array $availableLimits = [])
+    /**
+     * @var AggregationParser
+     */
+    private $aggregationParser;
+
+    /**
+     * @var ApiVersionConverter
+     */
+    private $apiVersionConverter;
+
+    public function __construct(AggregationParser $aggregationParser, ApiVersionConverter $apiVersionConverter, int $maxLimit, array $availableLimits = [])
     {
         $this->maxLimit = $maxLimit;
         $this->allowedLimits = $availableLimits;
+        $this->aggregationParser = $aggregationParser;
+        $this->apiVersionConverter = $apiVersionConverter;
     }
 
     public function handleRequest(Request $request, Criteria $criteria, EntityDefinition $definition, Context $context): Criteria
     {
         if ($request->getMethod() === Request::METHOD_GET) {
-            return $this->fromArray($request->query->all(), $criteria, $definition, $context);
+            $criteria = $this->fromArray($request->query->all(), $criteria, $definition, $context, $request->attributes->getInt('version'));
+        } else {
+            $criteria = $this->fromArray($request->request->all(), $criteria, $definition, $context, $request->attributes->getInt('version'));
         }
 
-        return $this->fromArray($request->request->all(), $criteria, $definition, $context);
+        if (empty($criteria->getIds()) && $criteria->getLimit() === null) {
+            $criteria->setLimit(10);
+        }
+
+        return $criteria;
     }
 
     public function getMaxLimit(): int
@@ -59,14 +79,17 @@ class RequestCriteriaBuilder
         return $this->allowedLimits;
     }
 
-    private function fromArray(array $payload, Criteria $criteria, EntityDefinition $definition, Context $context): Criteria
+    private function fromArray(array $payload, Criteria $criteria, EntityDefinition $definition, Context $context, int $apiVersion): Criteria
     {
         $searchException = new SearchRequestException();
 
-        $criteria->setLimit(10);
-
         if (isset($payload['ids'])) {
-            $ids = array_filter(explode('|', $payload['ids']));
+            if (is_string($payload['ids'])) {
+                $ids = array_filter(explode('|', $payload['ids']));
+            } else {
+                $ids = $payload['ids'];
+            }
+
             $criteria->setIds($ids);
             $criteria->setLimit(null);
         } else {
@@ -85,8 +108,18 @@ class RequestCriteriaBuilder
             }
         }
 
+        if (isset($payload['source'])) {
+            $criteria->setSource($payload['source']);
+        }
+
         if (isset($payload['filter'])) {
             $this->addFilter($definition, $payload, $criteria, $searchException);
+        }
+
+        if (isset($payload['grouping'])) {
+            foreach ($payload['grouping'] as $groupField) {
+                $criteria->addGroupField(new FieldGrouping($groupField));
+            }
         }
 
         if (isset($payload['post-filter'])) {
@@ -113,13 +146,11 @@ class RequestCriteriaBuilder
         }
 
         if (isset($payload['aggregations'])) {
-            AggregationParser::buildAggregations($definition, $payload, $criteria, $searchException);
+            $this->aggregationParser->buildAggregations($definition, $payload, $criteria, $searchException);
         }
 
         if (isset($payload['associations'])) {
             foreach ($payload['associations'] as $propertyName => $association) {
-                $nested = new Criteria();
-
                 $field = $definition->getFields()->get($propertyName);
 
                 if (!$field instanceof AssociationField) {
@@ -131,11 +162,13 @@ class RequestCriteriaBuilder
                     $ref = $field->getToManyReferenceDefinition();
                 }
 
-                $nested = $this->fromArray($association, $nested, $ref, $context);
+                $nested = $criteria->getAssociation($propertyName);
 
-                $criteria->addAssociation($propertyName, $nested);
+                $this->fromArray($association, $nested, $ref, $context, $apiVersion);
             }
         }
+
+        $this->apiVersionConverter->convertCriteria($definition, $criteria, $apiVersion, $searchException);
 
         $searchException->tryToThrow();
 
@@ -175,12 +208,12 @@ class RequestCriteriaBuilder
 
         $sorting = [];
         foreach ($parts as $part) {
-            $first = substr($part, 0, 1);
+            $first = mb_substr($part, 0, 1);
 
             $direction = $first === '-' ? FieldSorting::DESCENDING : FieldSorting::ASCENDING;
 
             if ($direction === FieldSorting::DESCENDING) {
-                $part = substr($part, 1);
+                $part = mb_substr($part, 1);
             }
 
             $sorting[] = new FieldSorting($this->buildFieldName($definition, $part), $direction);
@@ -199,11 +232,13 @@ class RequestCriteriaBuilder
 
             if ($field === '') {
                 $searchRequestException->add(new InvalidFilterQueryException(sprintf('The key for filter at position "%s" must not be blank.', $index)), '/filter/' . $index);
+
                 continue;
             }
 
             if ($value === '') {
                 $searchRequestException->add(new InvalidFilterQueryException(sprintf('The value for filter "%s" must not be blank.', $field)), '/filter/' . $field);
+
                 continue;
             }
 
@@ -356,7 +391,7 @@ class RequestCriteriaBuilder
     {
         $prefix = $definition->getEntityName() . '.';
 
-        if (strpos($fieldName, $prefix) === false) {
+        if (mb_strpos($fieldName, $prefix) === false) {
             return $prefix . $fieldName;
         }
 

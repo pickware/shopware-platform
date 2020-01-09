@@ -16,7 +16,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Aggregation\Aggregation;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\Language\LanguageDefinition;
+use Shopware\Core\System\Language\LanguageDefinition;
 
 class EntityCacheKeyGenerator
 {
@@ -25,9 +25,15 @@ class EntityCacheKeyGenerator
      */
     private $languageDefinition;
 
-    public function __construct(LanguageDefinition $languageDefinition)
+    /**
+     * @var string
+     */
+    private $cacheHash;
+
+    public function __construct(LanguageDefinition $languageDefinition, string $cacheHash)
     {
         $this->languageDefinition = $languageDefinition;
+        $this->cacheHash = $cacheHash;
     }
 
     /**
@@ -36,7 +42,12 @@ class EntityCacheKeyGenerator
      */
     public function getEntityContextCacheKey(string $id, EntityDefinition $definition, Context $context, ?Criteria $criteria = null): string
     {
-        $keys = [$this->getDefinitionCacheKey($definition), $id, $this->getContextHash($context)];
+        $keys = [
+            $id,
+            $this->cacheHash,
+            $this->getDefinitionCacheKey($definition),
+            $this->getContextHash($context),
+        ];
 
         if ($criteria && \count($criteria->getAssociations()) > 0) {
             $keys[] = md5(json_encode($criteria->getAssociations()));
@@ -51,7 +62,12 @@ class EntityCacheKeyGenerator
      */
     public function getReadCriteriaCacheKey(EntityDefinition $definition, Criteria $criteria, Context $context): string
     {
-        $keys = [$this->getDefinitionCacheKey($definition), $this->getReadCriteriaHash($criteria), $this->getContextHash($context)];
+        $keys = [
+            $this->getDefinitionCacheKey($definition),
+            $this->getReadCriteriaHash($criteria),
+            $this->getContextHash($context),
+            $this->cacheHash,
+        ];
 
         return md5(implode('-', $keys));
     }
@@ -61,7 +77,12 @@ class EntityCacheKeyGenerator
      */
     public function getSearchCacheKey(EntityDefinition $definition, Criteria $criteria, Context $context): string
     {
-        $keys = [$this->getDefinitionCacheKey($definition), $this->getCriteriaHash($criteria), $this->getContextHash($context)];
+        $keys = [
+            $this->getDefinitionCacheKey($definition),
+            $this->getCriteriaHash($criteria),
+            $this->getContextHash($context),
+            $this->cacheHash,
+        ];
 
         return md5(implode('-', $keys));
     }
@@ -76,6 +97,7 @@ class EntityCacheKeyGenerator
             $this->getDefinitionCacheKey($definition),
             $this->getAggregationHash($criteria),
             $this->getContextHash($context),
+            $this->cacheHash,
         ];
 
         return md5(implode('-', $keys));
@@ -146,7 +168,6 @@ class EntityCacheKeyGenerator
             $keys[] = $translationDefinition->getEntityName() . '.language_id';
         }
 
-        /** @var AssociationField[] $associations */
         foreach ($associations as $association) {
             if ($association->is(Extension::class)) {
                 $value = $entity->getExtension($association->getPropertyName());
@@ -173,7 +194,6 @@ class EntityCacheKeyGenerator
             }
 
             if ($association instanceof OneToManyAssociationField) {
-                /** @var Entity[] $value */
                 foreach ($value as $item) {
                     $nested = $this->getAssociatedTags($association->getReferenceDefinition(), $item, $context);
                     foreach ($nested as $key) {
@@ -185,7 +205,6 @@ class EntityCacheKeyGenerator
             }
 
             if ($association instanceof ManyToManyAssociationField) {
-                /** @var Entity[] $value */
                 foreach ($value as $item) {
                     $nested = $this->getAssociatedTags($association->getToManyReferenceDefinition(), $item, $context);
                     foreach ($nested as $key) {
@@ -282,6 +301,7 @@ class EntityCacheKeyGenerator
             $criteria->getOffset(),
             $criteria->getTotalCountMode(),
             $criteria->getExtensions(),
+            $criteria->getGroupFields(),
         ]));
     }
 

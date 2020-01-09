@@ -91,14 +91,36 @@ class PromotionRedemptionIndexer implements IndexerInterface
         );
     }
 
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        $context = Context::createDefaultContext();
+
+        $iterator = $this->iteratorFactory->createIterator($this->orderLineItemDefinition, $lastId);
+
+        $ids = $iterator->fetch();
+
+        if (empty($ids)) {
+            return null;
+        }
+
+        $this->update($ids, $context);
+
+        return $iterator->getOffset();
+    }
+
     public function refresh(EntityWrittenContainerEvent $event): void
     {
-        $lineItems = $event->getEventByDefinition(OrderLineItemDefinition::class);
+        $lineItems = $event->getEventByEntityName(OrderLineItemDefinition::ENTITY_NAME);
         if (!$lineItems) {
             return;
         }
 
         $this->update($lineItems->getIds(), $event->getContext());
+    }
+
+    public static function getName(): string
+    {
+        return 'Swag.PromotionRedemptionIndexer';
     }
 
     private function update(array $ids, Context $context): void
@@ -235,17 +257,21 @@ class PromotionRedemptionIndexer implements IndexerInterface
                 $ordersPerCustomerCount[$customerId] += $customerIncrement;
             }
 
-            $context->scope(Context::SYSTEM_SCOPE,
-                function (Context $context) use ($promotion, $increment, $ordersPerCustomerCount) {
-                    $this->promotionRepository->update([
+            $context->scope(
+                Context::SYSTEM_SCOPE,
+                function (Context $context) use ($promotion, $increment, $ordersPerCustomerCount): void {
+                    $this->promotionRepository->update(
                         [
-                            'id' => $promotion->getId(),
-                            'orderCount' => $promotion->getOrderCount() + $increment,
-                            'ordersPerCustomerCount' => $ordersPerCustomerCount,
+                            [
+                                'id' => $promotion->getId(),
+                                'orderCount' => $promotion->getOrderCount() + $increment,
+                                'ordersPerCustomerCount' => $ordersPerCustomerCount,
+                            ],
                         ],
-                    ],
-                        $context);
-                });
+                        $context
+                    );
+                }
+            );
         }
     }
 

@@ -2,15 +2,12 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue;
 
-use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
-use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
-use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerRegistryInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Dispatches the tagged indexer like the IndexerRegistry but the work happens inside the message queue.
  */
-class IndexerMessageSender implements IndexerRegistryInterface
+class IndexerMessageSender
 {
     /**
      * @var MessageBusInterface
@@ -18,35 +15,33 @@ class IndexerMessageSender implements IndexerRegistryInterface
     private $bus;
 
     /**
-     * @var IndexerInterface[]
+     * @var iterable
      */
-    private $indexer;
+    private $indexers;
 
     public function __construct(MessageBusInterface $bus, iterable $indexer)
     {
         $this->bus = $bus;
-        $this->indexer = $indexer;
+        $this->indexers = $indexer;
     }
 
-    public function index(\DateTimeInterface $timestamp): void
+    public function partial(\DateTimeInterface $timestamp, ?array $indexers = null): void
     {
-        foreach ($this->indexer as $indexer) {
-            $message = new IndexerMessage();
-            $message->setActionType(IndexerMessage::ACTION_INDEX);
-            $message->setTimestamp($timestamp);
-            $message->setIndexer(get_class($indexer));
-            $this->bus->dispatch($message);
+        $scheduledIndexers = [];
+        foreach ($this->indexers as $indexer) {
+            $indexerName = $indexer::getName();
+            if ($indexers !== null && !in_array($indexerName, $indexers, true)) {
+                continue;
+            }
+            $scheduledIndexers[] = $indexerName;
         }
-    }
 
-    public function refresh(EntityWrittenContainerEvent $event): void
-    {
-        foreach ($this->indexer as $indexer) {
-            $message = new IndexerMessage();
-            $message->setActionType(IndexerMessage::ACTION_REFRESH);
-            $message->setEntityWrittenContainerEvent($event);
-            $message->setIndexer(get_class($indexer));
-            $this->bus->dispatch($message);
+        if (empty($scheduledIndexers)) {
+            return;
         }
+
+        $message = new IndexerMessage($scheduledIndexers);
+        $message->setTimestamp($timestamp);
+        $this->bus->dispatch($message);
     }
 }

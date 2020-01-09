@@ -15,6 +15,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ChildCountField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ChildrenAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CreatedAtField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CustomFields;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\DateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\DateTimeField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
@@ -48,6 +49,9 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionDataPayloadField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\WhitelistRuleField;
 
+/**
+ * @internal
+ */
 class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
 {
     public const FORMAT = 'entity-schema';
@@ -57,22 +61,18 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
         return $format === self::FORMAT;
     }
 
-    public function generate(array $definitions): array
+    public function generate(array $definitions, int $version): array
     {
-        return $this->getSchema($definitions);
+        return $this->getSchema($definitions, $version);
     }
 
-    public function getSchema(array $definitions): array
+    public function getSchema(array $definitions, int $version): array
     {
         $schema = [];
 
         ksort($definitions);
 
         foreach ($definitions as $definition) {
-            if (preg_match('/_translation$/', $definition->getEntityName())) {
-                continue;
-            }
-
             $entity = $definition->getEntityName();
 
             $schema[$entity] = $this->getEntitySchema($definition);
@@ -99,7 +99,6 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
     private function parseField(EntityDefinition $definition, Field $field): array
     {
         $flags = [];
-        /** @var Flag $flag */
         foreach ($field->getFlags() as $flag) {
             $flags = array_replace_recursive($flags, iterator_to_array($flag->parse()));
         }
@@ -124,9 +123,6 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
                 return ['type' => 'uuid', 'flags' => $flags];
 
             // json fields
-            case $field instanceof ListField:
-                return ['type' => 'json_list', 'flags' => $flags];
-
             case $field instanceof CustomFields:
             case $field instanceof VersionDataPayloadField:
             case $field instanceof WhitelistRuleField:
@@ -137,33 +133,33 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
             case $field instanceof PriceField:
             case $field instanceof ListingPriceField:
             case $field instanceof ObjectField:
-            case $field instanceof JsonField:
-                $nested = [];
-                if ($field instanceof JsonField) {
-                    foreach ($field->getPropertyMapping() as $nestedField) {
-                        $nested[$nestedField->getPropertyName()] = $this->parseField($definition, $nestedField);
-                    }
-                }
+                return $this->createJsonObjectType($definition, $field, $flags);
 
-                return [
-                    'type' => 'json_object',
-                    'properties' => $nested,
-                    'flags' => $flags,
-                ];
+            case $field instanceof ListField:
+                return ['type' => 'json_list', 'flags' => $flags];
+
+            case $field instanceof JsonField:
+                return $this->createJsonObjectType($definition, $field, $flags);
 
             // association fields
             case $field instanceof OneToManyAssociationField:
             case $field instanceof ChildrenAssociationField:
             case $field instanceof TranslationsAssociationField:
-                if (!$field instanceof AssociationField) {
-                    throw new \RuntimeException('Field should extend AssociationField');
+                if (!$field instanceof OneToManyAssociationField) {
+                    throw new \RuntimeException('Field should extend OneToManyAssociationField');
                 }
+
+                $reference = $field->getReferenceDefinition();
+                $localField = $definition->getFields()->getByStorageName($field->getLocalField());
+                $referenceField = $reference->getFields()->getByStorageName($field->getReferenceField());
 
                 return [
                     'type' => 'association',
                     'relation' => 'one_to_many',
-                    'entity' => $field->getReferenceDefinition()->getEntityName(),
+                    'entity' => $reference->getEntityName(),
                     'flags' => $flags,
+                    'localField' => $localField ? $localField->getPropertyName() : null,
+                    'referenceField' => $referenceField ? $referenceField->getPropertyName() : null,
                 ];
 
             case $field instanceof ParentAssociationField:
@@ -172,11 +168,17 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
                     throw new \RuntimeException('Field should extend AssociationField');
                 }
 
+                $reference = $field->getReferenceDefinition();
+                $localField = $definition->getFields()->getByStorageName($field->getStorageName());
+                $referenceField = $reference->getFields()->getByStorageName($field->getReferenceField());
+
                 return [
                     'type' => 'association',
                     'relation' => 'many_to_one',
-                    'entity' => $field->getReferenceDefinition()->getEntityName(),
+                    'entity' => $reference->getEntityName(),
                     'flags' => $flags,
+                    'localField' => $localField ? $localField->getPropertyName() : null,
+                    'referenceField' => $referenceField ? $referenceField->getPropertyName() : null,
                 ];
 
             case $field instanceof ManyToManyAssociationField:
@@ -188,11 +190,18 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
                 ];
 
             case $field instanceof OneToOneAssociationField:
+                $reference = $field->getReferenceDefinition();
+
+                $localField = $definition->getFields()->getByStorageName($field->getStorageName());
+                $referenceField = $reference->getFields()->getByStorageName($field->getReferenceField());
+
                 return [
                     'type' => 'association',
                     'relation' => 'one_to_one',
-                    'entity' => $field->getReferenceDefinition()->getEntityName(),
+                    'entity' => $reference->getEntityName(),
                     'flags' => $flags,
+                    'localField' => $localField ? $localField->getPropertyName() : null,
+                    'referenceField' => $referenceField ? $referenceField->getPropertyName() : null,
                 ];
 
             // int fields
@@ -211,6 +220,7 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
             case $field instanceof UpdatedAtField:
             case $field instanceof CreatedAtField:
             case $field instanceof DateTimeField:
+            case $field instanceof DateField:
                 return ['type' => 'date', 'flags' => $flags];
 
             // scalar fields
@@ -230,7 +240,26 @@ class EntitySchemaGenerator implements ApiDefinitionGeneratorInterface
                 return ['type' => 'boolean', 'flags' => $flags];
 
             default:
-                return ['type' => get_class($field), 'flags' => $flags];
+                return ['type' => \get_class($field), 'flags' => $flags];
         }
+    }
+
+    /**
+     * @param Flag[] $flags
+     */
+    private function createJsonObjectType(EntityDefinition $definition, Field $field, array $flags): array
+    {
+        $nested = [];
+        if ($field instanceof JsonField) {
+            foreach ($field->getPropertyMapping() as $nestedField) {
+                $nested[$nestedField->getPropertyName()] = $this->parseField($definition, $nestedField);
+            }
+        }
+
+        return [
+            'type' => 'json_object',
+            'properties' => $nested,
+            'flags' => $flags,
+        ];
     }
 }

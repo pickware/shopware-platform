@@ -35,6 +35,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\RuleTestBehaviour;
+use Shopware\Core\Framework\Test\TestCaseBase\TaxAddToSalesChannelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextFactory;
 use Shopware\Core\System\SalesChannel\Context\SalesChannelContextService;
@@ -45,6 +46,8 @@ class DocumentServiceTest extends TestCase
 {
     use IntegrationTestBehaviour;
     use RuleTestBehaviour;
+    use TaxAddToSalesChannelTestBehaviour;
+
     /**
      * @var SalesChannelContext
      */
@@ -205,28 +208,29 @@ class DocumentServiceTest extends TestCase
 
         $documentId = Uuid::randomHex();
         $mediaId = Uuid::randomHex();
-        $documentRepository->create([
+        $documentRepository->create(
             [
-                'id' => $documentId,
-                'documentTypeId' => $documentType->getId(),
-                'fileType' => FileTypes::PDF,
-                'orderId' => $orderId,
-                'orderVersionId' => $orderVersionId,
-                'config' => ['documentNumber' => '1001'],
-                'deepLinkCode' => 'dfr',
-                'static' => true,
-                'documentMediaFile' => [
-                    'id' => $mediaId,
-                    'mimeType' => 'plain/txt',
-                    'fileExtension' => 'txt',
-                    'fileName' => 'textFileWithExtension',
-                    'fileSize' => 1024,
-                    'private' => true,
-                    'mediaType' => new BinaryType(),
-                    'uploadedAt' => new \DateTime('2011-01-01T15:03:01.012345Z'),
+                [
+                    'id' => $documentId,
+                    'documentTypeId' => $documentType->getId(),
+                    'fileType' => FileTypes::PDF,
+                    'orderId' => $orderId,
+                    'orderVersionId' => $orderVersionId,
+                    'config' => ['documentNumber' => '1001'],
+                    'deepLinkCode' => 'dfr',
+                    'static' => true,
+                    'documentMediaFile' => [
+                        'id' => $mediaId,
+                        'mimeType' => 'plain/txt',
+                        'fileExtension' => 'txt',
+                        'fileName' => 'textFileWithExtension',
+                        'fileSize' => 1024,
+                        'private' => true,
+                        'mediaType' => new BinaryType(),
+                        'uploadedAt' => new \DateTime('2011-01-01T15:03:01.012345Z'),
+                    ],
                 ],
             ],
-        ],
             $this->context
         );
 
@@ -317,7 +321,7 @@ class DocumentServiceTest extends TestCase
             $price = random_int(100, 200000) / 100.0;
 
             shuffle($keywords);
-            $name = ucfirst(implode($keywords, ' ') . ' product');
+            $name = ucfirst(implode(' ', $keywords) . ' product');
 
             $products[] = [
                 'id' => $id,
@@ -336,6 +340,7 @@ class DocumentServiceTest extends TestCase
             ];
 
             $cart->add($factory->create($id));
+            $this->addTaxDataToSalesChannel($this->salesChannelContext, end($products)['tax']);
         }
 
         $this->getContainer()->get('product.repository')

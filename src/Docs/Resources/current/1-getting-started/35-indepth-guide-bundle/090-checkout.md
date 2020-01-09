@@ -142,9 +142,9 @@ class BundleCartProcessor implements CartDataCollectorInterface
                 new DeliveryInformation(
                     (int)$bundle->getProducts()->first()->getStock(),
                     (float)$bundle->getProducts()->first()->getWeight(),
-                    $bundle->getProducts()->first()->getDeliveryDate(),
-                    $bundle->getProducts()->first()->getRestockDeliveryDate(),
-                    $bundle->getProducts()->first()->getShippingFree()
+                    $bundle->getProducts()->first()->getShippingFree(),
+                    $bundle->getProducts()->first()->getRestockTime(),
+                    $bundle->getProducts()->first()->getDeliveryDate()
                 )
             )
             ->setQuantityInformation(new QuantityInformation());
@@ -535,7 +535,7 @@ Now all bundle line items are enriched with all necessary information and can be
 Implementing the `\Shopware\Core\Checkout\Cart\CartProcessorInterface` requires to implement the `process` function.
 
 In this method, it is your task to calculate the prices of the bundle and move the bundle from the previous cart to a new cart.
-But what does that even mean? The `process` method receives to instances of an cart.
+But what does that even mean? The `process` method receives two instances of a cart.
 The first one `Cart $original` contains all the original information, such as your bundle line item and all its children.
 The second instance, `Cart $toCalculate`, is actually an empty cart instance, only containing line items that were added from previous **processors**, not collectors, already. It is the one, which will be used when all the calculating is done.
 This prevents line items from sneaking through the cart process that were not considered by any processor and thus will be automatically dropped.
@@ -830,7 +830,7 @@ If you do not want to do this yourself, you can simply use one of the two calcul
 * `\Shopware\Core\Checkout\Cart\Price\PercentagePriceCalculator` Calculates prices based on a percentage value relative to the discounting prices.
 * `\Shopware\Core\Checkout\Cart\Price\AbsolutePriceCalculator` Calculates prices based on an absolute price relative to the discounting prices.
 
-However, in order to calculate the taxes proportionately, both calculators need to have a `\Shopware\Core\Framework\Pricing\PriceCollection` in which the prices to be discounted are located.
+However, in order to calculate the taxes proportionately, both calculators need to have a `\Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection` in which the prices to be discounted are located.
 In your case it is the prices of the products that are in the bundle line item stored as children. 
 You can easily extract them by first filtering on the product type and then calling `getPrices()`:
 
@@ -930,13 +930,13 @@ Let's quickly add them in the `services.xml` again:
 
             <!-- inject before product processor (5000) -->
             <tag name="shopware.cart.processor" priority="6000" />
-            <tag name="shopware.cart.processor" priority="6000" />
+            <tag name="shopware.cart.collector" priority="6000" />
         </service>
     </services>
 </container>
 ```
 
-The necessary calculators are injected into your processor. Note the tags though, `shopware.cart.processor` and `shopware.cart.processor`.
+The necessary calculators are injected into your processor. Note the tags though, `shopware.cart.processor` and `shopware.cart.collector`.
 The `priority` defines the order they are executed and as you might remember, your processor has to run before the `ProductCartProcessor`.
 
 Your plugin is almost done, just some last polishing is necessary. Head over to the [next step](./100-final-preparation.md) for the last few changes necessary.

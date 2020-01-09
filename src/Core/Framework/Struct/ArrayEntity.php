@@ -16,6 +16,11 @@ class ArrayEntity extends Entity implements \ArrayAccess
         $this->data = $data;
     }
 
+    public function has(string $property): bool
+    {
+        return \array_key_exists($property, $this->data);
+    }
+
     public function getUniqueIdentifier(): string
     {
         if (!$this->_uniqueIdentifier) {
@@ -32,7 +37,7 @@ class ArrayEntity extends Entity implements \ArrayAccess
 
     public function offsetExists($offset)
     {
-        return array_key_exists($offset, $this->data);
+        return \array_key_exists($offset, $this->data);
     }
 
     public function offsetGet($offset)
@@ -40,9 +45,9 @@ class ArrayEntity extends Entity implements \ArrayAccess
         return $this->data[$offset] ?? null;
     }
 
-    public function offsetSet($offset, $value)
+    public function offsetSet($offset, $value): void
     {
-        return $this->data[$offset] = $value;
+        $this->data[$offset] = $value;
     }
 
     public function offsetUnset($offset): void
@@ -64,11 +69,16 @@ class ArrayEntity extends Entity implements \ArrayAccess
     {
         $this->data = array_replace_recursive($this->data, $options);
 
-        if (array_key_exists('id', $options)) {
+        if (\array_key_exists('id', $options)) {
             $this->_uniqueIdentifier = $options['id'];
         }
 
         return $this;
+    }
+
+    public function all()
+    {
+        return $this->data;
     }
 
     public function jsonSerialize(): array

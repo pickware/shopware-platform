@@ -4,16 +4,24 @@ namespace Shopware\Core\Checkout\Customer\SalesChannel;
 
 use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Customer\CustomerEvents;
+use Shopware\Core\Checkout\Customer\Event\CustomerDoubleOptInRegistrationEvent;
 use Shopware\Core\Checkout\Customer\Event\CustomerRegisterEvent;
+use Shopware\Core\Checkout\Customer\Event\DoubleOptInGuestOrderEvent;
+use Shopware\Core\Checkout\Customer\Exception\CustomerAlreadyConfirmedException;
+use Shopware\Core\Checkout\Customer\Exception\CustomerNotFoundByHashException;
+use Shopware\Core\Checkout\Customer\Exception\NoHashProvidedException;
 use Shopware\Core\Checkout\Customer\Validation\Constraint\CustomerEmailUnique;
+use Shopware\Core\Content\Newsletter\Exception\SalesChannelDomainNotFoundException;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\Event\DataMappingEvent;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Framework\Validation\BuildValidationEvent;
 use Shopware\Core\Framework\Validation\DataBag\DataBag;
 use Shopware\Core\Framework\Validation\DataValidationDefinition;
+use Shopware\Core\Framework\Validation\DataValidationFactoryInterface;
 use Shopware\Core\Framework\Validation\DataValidator;
 use Shopware\Core\Framework\Validation\Exception\ConstraintViolationException;
 use Shopware\Core\Framework\Validation\ValidationServiceInterface;
@@ -21,8 +29,10 @@ use Shopware\Core\System\NumberRange\ValueGenerator\NumberRangeValueGeneratorInt
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Validator\Constraints\EqualTo;
 use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Contracts\EventDispatcher\Event;
 
 class AccountRegistrationService
 {
@@ -42,9 +52,9 @@ class AccountRegistrationService
     private $numberRangeValueGenerator;
 
     /**
-     * @var ValidationServiceInterface
+     * @var ValidationServiceInterface|DataValidationFactoryInterface
      */
-    private $addressValidationService;
+    private $addressValidationFactory;
 
     /**
      * @var DataValidator
@@ -52,35 +62,47 @@ class AccountRegistrationService
     private $validator;
 
     /**
-     * @var ValidationServiceInterface
+     * @var ValidationServiceInterface|DataValidationFactoryInterface
      */
-    private $accountValidationService;
+    private $accountValidationFactory;
+
     /**
      * @var SystemConfigService
      */
     private $systemConfigService;
 
+    /**
+     * @var EntityRepositoryInterface
+     */
+    private $domainRepository;
+
+    /**
+     * @param ValidationServiceInterface|DataValidationFactoryInterface $accountValidationFactory
+     * @param ValidationServiceInterface|DataValidationFactoryInterface $addressValidationFactory
+     */
     public function __construct(
         EntityRepositoryInterface $customerRepository,
         EventDispatcherInterface $eventDispatcher,
         NumberRangeValueGeneratorInterface $numberRangeValueGenerator,
         DataValidator $validator,
-        ValidationServiceInterface $accountValidationService,
-        ValidationServiceInterface $addressValidationService,
-        SystemConfigService $systemConfigService
+        $accountValidationFactory,
+        $addressValidationFactory,
+        SystemConfigService $systemConfigService,
+        EntityRepositoryInterface $domainRepository
     ) {
         $this->customerRepository = $customerRepository;
         $this->eventDispatcher = $eventDispatcher;
         $this->numberRangeValueGenerator = $numberRangeValueGenerator;
         $this->validator = $validator;
-        $this->accountValidationService = $accountValidationService;
-        $this->addressValidationService = $addressValidationService;
+        $this->accountValidationFactory = $accountValidationFactory;
+        $this->addressValidationFactory = $addressValidationFactory;
         $this->systemConfigService = $systemConfigService;
+        $this->domainRepository = $domainRepository;
     }
 
     public function register(DataBag $data, bool $isGuest, SalesChannelContext $context, ?DataValidationDefinition $additionalValidationDefinitions = null): string
     {
-        $this->validateRegistrationData($data, $isGuest, $context->getContext(), $additionalValidationDefinitions);
+        $this->validateRegistrationData($data, $isGuest, $context, $additionalValidationDefinitions);
 
         $customer = $this->mapCustomerData($data, $isGuest, $context);
 
@@ -109,21 +131,148 @@ class AccountRegistrationService
             $customer['addresses'][] = $shippingAddress;
         }
 
+        $customer = $this->setDoubleOptInData($customer, $context);
+
         $this->customerRepository->create([$customer], $context->getContext());
 
         $criteria = new Criteria([$customer['id']]);
         $criteria->addAssociation('addresses');
         $criteria->addAssociation('salutation');
 
+        /** @var CustomerEntity $customerEntity */
         $customerEntity = $this->customerRepository->search($criteria, $context->getContext())->first();
 
-        $event = new CustomerRegisterEvent($context->getContext(), $customerEntity, $context->getSalesChannel()->getId());
+        if ($customerEntity->getDoubleOptInRegistration()) {
+            $event = $this->getDoubleOptInEvent($customerEntity, $context);
+        } else {
+            $event = new CustomerRegisterEvent($context, $customerEntity);
+        }
+
         $this->eventDispatcher->dispatch($event);
 
         return $customer['id'];
     }
 
-    private function validateRegistrationData(DataBag $data, bool $isGuest, Context $context, ?DataValidationDefinition $additionalValidations = null): void
+    public function finishDoubleOptInRegistration(DataBag $dataBag, SalesChannelContext $context): string
+    {
+        if (!$dataBag->has('hash')) {
+            throw new NoHashProvidedException();
+        }
+
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('hash', $dataBag->get('hash')));
+        $criteria->addAssociation('addresses');
+        $criteria->addAssociation('salutation');
+        $criteria->setLimit(1);
+
+        $customer = $this->customerRepository
+            ->search($criteria, $context->getContext())
+            ->first();
+
+        if ($customer === null) {
+            throw new CustomerNotFoundByHashException($dataBag->get('hash'));
+        }
+
+        $this->validator->validate(
+            ['em' => $dataBag->get('em')],
+            $this->getBeforeConfirmValidation(hash('sha1', $customer->getEmail()))
+        );
+
+        if ($customer->getActive()) {
+            throw new CustomerAlreadyConfirmedException($customer->getId());
+        }
+
+        $this->customerRepository->update(
+            [
+                [
+                    'id' => $customer->getId(),
+                    'active' => true,
+                    'doubleOptInConfirmDate' => new \DateTimeImmutable(),
+                ],
+            ],
+            $context->getContext()
+        );
+
+        if (!$customer->getGuest()) {
+            $event = new CustomerRegisterEvent($context, $customer);
+
+            $this->eventDispatcher->dispatch($event);
+        }
+
+        return $customer->getId();
+    }
+
+    private function getDoubleOptInEvent(CustomerEntity $customer, SalesChannelContext $context): Event
+    {
+        $url = $this->getConfirmUrl($context, $customer);
+
+        if ($customer->getGuest()) {
+            $event = new DoubleOptInGuestOrderEvent($customer, $context, $url);
+        } else {
+            $event = new CustomerDoubleOptInRegistrationEvent($customer, $context, $url);
+        }
+
+        return $event;
+    }
+
+    private function getBeforeConfirmValidation(string $emHash): DataValidationDefinition
+    {
+        $definition = new DataValidationDefinition('registration.opt_in_before');
+        $definition->add('em', new EqualTo(['value' => $emHash]));
+
+        return $definition;
+    }
+
+    private function setDoubleOptInData(array $customer, SalesChannelContext $context): array
+    {
+        $configKey = $customer['guest']
+            ? 'core.loginRegistration.doubleOptInGuestOrder'
+            : 'core.loginRegistration.doubleOptInRegistration';
+
+        $doubleOptInRequired = $this->systemConfigService
+            ->get($configKey, $context->getSalesChannel()->getId());
+
+        if (!$doubleOptInRequired) {
+            return $customer;
+        }
+
+        $customer['active'] = false;
+        $customer['doubleOptInRegistration'] = true;
+        $customer['doubleOptInEmailSentDate'] = new \DateTimeImmutable();
+        $customer['hash'] = Uuid::randomHex();
+
+        return $customer;
+    }
+
+    private function getConfirmUrl(SalesChannelContext $context, CustomerEntity $customer): string
+    {
+        $domainUrl = $this->systemConfigService
+            ->get('core.loginRegistration.doubleOptInDomain', $context->getSalesChannel()->getId());
+
+        if (!$domainUrl) {
+            $criteria = new Criteria();
+            $criteria->addFilter(new EqualsFilter('salesChannelId', $context->getSalesChannel()->getId()));
+            $criteria->setLimit(1);
+
+            $domain = $this->domainRepository
+                ->search($criteria, $context->getContext())
+                ->first();
+
+            if (!$domain) {
+                throw new SalesChannelDomainNotFoundException($context->getSalesChannel());
+            }
+
+            $domainUrl = $domain->getUrl();
+        }
+
+        return sprintf(
+            $domainUrl . '/registration/confirm?em=%s&hash=%s',
+            hash('sha1', $customer->getEmail()),
+            $customer->getHash()
+        );
+    }
+
+    private function validateRegistrationData(DataBag $data, bool $isGuest, SalesChannelContext $context, ?DataValidationDefinition $additionalValidations = null): void
     {
         /** @var DataBag $addressData */
         $addressData = $data->get('billingAddress');
@@ -174,23 +323,7 @@ class AccountRegistrationService
 
     private function mapBillingAddress(DataBag $billing, Context $context): array
     {
-        $billingAddress = $billing->only(
-            'firstName',
-            'lastName',
-            'salutationId',
-            'title',
-            'street',
-            'zipcode',
-            'city',
-            'company',
-            'department',
-            'vatId',
-            'countryStateId',
-            'countryId',
-            'additionalAddressLine1',
-            'additionalAddressLine2',
-            'phoneNumber'
-        );
+        $billingAddress = $this->mapAddressData($billing);
 
         $event = new DataMappingEvent($billing, $billingAddress, $context);
         $this->eventDispatcher->dispatch($event, CustomerEvents::MAPPING_REGISTER_ADDRESS_BILLING);
@@ -200,22 +333,7 @@ class AccountRegistrationService
 
     private function mapShippingAddress(DataBag $shipping, Context $context): array
     {
-        $shippingAddress = $shipping->only(
-            'firstName',
-            'lastName',
-            'salutationId',
-            'street',
-            'zipcode',
-            'city',
-            'company',
-            'department',
-            'vatId',
-            'countryStateId',
-            'countryId',
-            'additionalAddressLine1',
-            'additionalAddressLine2',
-            'phoneNumber'
-        );
+        $shippingAddress = $this->mapAddressData($shipping);
 
         $event = new DataMappingEvent($shipping, $shippingAddress, $context);
         $this->eventDispatcher->dispatch($event, CustomerEvents::MAPPING_REGISTER_ADDRESS_SHIPPING);
@@ -227,7 +345,8 @@ class AccountRegistrationService
     {
         $customer = [
             'customerNumber' => $this->numberRangeValueGenerator->getValue(
-                $this->customerRepository->getDefinition()->getEntityName(), $context->getContext(),
+                $this->customerRepository->getDefinition()->getEntityName(),
+                $context->getContext(),
                 $context->getSalesChannel()->getId()
             ),
             'salesChannelId' => $context->getSalesChannel()->getId(),
@@ -239,6 +358,8 @@ class AccountRegistrationService
             'lastName' => $data->get('lastName'),
             'email' => $data->get('email'),
             'title' => $data->get('title'),
+            'affiliateCode' => $data->get('affiliateCode'),
+            'campaignCode' => $data->get('campaignCode'),
             'active' => true,
             'birthday' => $this->getBirthday($data),
             'guest' => $isGuest,
@@ -259,31 +380,69 @@ class AccountRegistrationService
         return $customer;
     }
 
-    private function getCreateAddressValidationDefinition(string $accountType, bool $isBillingAddress, Context $context): DataValidationDefinition
+    private function getCreateAddressValidationDefinition(string $accountType, bool $isBillingAddress, SalesChannelContext $context): DataValidationDefinition
     {
-        $validation = $this->addressValidationService->buildCreateValidation($context);
-        if ($isBillingAddress && $accountType === CustomerEntity::ACCOUNT_TYPE_BUSINESS && $this->systemConfigService->get('core.loginRegistration.showAccountTypeSelection')) {
+        if ($this->addressValidationFactory instanceof DataValidationFactoryInterface) {
+            $validation = $this->addressValidationFactory->create($context);
+        } else {
+            $validation = $this->addressValidationFactory->buildCreateValidation($context->getContext());
+        }
+
+        if ($isBillingAddress
+            && $accountType === CustomerEntity::ACCOUNT_TYPE_BUSINESS
+            && $this->systemConfigService->get('core.loginRegistration.showAccountTypeSelection', $context->getSalesChannel()->getId())) {
             $validation->add('company', new NotBlank());
         }
 
-        $validationEvent = new BuildValidationEvent($validation, $context);
+        $validationEvent = new BuildValidationEvent($validation, $context->getContext());
         $this->eventDispatcher->dispatch($validationEvent, $validationEvent->getName());
 
         return $validation;
     }
 
-    private function getCustomerCreateValidationDefinition(bool $isGuest, Context $context): DataValidationDefinition
+    private function getCustomerCreateValidationDefinition(bool $isGuest, SalesChannelContext $context): DataValidationDefinition
     {
-        $validation = $this->accountValidationService->buildCreateValidation($context);
-
-        if (!$isGuest) {
-            $validation->add('password', new NotBlank(), new Length(['min' => $this->systemConfigService->get('core.loginRegistration.passwordMinLength')]));
-            $validation->add('email', new CustomerEmailUnique(['context' => $context]));
+        if ($this->addressValidationFactory instanceof DataValidationFactoryInterface) {
+            $validation = $this->accountValidationFactory->create($context);
+        } else {
+            $validation = $this->accountValidationFactory->buildCreateValidation($context->getContext());
         }
 
-        $validationEvent = new BuildValidationEvent($validation, $context);
+        if (!$isGuest) {
+            $minLength = $this->systemConfigService->get('core.loginRegistration.passwordMinLength', $context->getSalesChannel()->getId());
+            $validation->add('password', new NotBlank(), new Length(['min' => $minLength]));
+            $validation->add('email', new CustomerEmailUnique(['context' => $context->getContext()]));
+        }
+
+        $validationEvent = new BuildValidationEvent($validation, $context->getContext());
         $this->eventDispatcher->dispatch($validationEvent, $validationEvent->getName());
 
         return $validation;
+    }
+
+    private function mapAddressData(DataBag $addressData): array
+    {
+        $mappedData = $addressData->only(
+            'firstName',
+            'lastName',
+            'salutationId',
+            'street',
+            'zipcode',
+            'city',
+            'company',
+            'department',
+            'vatId',
+            'countryStateId',
+            'countryId',
+            'additionalAddressLine1',
+            'additionalAddressLine2',
+            'phoneNumber'
+        );
+
+        if (isset($mappedData['countryStateId']) && $mappedData['countryStateId'] === '') {
+            $mappedData['countryStateId'] = null;
+        }
+
+        return $mappedData;
     }
 }

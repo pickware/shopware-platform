@@ -98,7 +98,7 @@ class DocumentMetadata
             'locale' => [
                 'de_DE' => [
                     'seoUrl' => $this->getPrefixedUrlDe(),
-                    'searchableInAllLanguages' => true,
+                    'searchableInAllLanguages' => false,
                 ],
                 'en_GB' => [
                     'seoUrl' => $this->getPrefixedUrlEn(),
@@ -110,7 +110,7 @@ class DocumentMetadata
                     'title' => $this->requireMetadata('titleEn'),
                     'navigationTitle' => $this->requireMetadata('titleEn'),
                     'content' => '<p>Die Entwicklerdokumentation ist nur auf Englisch verfügbar.</p>',
-                    'searchableInAllLanguages' => true,
+                    'searchableInAllLanguages' => false,
                     'fromProductVersion' => self::INITIAL_VERSION,
                     'active' => $this->isActive(),
                     'metaTitle' => $this->getMetaTitleDe(),
@@ -144,7 +144,7 @@ class DocumentMetadata
         return '/' . implode('/', $urlParts);
     }
 
-    private function requireMetadata($key)
+    private function requireMetadata(string $key)
     {
         $metadata = $this->document->loadRawMetadata();
 

@@ -2,12 +2,13 @@
 
 namespace Shopware\Core\Framework\Plugin\Command\Lifecycle;
 
-use Shopware\Core\Framework\Cache\CacheClearer;
-use Shopware\Core\Framework\Console\ShopwareStyle;
+use Shopware\Core\Framework\Adapter\Cache\CacheClearer;
+use Shopware\Core\Framework\Adapter\Console\ShopwareStyle;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\ContainsFilter;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\MultiFilter;
 use Shopware\Core\Framework\Plugin\PluginCollection;
 use Shopware\Core\Framework\Plugin\PluginEntity;
@@ -54,7 +55,6 @@ abstract class AbstractPluginLifecycleCommand extends Command
     protected function configureCommand(string $lifecycleMethod): void
     {
         $this
-            ->setName(sprintf('plugin:%s', $lifecycleMethod))
             ->setDescription(sprintf('%ss given plugins', ucfirst($lifecycleMethod)))
             ->addArgument(
                 'plugins',
@@ -96,7 +96,7 @@ abstract class AbstractPluginLifecycleCommand extends Command
 
         if ($plugins->count() === 0) {
             $io->warning('No plugins found');
-            $io->text('Try the plugin:refresh command first, or change your search term');
+            $io->text('Try the plugin:refresh command first, run composer update for changes in the plugin\'s composer.json, or change your search term');
 
             return $plugins;
         }
@@ -119,6 +119,7 @@ abstract class AbstractPluginLifecycleCommand extends Command
     {
         if ($input->getOption('clearCache')) {
             $io->note('Clearing Cache');
+
             try {
                 $this->cacheClearer->clear();
             } catch (\Exception $e) {
@@ -147,6 +148,19 @@ abstract class AbstractPluginLifecycleCommand extends Command
     ): ?PluginCollection {
         $plugins = array_unique($arguments);
         $filter = [];
+
+        // try exact match first
+        if (count($plugins) === 1) {
+            $criteria = new Criteria();
+            $criteria->addFilter(new EqualsFilter('name', $plugins[0]));
+
+            /** @var PluginCollection $matches */
+            $matches = $this->pluginRepo->search($criteria, $context)->getEntities();
+            if ($matches->count() === 1) {
+                return $matches;
+            }
+        }
+
         foreach ($plugins as $plugin) {
             $filter[] = new ContainsFilter('name', $plugin);
         }

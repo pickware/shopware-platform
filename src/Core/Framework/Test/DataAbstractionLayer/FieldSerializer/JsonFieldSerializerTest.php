@@ -53,7 +53,7 @@ class JsonFieldSerializerTest extends TestCase
         $this->field = new JsonField('data', 'data');
 
         $definition = $this->registerDefinition(JsonDefinition::class);
-        $this->existence = new EntityExistence($definition, [], false, false, false, []);
+        $this->existence = new EntityExistence($definition->getEntityName(), [], false, false, false, []);
 
         $this->parameters = new WriteParameterBag(
             $definition,
@@ -144,6 +144,7 @@ class JsonFieldSerializerTest extends TestCase
 
         /** @var WriteConstraintViolationException|null $exception */
         $exception = null;
+
         try {
             $this->serializer->encode($field, $this->existence, $kvPair, $this->parameters)->current();
         } catch (\Throwable $e) {
@@ -151,7 +152,7 @@ class JsonFieldSerializerTest extends TestCase
         }
 
         static::assertInstanceOf(WriteConstraintViolationException::class, $exception, 'JsonFieldSerializer does not throw violation exception for empty required field.');
-        static::assertEquals('/data', $exception->getPath());
+        static::assertEquals('/data', $exception->getViolations()->get(0)->getPropertyPath());
     }
 
     public function testNullValueForNotRequiredField(): void

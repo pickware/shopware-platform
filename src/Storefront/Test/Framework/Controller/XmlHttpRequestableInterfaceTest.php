@@ -9,37 +9,37 @@ class XmlHttpRequestableInterfaceTest extends TestCase
 {
     use SalesChannelFunctionalTestBehaviour;
 
-    public function testPageLoads()
+    public function testPageLoads(): void
     {
         $client = $this->createSalesChannelBrowser(null, true);
-        $client->request('GET', getenv('APP_URL'));
+        $client->request('GET', 'http://localhost/');
 
         static::assertEquals(200, $client->getResponse()->getStatusCode());
     }
 
-    public function testAccessDeniedForXmlHttpRequest()
+    public function testAccessDeniedForXmlHttpRequest(): void
     {
         $client = $this->createSalesChannelBrowser(null, true);
 
-        $client->xmlHttpRequest('GET', getenv('APP_URL'));
+        $client->xmlHttpRequest('GET', 'http://localhost/');
 
         static::assertEquals(403, $client->getResponse()->getStatusCode());
     }
 
-    public function testPageletLoads()
+    public function testPageletLoads(): void
     {
         $client = $this->createSalesChannelBrowser(null, true);
 
-        $client->request('GET', getenv('APP_URL') . '/widgets/checkout/info');
+        $client->request('GET', 'http://localhost/widgets/checkout/info');
 
         static::assertEquals(200, $client->getResponse()->getStatusCode());
     }
 
-    public function testPageletLoadsForXmlHttpRequest()
+    public function testPageletLoadsForXmlHttpRequest(): void
     {
         $client = $this->createSalesChannelBrowser(null, true);
 
-        $client->xmlHttpRequest('GET', getenv('APP_URL') . '/widgets/checkout/info');
+        $client->xmlHttpRequest('GET', 'http://localhost/widgets/checkout/info');
 
         static::assertEquals(200, $client->getResponse()->getStatusCode());
     }

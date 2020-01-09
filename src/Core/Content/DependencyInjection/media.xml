@@ -76,18 +76,28 @@
 
         <service id="Shopware\Core\Content\Media\DataAbstractionLayer\Indexing\MediaFolderConfigIndexer">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory"/>
             <argument type="service" id="media_folder.repository"/>
+            <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator"/>
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Cache\CacheClearer"/>
+            <tag name="shopware.dal_indexing.indexer" priority="500"/>
+        </service>
+
+        <service id="Shopware\Core\Content\Media\DataAbstractionLayer\Indexing\MediaFolderSizeIndexer">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory"/>
             <argument type="service" id="media_folder_configuration.repository"/>
             <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator"/>
-            <argument type="service" id="shopware.cache"/>
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Cache\CacheClearer"/>
             <tag name="shopware.dal_indexing.indexer" priority="500"/>
         </service>
 
         <service id="Shopware\Core\Content\Media\DataAbstractionLayer\Indexing\MediaThumbnailIndexer">
             <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory"/>
             <argument type="service" id="media.repository"/>
             <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Cache\EntityCacheKeyGenerator"/>
-            <argument type="service" id="shopware.cache"/>
+            <argument type="service" id="Shopware\Core\Framework\Adapter\Cache\CacheClearer"/>
             <argument type="service" id="Shopware\Core\Content\Media\MediaDefinition"/>
             <tag name="shopware.dal_indexing.indexer"/>
             <tag name="kernel.event_subscriber"/>
@@ -156,11 +166,13 @@
         <service id="Shopware\Core\Content\Media\Commands\GenerateMediaTypesCommand">
             <argument type="service" id="Shopware\Core\Content\Media\TypeDetector\TypeDetector"/>
             <argument type="service" id="media.repository"/>
+
             <tag name="console.command"/>
         </service>
 
         <service id="Shopware\Core\Content\Media\Commands\DeleteNotUsedMediaCommand">
             <argument type="service" id="Shopware\Core\Content\Media\DeleteNotUsedMediaService"/>
+
             <tag name="console.command"/>
         </service>
 
@@ -180,7 +192,15 @@
             <argument>%shopware.cdn.strategy%</argument>
         </service>
 
-        <service id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\Md5PathnameStrategy">
+        <service id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\FilenamePathnameStrategy">
+            <argument type="service" id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\PlainPathnameStrategy"/>
+
+            <tag name="shopware.pathname.strategy"/>
+        </service>
+
+        <service id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\PhysicalFilenamePathnameStrategy">
+            <argument type="service" id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\PlainPathnameStrategy"/>
+
             <tag name="shopware.pathname.strategy"/>
         </service>
 
@@ -188,9 +208,15 @@
             <tag name="shopware.pathname.strategy"/>
         </service>
 
+        <service id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\IdPathnameStrategy">
+            <argument type="service" id="Shopware\Core\Content\Media\Pathname\PathnameStrategy\PlainPathnameStrategy"/>
+
+            <tag name="shopware.pathname.strategy"/>
+        </service>
+
         <!-- Controller -->
         <service id="Shopware\Core\Content\Media\Api\MediaUploadController" public="true">
-            <argument type="service" id="Shopware\Core\Content\Media\File\FileFetcher"/>
+            <argument type="service" id="Shopware\Core\Content\Media\MediaService"/>
             <argument type="service" id="Shopware\Core\Content\Media\File\FileSaver"/>
             <argument type="service" id="Shopware\Core\Content\Media\File\FileNameProvider"/>
             <argument type="service" id="Shopware\Core\Content\Media\MediaDefinition"/>

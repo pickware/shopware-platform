@@ -63,7 +63,7 @@ class LineItemUnitPriceRule extends Rule
                 return FloatComparator::notEquals($unitPrice, $this->amount);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -72,6 +72,7 @@ class LineItemUnitPriceRule extends Rule
         return [
             'amount' => [new NotBlank(), new Type('numeric')],
             'operator' => [
+                new NotBlank(),
                 new Choice(
                     [
                         self::OPERATOR_NEQ,

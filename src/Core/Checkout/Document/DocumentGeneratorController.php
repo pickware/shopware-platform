@@ -6,11 +6,15 @@ use Shopware\Core\Checkout\Document\Exception\InvalidDocumentGeneratorTypeExcept
 use Shopware\Core\Checkout\Document\Exception\InvalidFileGeneratorTypeException;
 use Shopware\Core\Checkout\Document\FileGenerator\FileTypes;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
+/**
+ * @RouteScope(scopes={"api"})
+ */
 class DocumentGeneratorController extends AbstractController
 {
     /**
@@ -23,7 +27,6 @@ class DocumentGeneratorController extends AbstractController
         $this->documentService = $documentService;
     }
 
-    /**
     /**
      * @Route("/api/v{version}/_action/order/{orderId}/document/{documentTypeName}", name="api.action.document.invoice", methods={"POST"})
      *
@@ -42,13 +45,34 @@ class DocumentGeneratorController extends AbstractController
             $fileType,
             $config,
             $context,
-            $referencedDocumentId
+            $referencedDocumentId,
+            $request->request->get('static', false)
         );
 
         return new JsonResponse(
             [
                 'documentId' => $documentIdStruct->getId(),
                 'documentDeepLink' => $documentIdStruct->getDeepLinkCode(),
-            ]);
+            ]
+        );
+    }
+
+    /**
+     * @Route("/api/v{version}/_action/document/{documentId}/upload", name="api.action.document.upload", methods={"POST"})
+     */
+    public function uploadToDocument(Request $request, string $documentId, Context $context): JsonResponse
+    {
+        $documentIdStruct = $this->documentService->uploadFileForDocument(
+            $documentId,
+            $context,
+            $request
+        );
+
+        return new JsonResponse(
+            [
+                'documentId' => $documentIdStruct->getId(),
+                'documentDeepLink' => $documentIdStruct->getDeepLinkCode(),
+            ]
+        );
     }
 }

@@ -9,6 +9,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
 class RuleConditionEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string
      */
@@ -109,7 +110,7 @@ class RuleConditionEntity extends Entity
         return $this->children;
     }
 
-    public function setChildren(?RuleConditionCollection $children): void
+    public function setChildren(RuleConditionCollection $children): void
     {
         $this->children = $children;
     }

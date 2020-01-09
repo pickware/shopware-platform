@@ -26,6 +26,18 @@ class PromotionDiscountEntity extends Entity
     public const SCOPE_DELIVERY = 'delivery';
 
     /**
+     * This scope defines promotion discounts on
+     * the whole set of groups
+     */
+    public const SCOPE_SET = 'set';
+
+    /**
+     * This scope defines promotion discounts on
+     * a specific set group.
+     */
+    public const SCOPE_SETGROUP = 'setgroup';
+
+    /**
      * This type defines a percentage
      * price definition of the discount.
      */
@@ -39,7 +51,13 @@ class PromotionDiscountEntity extends Entity
     public const TYPE_ABSOLUTE = 'absolute';
 
     /**
-     * This type defines an fixed price
+     * This type defines an fixed unit price
+     * definition of the discount.
+     */
+    public const TYPE_FIXED_UNIT = 'fixed_unit';
+
+    /**
+     * This type defines a fixed price
      * definition of the discount.
      */
     public const TYPE_FIXED = 'fixed';
@@ -88,6 +106,21 @@ class PromotionDiscountEntity extends Entity
      * @var PromotionDiscountPriceCollection
      */
     protected $promotionDiscountPrices;
+
+    /**
+     * @var string
+     */
+    protected $sorterKey;
+
+    /**
+     * @var string
+     */
+    protected $applierKey;
+
+    /**
+     * @var string
+     */
+    protected $usageKey;
 
     public function getPromotionId(): string
     {
@@ -153,7 +186,7 @@ class PromotionDiscountEntity extends Entity
         return $this->discountRules;
     }
 
-    public function setDiscountRules(?RuleCollection $discountRules): void
+    public function setDiscountRules(RuleCollection $discountRules): void
     {
         $this->discountRules = $discountRules;
     }
@@ -169,7 +202,7 @@ class PromotionDiscountEntity extends Entity
         return $this->promotionDiscountPrices;
     }
 
-    public function setPromotionDiscountPrices(?PromotionDiscountPriceCollection $promotionDiscountPrices): void
+    public function setPromotionDiscountPrices(PromotionDiscountPriceCollection $promotionDiscountPrices): void
     {
         $this->promotionDiscountPrices = $promotionDiscountPrices;
     }
@@ -204,5 +237,74 @@ class PromotionDiscountEntity extends Entity
     public function setMaxValue(?float $maxValue): void
     {
         $this->maxValue = $maxValue;
+    }
+
+    /**
+     * Gets if the scope is set to a custom setgroup.
+     * The scope contains the groupId, so a prefix
+     * match must occur.
+     */
+    public function isScopeSetGroup(): bool
+    {
+        $prefix = PromotionDiscountEntity::SCOPE_SETGROUP . '-';
+
+        return mb_strpos($this->scope, $prefix) === 0;
+    }
+
+    /**
+     * Gets the assigned groupId if
+     * the discount scope has been set to setgroup.
+     */
+    public function getSetGroupId(): string
+    {
+        if (!$this->isScopeSetGroup()) {
+            return '';
+        }
+
+        $prefix = PromotionDiscountEntity::SCOPE_SETGROUP . '-';
+
+        return str_replace($prefix, '', $this->scope);
+    }
+
+    public function getSorterKey(): string
+    {
+        if ($this->sorterKey === null) {
+            return '';
+        }
+
+        return $this->sorterKey;
+    }
+
+    public function setSorterKey(string $sorterKey): void
+    {
+        $this->sorterKey = $sorterKey;
+    }
+
+    public function getApplierKey(): string
+    {
+        if ($this->applierKey === null) {
+            return '';
+        }
+
+        return $this->applierKey;
+    }
+
+    public function setApplierKey(string $applierKey): void
+    {
+        $this->applierKey = $applierKey;
+    }
+
+    public function getUsageKey(): string
+    {
+        if ($this->usageKey === null) {
+            return '';
+        }
+
+        return $this->usageKey;
+    }
+
+    public function setUsageKey(string $usageKey): void
+    {
+        $this->usageKey = $usageKey;
     }
 }

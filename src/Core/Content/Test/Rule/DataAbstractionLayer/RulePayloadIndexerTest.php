@@ -15,6 +15,7 @@ use Shopware\Core\Framework\Plugin\Context\DeactivateContext;
 use Shopware\Core\Framework\Plugin\Context\InstallContext;
 use Shopware\Core\Framework\Plugin\Context\UninstallContext;
 use Shopware\Core\Framework\Plugin\Context\UpdateContext;
+use Shopware\Core\Framework\Plugin\Event\PluginLifecycleEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPostActivateEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPostDeactivateEvent;
 use Shopware\Core\Framework\Plugin\Event\PluginPostInstallEvent;
@@ -89,6 +90,7 @@ class RulePayloadIndexerTest extends TestCase
                                     $currencyId1,
                                     $currencyId2,
                                 ],
+                                'operator' => CurrencyRule::OPERATOR_EQ,
                             ],
                         ],
                     ],
@@ -132,6 +134,7 @@ class RulePayloadIndexerTest extends TestCase
                                     $currencyId1,
                                     $currencyId2,
                                 ],
+                                'operator' => CurrencyRule::OPERATOR_EQ,
                             ],
                         ],
                     ],
@@ -175,6 +178,7 @@ class RulePayloadIndexerTest extends TestCase
                                         $currencyId1,
                                         $currencyId2,
                                     ],
+                                    'operator' => CurrencyRule::OPERATOR_EQ,
                                 ],
                             ],
                         ],
@@ -193,6 +197,7 @@ class RulePayloadIndexerTest extends TestCase
                                 $salesChannelId1,
                                 $salesChannelId2,
                             ],
+                            'operator' => CurrencyRule::OPERATOR_EQ,
                         ],
                     ],
                 ],
@@ -247,6 +252,7 @@ class RulePayloadIndexerTest extends TestCase
                                         $currencyId1,
                                         $currencyId2,
                                     ],
+                                    'operator' => CurrencyRule::OPERATOR_EQ,
                                 ],
                             ],
                         ],
@@ -265,6 +271,7 @@ class RulePayloadIndexerTest extends TestCase
                                 $salesChannelId1,
                                 $salesChannelId2,
                             ],
+                            'operator' => SalesChannelRule::OPERATOR_EQ,
                         ],
                     ],
                 ],
@@ -312,6 +319,7 @@ class RulePayloadIndexerTest extends TestCase
                                             Uuid::randomHex(),
                                             Uuid::randomHex(),
                                         ],
+                                        'operator' => CurrencyRule::OPERATOR_EQ,
                                     ],
                                 ],
                             ],
@@ -356,6 +364,7 @@ class RulePayloadIndexerTest extends TestCase
                             $currencyId1,
                             $currencyId2,
                         ],
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ],
@@ -394,6 +403,7 @@ class RulePayloadIndexerTest extends TestCase
                             $currencyId1,
                             $currencyId2,
                         ],
+                        'operator' => CurrencyRule::OPERATOR_EQ,
                     ],
                 ],
             ],
@@ -413,7 +423,7 @@ class RulePayloadIndexerTest extends TestCase
     /**
      * @dataProvider dataProviderForTestPostEventNullsPayload
      */
-    public function testPostEventNullsPayload(Plugin\Event\PluginLifecycleEvent $event): void
+    public function testPostEventNullsPayload(PluginLifecycleEvent $event): void
     {
         $payload = serialize(new AndRule());
 

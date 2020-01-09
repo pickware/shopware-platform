@@ -69,6 +69,7 @@ class SalesChannelEntityCompilerPass implements CompilerPassInterface
             $service = $container->getDefinition($serviceId);
 
             $repositoryId = 'sales_channel.' . $entityName . '.repository';
+
             try {
                 $container->getDefinition($repositoryId);
             } catch (ServiceNotFoundException $exception) {
@@ -102,7 +103,7 @@ class SalesChannelEntityCompilerPass implements CompilerPassInterface
 
         foreach ($taggedServiceIds as $serviceId => $tags) {
             if (!isset($tags[0]['entity'])) {
-                throw new \RuntimeException(sprintf('Malformed configuration found for "%s"', $serviceId));
+                throw new \RuntimeException(sprintf('Missing attribute "entity" on tag "shopware.entity.definition" for definition with id "%s"', $serviceId));
             }
 
             $entityName = $tags[0]['entity'];

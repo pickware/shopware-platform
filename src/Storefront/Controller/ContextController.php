@@ -5,6 +5,7 @@ namespace Shopware\Storefront\Controller;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
+use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Shopware\Core\Framework\Routing\Exception\LanguageNotFoundException;
 use Shopware\Core\Framework\Routing\Exception\MissingRequestParameterException;
 use Shopware\Core\Framework\Validation\DataBag\RequestDataBag;
@@ -20,6 +21,9 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Routing\RouterInterface;
 
+/**
+ * @RouteScope(scopes={"storefront"})
+ */
 class ContextController extends StorefrontController
 {
     /**
@@ -66,16 +70,9 @@ class ContextController extends StorefrontController
      */
     public function configure(Request $request, RequestDataBag $data, SalesChannelContext $context): Response
     {
-        $route = $request->get('redirectTo', 'frontend.checkout.cart.page');
-        $parameters = $request->get('redirectParameters', []);
-
-        //since the keys "redirectTo" and "redirectParameters" are used to configure this action, the shall not be persisted
-        $data->remove('redirectTo');
-        $data->remove('redirectParameters');
-
         $this->contextSwitcher->update($data, $context);
 
-        return $this->redirectToRoute($route, $parameters);
+        return $this->createActionResponse($request);
     }
 
     /**
@@ -94,10 +91,9 @@ class ContextController extends StorefrontController
         $criteria->addFilter(new EqualsFilter('salesChannelId', $context->getSalesChannel()->getId()));
         $criteria->setLimit(1);
 
+        /** @var SalesChannelDomainEntity|null $domain */
         $domain = $this->domainRepository->search($criteria, $context->getContext())->first();
-
-        /** @var SalesChannelDomainEntity $domain */
-        if (!$domain) {
+        if ($domain === null) {
             throw new LanguageNotFoundException($languageId);
         }
 
@@ -114,7 +110,7 @@ class ContextController extends StorefrontController
 
         $params = $request->request->get('redirectParameters', json_encode([]));
 
-        if (is_string($params)) {
+        if (\is_string($params)) {
             $params = json_decode($params, true);
         }
 
@@ -147,10 +143,11 @@ class ContextController extends StorefrontController
             $domain->getUrl()
         );
 
-        $this->router->getContext()->setHttpPort(80);
-        $this->router->getContext()->setMethod('GET');
-        $this->router->getContext()->setHost($url);
-        $this->router->getContext()->setBaseUrl('');
+        $routerContext = $this->router->getContext();
+        $routerContext->setHttpPort(80);
+        $routerContext->setMethod('GET');
+        $routerContext->setHost($url);
+        $routerContext->setBaseUrl('');
 
         $this->requestStack->getMasterRequest()
             ->attributes->set(RequestTransformer::SALES_CHANNEL_BASE_URL, '');

@@ -8,7 +8,7 @@ use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
-use Shopware\Core\Framework\Logging\ScheduledTask\LogCleanupTaskHandler;
+use Shopware\Core\Framework\Log\ScheduledTask\LogCleanupTaskHandler;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
 
@@ -65,13 +65,13 @@ class LogCleanupTaskHandlerTest extends TestCase
     public function testCleanupWithAgeLimit(): void
     {
         $year = 60 * 60 * 24 * 31 * 12;
-        $this->runWithOptions(intval($year * 1.5), -1, ['test1']);
+        $this->runWithOptions((int) ($year * 1.5), -1, ['test1']);
     }
 
     public function testCleanupWithBothLimits(): void
     {
         $year = 60 * 60 * 24 * 31 * 12;
-        $this->runWithOptions(intval($year * 1.5), 2, ['test1']);
+        $this->runWithOptions((int) ($year * 1.5), 2, ['test1']);
     }
 
     private function runWithOptions(int $age, int $maxEntries, array $expectedMessages): void

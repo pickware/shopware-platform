@@ -3,23 +3,23 @@
 namespace Shopware\Core\Framework\Test\Snippet\Filter;
 
 use PHPUnit\Framework\TestCase;
-use Shopware\Core\Framework\Snippet\Filter\AuthorFilter;
+use Shopware\Core\System\Snippet\Filter\AuthorFilter;
 
 class AuthorFilterTest extends TestCase
 {
-    public function testGetFilterName()
+    public function testGetFilterName(): void
     {
         static::assertSame('author', (new AuthorFilter())->getName());
     }
 
-    public function testSupports()
+    public function testSupports(): void
     {
         static::assertTrue((new AuthorFilter())->supports('author'));
         static::assertFalse((new AuthorFilter())->supports(''));
         static::assertFalse((new AuthorFilter())->supports('test'));
     }
 
-    public function testFilter()
+    public function testFilter(): void
     {
         $snippets = [
             'firstSetId' => [
@@ -88,7 +88,7 @@ class AuthorFilterTest extends TestCase
         static::assertEquals($expected, $result);
     }
 
-    public function testFilterDoesntRemoveSnippetInOtherSet()
+    public function testFilterDoesntRemoveSnippetInOtherSet(): void
     {
         $snippets = [
             'firstSetId' => [
@@ -153,7 +153,7 @@ class AuthorFilterTest extends TestCase
         static::assertEquals($expected, $result);
     }
 
-    public function testFilterWithMultipleAuthors()
+    public function testFilterWithMultipleAuthors(): void
     {
         $snippets = [
             'firstSetId' => [

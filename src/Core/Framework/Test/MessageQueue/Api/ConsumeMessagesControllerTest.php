@@ -6,7 +6,7 @@ use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\MessageQueue\ScheduledTask\RequeueDeadMessagesTask;
-use Shopware\Core\Framework\ScheduledTask\ScheduledTaskDefinition;
+use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskDefinition;
 use Shopware\Core\Framework\Test\TestCaseBase\AdminFunctionalTestBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\QueueTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
@@ -17,7 +17,7 @@ class ConsumeMessagesControllerTest extends TestCase
     use AdminFunctionalTestBehaviour;
     use QueueTestBehaviour;
 
-    public function testConsumeMessages()
+    public function testConsumeMessages(): void
     {
         $connection = $this->getContainer()->get(Connection::class);
         $connection->exec('DELETE FROM scheduled_task');

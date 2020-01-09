@@ -11,9 +11,9 @@ use Shopware\Core\Framework\Rule\DateRangeRule;
 use Shopware\Core\Framework\Test\TestCaseBase\DatabaseTransactionBehaviour;
 use Shopware\Core\Framework\Test\TestCaseBase\KernelTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Shopware\Core\Framework\Validation\WriteConstraintViolationException;
 use Symfony\Component\Validator\Constraints\DateTime;
 use Symfony\Component\Validator\Constraints\NotBlank;
+use Symfony\Component\Validator\Constraints\NotNull;
 use Symfony\Component\Validator\Constraints\Type;
 
 class DateRangeRuleTest extends TestCase
@@ -46,151 +46,86 @@ class DateRangeRuleTest extends TestCase
     public function testValidateWithoutParameters(): void
     {
         $conditionId = Uuid::randomHex();
-        try {
-            $this->conditionRepository->create([
-                [
-                    'id' => $conditionId,
-                    'type' => (new DateRangeRule())->getName(),
-                    'ruleId' => Uuid::randomHex(),
-                ],
-            ], $this->context);
-            static::fail('Exception was not thrown');
-        } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(2, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/fromDate', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-                static::assertSame('/conditions/' . $conditionId . '/toDate', $exception->getViolations()->get(1)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(1)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(1)->getMessage());
-            }
-        }
-    }
 
-    public function testValidateWithoutFromDate(): void
-    {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
                     'id' => $conditionId,
                     'type' => (new DateRangeRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
-                    'value' => [
-                        'toDate' => '2018-12-06T10:03:35+00:00',
-                    ],
                 ],
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/fromDate', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
-        }
-    }
+            $exceptions = iterator_to_array($stackException->getErrors());
+            static::assertCount(3, $exceptions);
 
-    public function testValidateWithoutToDate(): void
-    {
-        $conditionId = Uuid::randomHex();
-        try {
-            $this->conditionRepository->create([
-                [
-                    'id' => $conditionId,
-                    'type' => (new DateRangeRule())->getName(),
-                    'ruleId' => Uuid::randomHex(),
-                    'value' => [
-                        'fromDate' => '2018-12-06T10:03:35+00:00',
-                    ],
-                ],
-            ], $this->context);
-            static::fail('Exception was not thrown');
-        } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/toDate', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(NotBlank::IS_BLANK_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should not be blank.', $exception->getViolations()->get(0)->getMessage());
-            }
+            static::assertSame('/0/value/fromDate', $exceptions[0]['source']['pointer']);
+            static::assertSame(NotBlank::IS_BLANK_ERROR, $exceptions[0]['code']);
+
+            static::assertSame('/0/value/toDate', $exceptions[1]['source']['pointer']);
+            static::assertSame(NotBlank::IS_BLANK_ERROR, $exceptions[1]['code']);
+
+            static::assertSame('/0/value/useTime', $exceptions[2]['source']['pointer']);
+            static::assertSame(NotNull::IS_NULL_ERROR, $exceptions[2]['code']);
         }
     }
 
     public function testValidateWithInvalidFromDateFormat(): void
     {
-        $conditionId = Uuid::randomHex();
         foreach ([true, 'Invalid'] as $value) {
             try {
                 $this->conditionRepository->create([
                     [
-                        'id' => $conditionId,
                         'type' => (new DateRangeRule())->getName(),
                         'ruleId' => Uuid::randomHex(),
                         'value' => [
                             'fromDate' => $value,
                             'toDate' => '2018-12-06T10:03:35+00:00',
+                            'useTime' => true,
                         ],
                     ],
                 ], $this->context);
                 static::fail('Exception was not thrown');
             } catch (WriteException $stackException) {
-                static::assertGreaterThan(0, count($stackException->getExceptions()));
-                /** @var WriteConstraintViolationException $exception */
-                foreach ($stackException->getExceptions() as $exception) {
-                    static::assertCount(1, $exception->getViolations());
-                    static::assertSame('/conditions/' . $conditionId . '/fromDate', $exception->getViolations()->get(0)->getPropertyPath());
-                    static::assertSame(DateTime::INVALID_FORMAT_ERROR, $exception->getViolations()->get(0)->getCode());
-                    static::assertSame('This value is not a valid datetime.', $exception->getViolations()->get(0)->getMessage());
-                }
+                $exceptions = iterator_to_array($stackException->getErrors());
+                static::assertCount(1, $exceptions);
+                static::assertSame('/0/value/fromDate', $exceptions[0]['source']['pointer']);
+                static::assertSame(DateTime::INVALID_FORMAT_ERROR, $exceptions[0]['code']);
             }
         }
     }
 
     public function testValidateWithInvalidToDateFormat(): void
     {
-        $conditionId = Uuid::randomHex();
         foreach ([true, 'Invalid'] as $value) {
             try {
                 $this->conditionRepository->create([
                     [
-                        'id' => $conditionId,
                         'type' => (new DateRangeRule())->getName(),
                         'ruleId' => Uuid::randomHex(),
                         'value' => [
                             'toDate' => $value,
                             'fromDate' => '2018-12-06T10:03:35+00:00',
+                            'useTime' => true,
                         ],
                     ],
                 ], $this->context);
                 static::fail('Exception was not thrown');
             } catch (WriteException $stackException) {
-                static::assertGreaterThan(0, count($stackException->getExceptions()));
-                /** @var WriteConstraintViolationException $exception */
-                foreach ($stackException->getExceptions() as $exception) {
-                    static::assertCount(1, $exception->getViolations());
-                    static::assertSame('/conditions/' . $conditionId . '/toDate', $exception->getViolations()->get(0)->getPropertyPath());
-                    static::assertSame(DateTime::INVALID_FORMAT_ERROR, $exception->getViolations()->get(0)->getCode());
-                    static::assertSame('This value is not a valid datetime.', $exception->getViolations()->get(0)->getMessage());
-                }
+                $exceptions = iterator_to_array($stackException->getErrors());
+                static::assertCount(1, $exceptions);
+                static::assertSame('/0/value/toDate', $exceptions[0]['source']['pointer']);
+                static::assertSame(DateTime::INVALID_FORMAT_ERROR, $exceptions[0]['code']);
             }
         }
     }
 
     public function testValidateWithInvalidUseTime(): void
     {
-        $conditionId = Uuid::randomHex();
         try {
             $this->conditionRepository->create([
                 [
-                    'id' => $conditionId,
                     'type' => (new DateRangeRule())->getName(),
                     'ruleId' => Uuid::randomHex(),
                     'value' => [
@@ -202,14 +137,10 @@ class DateRangeRuleTest extends TestCase
             ], $this->context);
             static::fail('Exception was not thrown');
         } catch (WriteException $stackException) {
-            static::assertGreaterThan(0, count($stackException->getExceptions()));
-            /** @var WriteConstraintViolationException $exception */
-            foreach ($stackException->getExceptions() as $exception) {
-                static::assertCount(1, $exception->getViolations());
-                static::assertSame('/conditions/' . $conditionId . '/useTime', $exception->getViolations()->get(0)->getPropertyPath());
-                static::assertSame(Type::INVALID_TYPE_ERROR, $exception->getViolations()->get(0)->getCode());
-                static::assertSame('This value should be of type bool.', $exception->getViolations()->get(0)->getMessage());
-            }
+            $exceptions = iterator_to_array($stackException->getErrors());
+            static::assertCount(1, $exceptions);
+            static::assertSame('/0/value/useTime', $exceptions[0]['source']['pointer']);
+            static::assertSame(Type::INVALID_TYPE_ERROR, $exceptions[0]['code']);
         }
     }
 

@@ -48,7 +48,7 @@ class ShippingZipCodeRule extends Rule
                 return !\in_array($location->getZipcode(), $this->zipCodes, true);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -56,7 +56,7 @@ class ShippingZipCodeRule extends Rule
     {
         return [
             'zipCodes' => [new NotBlank(), new ArrayOfType('string')],
-            'operator' => [new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_EQ, self::OPERATOR_NEQ])],
         ];
     }
 

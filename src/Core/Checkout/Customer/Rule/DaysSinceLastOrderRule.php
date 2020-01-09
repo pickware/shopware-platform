@@ -48,14 +48,12 @@ class DaysSinceLastOrderRule extends Rule
         }
 
         $currentDate = $this->dateTime ?? new \DateTime();
-        $lastOrderDate = null;
         $customer = $scope->getSalesChannelContext()->getCustomer();
 
         if (!$customer) {
             return false;
         }
 
-        /** @var \DateTimeInterface|null $lastOrderDate */
         $lastOrderDate = $customer->getLastOrderDate();
 
         if ($lastOrderDate === null) {
@@ -82,7 +80,7 @@ class DaysSinceLastOrderRule extends Rule
                         && (int) $currentDate->format('i') < (int) $lastOrderDate->format('i')
                     )
                 )
-            ) {
+        ) {
             $interval = $lastOrderDate->diff($currentDate->modify('+1 day'));
         }
 
@@ -100,7 +98,7 @@ class DaysSinceLastOrderRule extends Rule
             case self::OPERATOR_GTE:
                 return $interval->days >= $this->daysPassed;
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -109,6 +107,7 @@ class DaysSinceLastOrderRule extends Rule
         return [
             'daysPassed' => [new NotBlank(), new Type('int')],
             'operator' => [
+                new NotBlank(),
                 new Choice(
                     [
                         self::OPERATOR_EQ,

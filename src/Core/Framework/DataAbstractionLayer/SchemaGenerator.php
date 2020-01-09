@@ -18,6 +18,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\CascadeDelete;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\RestrictDelete;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Runtime;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FloatField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
@@ -35,6 +36,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\PasswordField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceDefinitionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\RemoteAddressField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
@@ -64,7 +66,7 @@ EOL;
         $columns = [];
 
         foreach ($definition->getFields() as $field) {
-            $columns[] = $this->generateFieldColumn($definition, $field);
+            $columns[] = $this->generateFieldColumn($field);
         }
         $columns = array_filter($columns);
 
@@ -86,7 +88,7 @@ EOL;
         return $template;
     }
 
-    private function generateFieldColumn(EntityDefinition $definition, Field $field): ?string
+    private function generateFieldColumn(Field $field): ?string
     {
         if ($field->is(Runtime::class)) {
             return null;
@@ -112,16 +114,19 @@ EOL;
             case $field instanceof IdField:
             case $field instanceof FkField:
                 $type = 'BINARY(16)';
+
                 break;
 
             case $field instanceof UpdatedAtField:
             case $field instanceof CreatedAtField:
             case $field instanceof DateTimeField:
                 $type = 'DATETIME(3)';
+
                 break;
 
             case $field instanceof DateField:
                 $type = 'DATE';
+
                 break;
 
             case $field instanceof TranslatedField:
@@ -137,43 +142,58 @@ EOL;
             case $field instanceof ListField:
             case $field instanceof JsonField:
                 $type = 'JSON';
+
                 break;
 
             case $field instanceof ChildCountField:
             case $field instanceof IntField:
                 $type = 'INT(11)';
+
                 break;
 
             case $field instanceof TreePathField:
             case $field instanceof LongTextField:
             case $field instanceof LongTextWithHtmlField:
                 $type = 'LONGTEXT';
+
                 break;
 
             case $field instanceof TreeLevelField:
                 $type = 'INT';
+
                 break;
 
             case $field instanceof PasswordField:
                 $type = 'VARCHAR(1024)';
+
                 break;
 
             case $field instanceof FloatField:
                 $type = 'DOUBLE';
+
                 break;
 
             case $field instanceof StringField:
                 $type = 'VARCHAR(' . $field->getMaxLength() . ')';
+
                 break;
 
             case $field instanceof BoolField:
                 $type = 'TINYINT(1)';
                 $default = "DEFAULT '0'";
+
                 break;
 
             case $field instanceof BlobField:
                 $type = 'LONGBLOB';
+
                 break;
+
+            case $field instanceof RemoteAddressField:
+                $type = 'VARCHAR(255)';
+
+                break;
+
             default:
                 throw new \RuntimeException(sprintf('Unknown field %s', get_class($field)));
         }
@@ -250,6 +270,7 @@ EOL;
                 foreach ($referenceVersionFields as $referenceVersionField) {
                     if ($referenceVersionField->getVersionReferenceDefinition() === $reference) {
                         $versionField = $referenceVersionField;
+
                         break;
                     }
                 }
@@ -278,8 +299,10 @@ EOL;
 
             if ($field->is(CascadeDelete::class)) {
                 $delete = 'CASCADE';
-            } else {
+            } elseif ($field->is(RestrictDelete::class)) {
                 $delete = 'RESTRICT';
+            } else {
+                $delete = 'SET NULL';
             }
 
             //skip foreign key to prevent bi-directional foreign key

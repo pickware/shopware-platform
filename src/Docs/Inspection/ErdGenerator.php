@@ -35,7 +35,7 @@ class ErdGenerator
                     new class($definition->entityName()) extends Field {
                         protected function getSerializerClass(): string
                         {
-                            /* nth */
+                            return '';
                         }
                     },
                     'Table'
@@ -83,6 +83,7 @@ class ErdGenerator
                         $this->toId($associated->toClassName()),
                         $associated->entityName()
                     );
+
                     continue;
                 }
 

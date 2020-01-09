@@ -8,7 +8,6 @@ class FeatureFlagGenerator
 <?php declare(strict_types=1);
 
 namespace %s {
-
     use PHPUnit\Framework\TestCase;
     use Shopware\Core\Framework\FeatureFlag\FeatureConfig;
 
@@ -26,7 +25,7 @@ namespace %s {
 
     function if%sCall($object, string $methodName, ...$arguments): void
     {
-        $closure = function () use ($methodName, $arguments) {
+        $closure = function () use ($methodName, $arguments): void {
             $this->{$methodName}(...$arguments);
         };
 
@@ -106,7 +105,7 @@ EOD;
     {
         $lowerCamelCaseName = $this->toLowerCamelCase($featureName);
         $upperCamelCase = ucfirst($lowerCamelCaseName);
-        $capitalName = strtoupper($lowerCamelCaseName);
+        $capitalName = mb_strtoupper($lowerCamelCaseName);
         $featureFilePath = $destinationPath . "/feature_$lowerCamelCaseName.js";
 
         $contents = sprintf(
@@ -132,12 +131,12 @@ EOD;
 
     public function getEnvironmentName(string $string): string
     {
-        return 'FEATURE_' . str_replace(' ', '_', strtoupper(trim(preg_replace('/[^\da-z]/i', ' ', $string))));
+        return 'FEATURE_' . str_replace(' ', '_', mb_strtoupper(trim(preg_replace('/[^\da-z]/i', ' ', $string))));
     }
 
     private function toLowerCamelCase(string $string): string
     {
-        $cleanedFeatureName = strtolower(preg_replace('/[^\da-z]/i', ' ', $string));
+        $cleanedFeatureName = mb_strtolower(preg_replace('/[^\da-z]/i', ' ', $string));
 
         $parts = explode(' ', $cleanedFeatureName);
 

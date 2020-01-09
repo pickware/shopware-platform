@@ -47,7 +47,7 @@ class ShippingCountryRule extends Rule
                 return !\in_array($context->getShippingLocation()->getCountry()->getId(), $this->countryIds, true);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -55,7 +55,7 @@ class ShippingCountryRule extends Rule
     {
         return [
             'countryIds' => [new NotBlank(), new ArrayOfUuid()],
-            'operator' => [new Choice([self::OPERATOR_NEQ, self::OPERATOR_EQ])],
+            'operator' => [new NotBlank(), new Choice([self::OPERATOR_NEQ, self::OPERATOR_EQ])],
         ];
     }
 

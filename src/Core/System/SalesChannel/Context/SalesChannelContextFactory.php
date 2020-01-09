@@ -9,15 +9,19 @@ use Shopware\Core\Checkout\Customer\CustomerEntity;
 use Shopware\Core\Checkout\Payment\PaymentMethodEntity;
 use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Defaults;
+use Shopware\Core\Framework\Api\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\Context\SalesChannelApiSource;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Routing\Exception\LanguageNotFoundException;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\System\SalesChannel\SalesChannelContext;
 use Shopware\Core\System\SalesChannel\SalesChannelEntity;
+use Shopware\Core\System\Tax\Aggregate\TaxRule\TaxRuleCollection;
+use Shopware\Core\System\Tax\Aggregate\TaxRule\TaxRuleEntity;
 use Shopware\Core\System\Tax\TaxCollection;
+use Shopware\Core\System\Tax\TaxEntity;
+use Shopware\Core\System\Tax\TaxRuleType\TaxRuleTypeFilterInterface;
 
 class SalesChannelContextFactory
 {
@@ -81,6 +85,11 @@ class SalesChannelContextFactory
      */
     private $taxDetector;
 
+    /**
+     * @var iterable|TaxRuleTypeFilterInterface[]
+     */
+    private $taxRuleTypeFilter;
+
     public function __construct(
         EntityRepositoryInterface $salesChannelRepository,
         EntityRepositoryInterface $currencyRepository,
@@ -93,7 +102,8 @@ class SalesChannelContextFactory
         EntityRepositoryInterface $shippingMethodRepository,
         Connection $connection,
         EntityRepositoryInterface $countryStateRepository,
-        TaxDetector $taxDetector
+        TaxDetector $taxDetector,
+        iterable $taxRuleTypeFilter
     ) {
         $this->salesChannelRepository = $salesChannelRepository;
         $this->currencyRepository = $currencyRepository;
@@ -107,6 +117,7 @@ class SalesChannelContextFactory
         $this->connection = $connection;
         $this->countryStateRepository = $countryStateRepository;
         $this->taxDetector = $taxDetector;
+        $this->taxRuleTypeFilter = $taxRuleTypeFilter;
     }
 
     public function create(string $token, string $salesChannelId, array $options = []): SalesChannelContext
@@ -115,6 +126,7 @@ class SalesChannelContextFactory
 
         $criteria = new Criteria([$salesChannelId]);
         $criteria->addAssociation('currency');
+        $criteria->addAssociation('domains');
 
         /** @var SalesChannelEntity|null $salesChannel */
         $salesChannel = $this->salesChannelRepository->search($criteria, $context)
@@ -169,10 +181,8 @@ class SalesChannelContextFactory
         $fallbackGroup = $customerGroups->get(Defaults::FALLBACK_CUSTOMER_GROUP);
         $customerGroup = $customerGroups->get($groupId);
 
-        //loads tax rules based on active customer group and delivery address
-        //todo@dr load area based tax rules
-        $criteria = new Criteria();
-        $taxRules = $this->taxRepository->search($criteria, $context);
+        //loads tax rules based on active customer and delivery address
+        $taxRules = $this->getTaxRules($context, $customer, $shippingLocation);
 
         //detect active payment method, first check if checkout defined other payment method, otherwise validate if customer logged in, at least use shop default
         $payment = $this->getPaymentMethod($options, $context, $salesChannel, $customer);
@@ -198,7 +208,7 @@ class SalesChannelContextFactory
             $currency,
             $customerGroup,
             $fallbackGroup,
-            new TaxCollection($taxRules),
+            $taxRules,
             $payment,
             $shippingMethod,
             $shippingLocation,
@@ -209,6 +219,38 @@ class SalesChannelContextFactory
         $salesChannelContext->setTaxState($this->taxDetector->getTaxState($salesChannelContext));
 
         return $salesChannelContext;
+    }
+
+    public function getTaxRules(Context $context, ?CustomerEntity $customer, ShippingLocation $shippingLocation): TaxCollection
+    {
+        $criteria = new Criteria();
+
+        $criteria->addAssociation('rules.type');
+
+        $taxes = $this->taxRepository->search($criteria, $context)->getEntities();
+
+        /** @var TaxEntity $tax */
+        foreach ($taxes as $tax) {
+            $taxRules = $tax->getRules()->filter(function (TaxRuleEntity $taxRule) use ($customer, $shippingLocation) {
+                foreach ($this->taxRuleTypeFilter as $ruleTypeFilter) {
+                    if ($ruleTypeFilter->match($taxRule, $customer, $shippingLocation)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+            $taxRules->sortByTypePosition();
+            $taxRule = $taxRules->first();
+
+            $matchingRules = new TaxRuleCollection();
+            if ($taxRule) {
+                $matchingRules->add($taxRule);
+            }
+            $tax->setRules($matchingRules);
+        }
+
+        return new TaxCollection($taxes);
     }
 
     private function getPaymentMethod(array $options, Context $context, SalesChannelEntity $salesChannel, ?CustomerEntity $customer): PaymentMethodEntity
@@ -246,15 +288,15 @@ class SalesChannelContextFactory
     private function getContext(string $salesChannelId, array $session): Context
     {
         $sql = '
-        SELECT 
-          sales_channel.id as sales_channel_id, 
+        SELECT
+          sales_channel.id as sales_channel_id,
           sales_channel.language_id as sales_channel_default_language_id,
           sales_channel.currency_id as sales_channel_currency_id,
           currency.factor as sales_channel_currency_factor,
           currency.decimal_precision as sales_channel_currency_decimal_precision,
           GROUP_CONCAT(LOWER(HEX(sales_channel_language.language_id))) as sales_channel_language_ids
         FROM sales_channel
-            INNER JOIN currency 
+            INNER JOIN currency
                 ON sales_channel.currency_id = currency.id
             LEFT JOIN sales_channel_language
                 ON sales_channel_language.sales_channel_id = sales_channel.id
@@ -268,7 +310,7 @@ class SalesChannelContextFactory
         $origin = new SalesChannelApiSource($salesChannelId);
 
         //explode all available languages for the provided sales channel
-        $languageIds = $data['sales_channel_language_ids'] ? explode(',', $data['sales_channel_language_ids']) : null;
+        $languageIds = $data['sales_channel_language_ids'] ? explode(',', $data['sales_channel_language_ids']) : [];
         $languageIds = array_keys(array_flip($languageIds));
 
         //check which language should be used in the current request (request header set, or context already contains a language - stored in `sales_channel_api_context`)
@@ -315,8 +357,8 @@ class SalesChannelContextFactory
         $criteria = new Criteria([$customerId]);
         $criteria->addAssociation('salutation');
         $criteria->addAssociation('defaultPaymentMethod');
-        $criteria->addAssociationPath('defaultBillingAddress.country');
-        $criteria->addAssociationPath('defaultShippingAddress.country');
+        $criteria->addAssociation('defaultBillingAddress.country');
+        $criteria->addAssociation('defaultShippingAddress.country');
 
         $customer = $this->customerRepository->search($criteria, $context)->get($customerId);
 

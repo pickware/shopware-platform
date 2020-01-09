@@ -21,8 +21,8 @@ class Configuration implements ConfigurationInterface
                 ->append($this->createApiSection())
                 ->append($this->createStoreSection())
                 ->append($this->createAdminWorkerSection())
-                ->append($this->createCacheSection())
                 ->append($this->createAutoUpdateSection())
+                ->append($this->createSitemapSection())
             ->end();
 
         return $treeBuilder;
@@ -30,10 +30,8 @@ class Configuration implements ConfigurationInterface
 
     private function createFilesystemSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('filesystem');
-
         /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
+        $rootNode = (new TreeBuilder('filesystem'))->getRootNode();
         $rootNode
             ->children()
                 ->arrayNode('private')
@@ -57,10 +55,8 @@ class Configuration implements ConfigurationInterface
 
     private function createCdnSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('cdn');
-
         /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
+        $rootNode = (new TreeBuilder('cdn'))->getRootNode();
         $rootNode
             ->children()
                 ->scalarNode('url')->end()
@@ -72,10 +68,8 @@ class Configuration implements ConfigurationInterface
 
     private function createApiSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('api');
-
         /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
+        $rootNode = (new TreeBuilder('api'))->getRootNode();
         $rootNode
             ->children()
             ->arrayNode('allowed_limits')
@@ -84,8 +78,8 @@ class Configuration implements ConfigurationInterface
             ->integerNode('max_limit')->end()
             ->arrayNode('api_browser')
                 ->children()
-                ->booleanNode('public')
-                    ->defaultFalse()
+                ->booleanNode('auth_required')
+                    ->defaultTrue()
                 ->end()
             ->end()
             ->end();
@@ -95,13 +89,11 @@ class Configuration implements ConfigurationInterface
 
     private function createStoreSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('store');
-
         /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
+        $rootNode = (new TreeBuilder('store'))->getRootNode();
         $rootNode
             ->children()
-            ->booleanNode('frw')->end()
+                ->booleanNode('frw')->end()
             ->end();
 
         return $rootNode;
@@ -109,10 +101,8 @@ class Configuration implements ConfigurationInterface
 
     private function createAdminWorkerSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('admin_worker');
-
         /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
+        $rootNode = (new TreeBuilder('admin_worker'))->getRootNode();
         $rootNode
             ->children()
                 ->arrayNode('transports')
@@ -124,26 +114,6 @@ class Configuration implements ConfigurationInterface
                 ->booleanNode('enable_admin_worker')
                     ->defaultValue(true)
                 ->end()
-
-            ->end();
-
-        return $rootNode;
-    }
-
-    private function createCacheSection(): ArrayNodeDefinition
-    {
-        $treeBuilder = new TreeBuilder('cache');
-
-        /** @var ArrayNodeDefinition $rootNode */
-        $rootNode = $treeBuilder->getRootNode();
-        $rootNode
-            ->children()
-                ->arrayNode('entity_cache')
-                    ->children()
-                        ->integerNode('expiration_time')->min(0)->end()
-                        ->booleanNode('enabled')->end()
-                    ->end()
-                ->end()
             ->end();
 
         return $rootNode;
@@ -151,15 +121,58 @@ class Configuration implements ConfigurationInterface
 
     private function createAutoUpdateSection(): ArrayNodeDefinition
     {
-        $treeBuilder = new TreeBuilder('auto_update');
+        /** @var ArrayNodeDefinition $rootNode */
+        $rootNode = (new TreeBuilder('auto_update'))->getRootNode();
+        $rootNode
+            ->children()
+                ->booleanNode('enabled')->end()
+            ->end();
+
+        return $rootNode;
+    }
+
+    private function createSitemapSection(): ArrayNodeDefinition
+    {
+        $treeBuilder = new TreeBuilder('sitemap');
 
         /** @var ArrayNodeDefinition $rootNode */
         $rootNode = $treeBuilder->getRootNode();
         $rootNode
             ->children()
-                ->booleanNode('enabled')->end()
-            ->end()
-        ;
+                ->arrayNode('custom_urls')
+                    ->arrayPrototype()
+                        ->children()
+                            ->scalarNode('url')->end()
+                            ->scalarNode('lastMod')->end()
+                            ->enumNode('changeFreq')
+                                ->values([
+                                    'always',
+                                    'hourly',
+                                    'daily',
+                                    'weekly',
+                                    'monthly',
+                                    'yearly',
+                                ])
+                            ->end()
+                            ->floatNode('priority')->end()
+                            ->scalarNode('salesChannelId')->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->arrayNode('excluded_urls')
+                    ->arrayPrototype()
+                        ->children()
+                            ->scalarNode('resource')->end()
+                            ->scalarNode('identifier')->end()
+                            ->scalarNode('salesChannelId')->end()
+                        ->end()
+                    ->end()
+                ->end()
+                ->integerNode('batchsize')
+                    ->min(1)
+                    ->defaultValue(100)
+                ->end()
+            ->end();
 
         return $rootNode;
     }

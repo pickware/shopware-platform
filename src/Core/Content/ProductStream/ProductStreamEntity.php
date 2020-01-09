@@ -2,6 +2,8 @@
 
 namespace Shopware\Core\Content\ProductStream;
 
+use Shopware\Core\Content\Product\Aggregate\ProductCrossSelling\ProductCrossSellingCollection;
+use Shopware\Core\Content\ProductExport\ProductExportCollection;
 use Shopware\Core\Content\ProductStream\Aggregate\ProductStreamFilter\ProductStreamFilterCollection;
 use Shopware\Core\Content\ProductStream\Aggregate\ProductStreamTranslation\ProductStreamTranslationCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
@@ -10,6 +12,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
 class ProductStreamEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string
      */
@@ -44,6 +47,16 @@ class ProductStreamEntity extends Entity
      * @var array|null
      */
     protected $customFields;
+
+    /**
+     * @var ProductExportCollection|null
+     */
+    protected $productExports;
+
+    /**
+     * @var ProductCrossSellingCollection|null
+     */
+    protected $productCrossSellings;
 
     public function getName(): string
     {
@@ -100,7 +113,7 @@ class ProductStreamEntity extends Entity
         return $this->translations;
     }
 
-    public function setTranslations(?ProductStreamTranslationCollection $translations): void
+    public function setTranslations(ProductStreamTranslationCollection $translations): void
     {
         $this->translations = $translations;
     }
@@ -113,5 +126,25 @@ class ProductStreamEntity extends Entity
     public function setCustomFields(?array $customFields): void
     {
         $this->customFields = $customFields;
+    }
+
+    public function getProductExports(): ?ProductExportCollection
+    {
+        return $this->productExports;
+    }
+
+    public function setProductExports(ProductExportCollection $productExports): void
+    {
+        $this->productExports = $productExports;
+    }
+
+    public function getProductCrossSellings(): ?ProductCrossSellingCollection
+    {
+        return $this->productCrossSellings;
+    }
+
+    public function setProductCrossSellings(ProductCrossSellingCollection $productCrossSellings): void
+    {
+        $this->productCrossSellings = $productCrossSellings;
     }
 }

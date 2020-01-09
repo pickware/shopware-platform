@@ -6,8 +6,7 @@ use Elasticsearch\Client;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntityAggregator;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntitySearcher;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
-use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
-use Shopware\Core\Framework\Test\TestCaseBase\QueueTestBehaviour;
+use Shopware\Elasticsearch\Framework\DataAbstractionLayer\CriteriaParser;
 use Shopware\Elasticsearch\Framework\DataAbstractionLayer\ElasticsearchEntityAggregator;
 use Shopware\Elasticsearch\Framework\DataAbstractionLayer\ElasticsearchEntitySearcher;
 use Shopware\Elasticsearch\Framework\ElasticsearchHelper;
@@ -17,9 +16,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 
 trait ElasticsearchTestTestBehaviour
 {
-    use IntegrationTestBehaviour;
-    use QueueTestBehaviour;
-
     /**
      * @before
      */
@@ -49,8 +45,16 @@ trait ElasticsearchTestTestBehaviour
         $this->runWorker();
 
         $this->getDiContainer()
+            ->get(Client::class)
+            ->indices()
+            ->refresh();
+
+        $this->getDiContainer()
             ->get(CreateAliasTaskHandler::class)
             ->run();
+
+        $client = $this->getDiContainer()->get(Client::class);
+        $client->indices()->refresh();
     }
 
     protected function createEntityAggregator(): ElasticsearchEntityAggregator
@@ -80,7 +84,8 @@ trait ElasticsearchTestTestBehaviour
         return new ElasticsearchEntitySearcher(
             $this->getDiContainer()->get(Client::class),
             $decorated,
-            $this->getDiContainer()->get(ElasticsearchHelper::class)
+            $this->getDiContainer()->get(ElasticsearchHelper::class),
+            $this->getDiContainer()->get(CriteriaParser::class)
         );
     }
 

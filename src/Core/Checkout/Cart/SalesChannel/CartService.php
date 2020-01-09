@@ -129,7 +129,7 @@ class CartService
 
         $this->eventDispatcher->dispatch(new LineItemAddedEvent($item, $cart, $context));
 
-        return $this->calculate($cart, $context);
+        return $this->calculate($cart, $context, true);
     }
 
     /**
@@ -150,7 +150,7 @@ class CartService
 
         $this->eventDispatcher->dispatch(new LineItemQuantityChangedEvent($lineItem, $cart, $context));
 
-        return $this->calculate($cart, $context);
+        return $this->calculate($cart, $context, true);
     }
 
     /**
@@ -170,7 +170,7 @@ class CartService
 
         $this->eventDispatcher->dispatch(new LineItemRemovedEvent($lineItem, $cart, $context));
 
-        return $this->calculate($cart, $context);
+        return $this->calculate($cart, $context, true);
     }
 
     /**
@@ -184,10 +184,14 @@ class CartService
 
         $criteria = new Criteria([$orderId]);
         $criteria
-            ->addAssociation('lineItems')
-            ->addAssociation('deliveries')
-            ->addAssociation('transactions')
-            ->addAssociation('addresses');
+            ->addAssociation('lineItems.payload')
+            ->addAssociation('deliveries.shippingCosts')
+            ->addAssociation('deliveries.shippingMethod')
+            ->addAssociation('deliveries.shippingOrderAddress.country')
+            ->addAssociation('cartPrice.calculatedTaxes')
+            ->addAssociation('transactions.paymentMethod')
+            ->addAssociation('currency')
+            ->addAssociation('addresses.country');
 
         /** @var OrderEntity|null $orderEntity */
         $orderEntity = $this->orderRepository->search($criteria, $context->getContext())->first();
@@ -216,10 +220,10 @@ class CartService
 
     public function recalculate(Cart $cart, SalesChannelContext $context): Cart
     {
-        return $this->calculate($cart, $context);
+        return $this->calculate($cart, $context, true);
     }
 
-    private function calculate(Cart $cart, SalesChannelContext $context): Cart
+    private function calculate(Cart $cart, SalesChannelContext $context, bool $persist = false): Cart
     {
         $behavior = new CartBehavior();
 
@@ -228,7 +232,9 @@ class CartService
             ->loadByCart($context, $cart, $behavior)
             ->getCart();
 
-        $this->persister->save($cart, $context);
+        if ($persist) {
+            $this->persister->save($cart, $context);
+        }
 
         $this->cart[$cart->getToken()] = $cart;
 
@@ -245,6 +251,7 @@ class CartService
         $criteria = new Criteria();
         $criteria->addFilter(new EqualsFilter('orderId', $orderId));
         $criteria->addAssociation('customer');
+        $criteria->addAssociation('salutation');
 
         return $this->orderCustomerRepository
             ->search($criteria, $context)

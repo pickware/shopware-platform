@@ -14,7 +14,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\FieldCollection;
-use Shopware\Core\Framework\Language\LanguageDefinition;
+use Shopware\Core\System\Language\LanguageDefinition;
 
 class ProductSearchKeywordDefinition extends EntityDefinition
 {
@@ -46,7 +46,7 @@ class ProductSearchKeywordDefinition extends EntityDefinition
             (new IdField('id', 'id'))->addFlags(new PrimaryKey(), new Required()),
             new VersionField(),
 
-            (new FkField('language_id', 'languageId', LanguageDefinition::class))->addFlags(new PrimaryKey(), new Required()),
+            (new FkField('language_id', 'languageId', LanguageDefinition::class))->addFlags(new Required()),
 
             (new FkField('product_id', 'productId', ProductDefinition::class))->addFlags(new Required()),
             (new ReferenceVersionField(ProductDefinition::class))->addFlags(new Required()),

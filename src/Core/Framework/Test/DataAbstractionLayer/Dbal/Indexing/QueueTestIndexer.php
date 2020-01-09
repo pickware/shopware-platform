@@ -8,11 +8,21 @@ use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerInterface;
 class QueueTestIndexer implements IndexerInterface
 {
     private $indexCalls = 0;
+
+    private $partialCalls = 0;
+
     private $refreshCalls = 0;
 
     public function index(\DateTimeInterface $timestamp): void
     {
         ++$this->indexCalls;
+    }
+
+    public function partial(?array $lastId, \DateTimeInterface $timestamp): ?array
+    {
+        ++$this->partialCalls;
+
+        return null;
     }
 
     public function refresh(EntityWrittenContainerEvent $event): void
@@ -34,5 +44,16 @@ class QueueTestIndexer implements IndexerInterface
     {
         $this->indexCalls = 0;
         $this->refreshCalls = 0;
+        $this->partialCalls = 0;
+    }
+
+    public function getPartialCalls(): int
+    {
+        return $this->partialCalls;
+    }
+
+    public static function getName(): string
+    {
+        return self::class;
     }
 }

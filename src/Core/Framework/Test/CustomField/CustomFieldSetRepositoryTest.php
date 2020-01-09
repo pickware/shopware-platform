@@ -4,14 +4,14 @@ namespace Shopware\Core\Framework\Test\CustomField;
 
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Framework\Context;
-use Shopware\Core\Framework\CustomField\Aggregate\CustomFieldSet\CustomFieldSetDefinition;
-use Shopware\Core\Framework\CustomField\Aggregate\CustomFieldSet\CustomFieldSetEntity;
-use Shopware\Core\Framework\CustomField\Aggregate\CustomFieldSetRelation\CustomFieldSetRelationDefinition;
-use Shopware\Core\Framework\CustomField\CustomFieldDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\System\CustomField\Aggregate\CustomFieldSet\CustomFieldSetDefinition;
+use Shopware\Core\System\CustomField\Aggregate\CustomFieldSet\CustomFieldSetEntity;
+use Shopware\Core\System\CustomField\Aggregate\CustomFieldSetRelation\CustomFieldSetRelationDefinition;
+use Shopware\Core\System\CustomField\CustomFieldDefinition;
 
 class CustomFieldSetRepositoryTest extends TestCase
 {
@@ -49,13 +49,13 @@ class CustomFieldSetRepositoryTest extends TestCase
         ];
         $result = $repo->create([$attributeSet], Context::createDefaultContext());
 
-        $events = $result->getEventByDefinition(CustomFieldSetDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldSetDefinition::ENTITY_NAME);
         static::assertCount(1, $events->getIds());
 
-        $events = $result->getEventByDefinition(CustomFieldDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldDefinition::ENTITY_NAME);
         static::assertCount(2, $events->getIds());
 
-        $events = $result->getEventByDefinition(CustomFieldSetRelationDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldSetRelationDefinition::ENTITY_NAME);
         static::assertCount(2, $events->getIds());
     }
 
@@ -106,13 +106,13 @@ class CustomFieldSetRepositoryTest extends TestCase
         ];
         $result = $repo->create($attributeSets, Context::createDefaultContext());
 
-        $events = $result->getEventByDefinition(CustomFieldSetDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldSetDefinition::ENTITY_NAME);
         static::assertCount(2, $events->getIds());
 
-        $events = $result->getEventByDefinition(CustomFieldDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldDefinition::ENTITY_NAME);
         static::assertCount(2, $events->getIds());
 
-        $events = $result->getEventByDefinition(CustomFieldSetRelationDefinition::class);
+        $events = $result->getEventByEntityName(CustomFieldSetRelationDefinition::ENTITY_NAME);
         static::assertCount(3, $events->getIds());
 
         $result = $repo->search(new Criteria([$id2]), Context::createDefaultContext());
@@ -165,14 +165,14 @@ class CustomFieldSetRepositoryTest extends TestCase
         $repo->create([$attributeSet], Context::createDefaultContext());
         $result = $repo->delete([['id' => $id]], Context::createDefaultContext());
 
-        $event = $result->getEventByDefinition(CustomFieldSetDefinition::class);
+        $event = $result->getEventByEntityName(CustomFieldSetDefinition::ENTITY_NAME);
         static::assertCount(1, $event->getIds());
         static::assertEquals($id, $event->getIds()[0]);
 
-        $event = $result->getEventByDefinition(CustomFieldDefinition::class);
+        $event = $result->getEventByEntityName(CustomFieldDefinition::ENTITY_NAME);
         static::assertCount(2, $event->getIds());
 
-        $event = $result->getEventByDefinition(CustomFieldSetRelationDefinition::class);
+        $event = $result->getEventByEntityName(CustomFieldSetRelationDefinition::ENTITY_NAME);
         static::assertCount(2, $event->getIds());
 
         $result = $repo->search(new Criteria([$id]), Context::createDefaultContext());
@@ -217,7 +217,7 @@ class CustomFieldSetRepositoryTest extends TestCase
             'config' => ['description' => 'update', 'translatable' => true],
         ];
         $result = $repo->update([$update], Context::createDefaultContext());
-        $event = $result->getEventByDefinition(CustomFieldSetDefinition::class);
+        $event = $result->getEventByEntityName(CustomFieldSetDefinition::ENTITY_NAME);
         static::assertCount(1, $event->getPayloads());
 
         $result = $repo->search(new Criteria([$id]), Context::createDefaultContext());

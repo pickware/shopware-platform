@@ -4,7 +4,7 @@ namespace Shopware\Core\Content\Category\Aggregate\CategoryTranslation;
 
 use Shopware\Core\Content\Category\CategoryEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\TranslationEntity;
-use Shopware\Core\Framework\Language\LanguageEntity;
+use Shopware\Core\System\Language\LanguageEntity;
 
 class CategoryTranslationEntity extends TranslationEntity
 {
@@ -52,6 +52,21 @@ class CategoryTranslationEntity extends TranslationEntity
      * @var string|null
      */
     protected $description;
+
+    /**
+     * @var string|null
+     */
+    protected $metaTitle;
+
+    /**
+     * @var string|null
+     */
+    protected $metaDescription;
+
+    /**
+     * @var string|null
+     */
+    protected $keywords;
 
     public function getCategoryId(): string
     {
@@ -131,5 +146,35 @@ class CategoryTranslationEntity extends TranslationEntity
     public function setBreadcrumb(?array $breadcrumb): void
     {
         $this->breadcrumb = $breadcrumb;
+    }
+
+    public function getMetaTitle(): ?string
+    {
+        return $this->metaTitle;
+    }
+
+    public function setMetaTitle(?string $metaTitle): void
+    {
+        $this->metaTitle = $metaTitle;
+    }
+
+    public function getMetaDescription(): ?string
+    {
+        return $this->metaDescription;
+    }
+
+    public function setMetaDescription(?string $metaDescription): void
+    {
+        $this->metaDescription = $metaDescription;
+    }
+
+    public function getKeywords(): ?string
+    {
+        return $this->keywords;
+    }
+
+    public function setKeywords(?string $keywords): void
+    {
+        $this->keywords = $keywords;
     }
 }

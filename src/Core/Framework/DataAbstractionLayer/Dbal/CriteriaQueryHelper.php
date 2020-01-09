@@ -2,10 +2,14 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Dbal;
 
+use Doctrine\DBAL\Connection;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Exception\InvalidSortingDirectionException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\AssociationField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\AntiJoinFilter;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\Filter;
@@ -16,6 +20,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Search\Query\ScoreQuery;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Sorting\FieldSorting;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\EntityScoreQueryBuilder;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Term\SearchTermInterpreter;
+use Shopware\Core\Framework\Uuid\Uuid;
 
 trait CriteriaQueryHelper
 {
@@ -40,12 +45,14 @@ trait CriteriaQueryHelper
 
         if ($criteria->getTerm()) {
             $pattern = $this->getInterpreter()->interpret($criteria->getTerm());
-            $queries = $this->getScoreBuilder()->buildScoreQueries($pattern, $definition, $definition->getEntityName());
+            $queries = $this->getScoreBuilder()->buildScoreQueries($pattern, $definition, $definition->getEntityName(), $context);
             $criteria->addQuery(...$queries);
         }
 
-        $filter = $this->antiJoinTransform($definition,
-            new MultiFilter('AND',
+        $filter = $this->antiJoinTransform(
+            $definition,
+            new MultiFilter(
+                'AND',
                 array_merge(
                     $criteria->getFilters(),
                     $criteria->getPostFilters()
@@ -78,16 +85,56 @@ trait CriteriaQueryHelper
             $this->getDefinitionHelper()->resolveAntiJoinAccessors($fieldName, $definition, $table, $query, $context, $antiJoinConditions);
         }
 
-        $this->applyFilter($definition, $filter, $query, $context);
+        $this->addFilter($definition, $filter, $query, $context);
 
         $this->addQueries($definition, $criteria, $query, $context);
 
-        $this->addSortings($definition, $criteria, $query, $context);
+        $this->addSortings($definition, $criteria->getSorting(), $query, $context);
 
         return $query;
     }
 
-    private function applyFilter(EntityDefinition $definition, ?Filter $filter, QueryBuilder $query, Context $context): void
+    protected function addIdCondition(Criteria $criteria, EntityDefinition $definition, QueryBuilder $query): void
+    {
+        $primaryKeys = $criteria->getIds();
+
+        $primaryKeys = array_values($primaryKeys);
+
+        if (empty($primaryKeys)) {
+            return;
+        }
+
+        if (!\is_array($primaryKeys[0]) || \count($primaryKeys[0]) === 1) {
+            $primaryKeyField = $definition->getPrimaryKeys()->first();
+            if ($primaryKeyField instanceof IdField) {
+                $primaryKeys = array_map(function ($id) {
+                    if (is_array($id)) {
+                        return Uuid::fromHexToBytes($id[0]);
+                    }
+
+                    return Uuid::fromHexToBytes($id);
+                }, $primaryKeys);
+            }
+
+            if (!$primaryKeyField instanceof StorageAware) {
+                throw new \RuntimeException('Primary key fields has to be an instance of StorageAware');
+            }
+
+            $query->andWhere(sprintf(
+                '%s.%s IN (:ids)',
+                EntityDefinitionQueryHelper::escape($definition->getEntityName()),
+                EntityDefinitionQueryHelper::escape($primaryKeyField->getStorageName())
+            ));
+
+            $query->setParameter('ids', array_values($primaryKeys), Connection::PARAM_STR_ARRAY);
+
+            return;
+        }
+
+        $this->addIdConditionWithOr($criteria, $definition, $query);
+    }
+
+    protected function addFilter(EntityDefinition $definition, ?Filter $filter, QueryBuilder $query, Context $context): void
     {
         if (!$filter) {
             return;
@@ -103,6 +150,41 @@ trait CriteriaQueryHelper
         foreach ($parsed->getParameters() as $key => $value) {
             $query->setParameter($key, $value, $parsed->getType($key));
         }
+    }
+
+    private function addIdConditionWithOr(Criteria $criteria, EntityDefinition $definition, QueryBuilder $query): void
+    {
+        $wheres = [];
+
+        foreach ($criteria->getIds() as $primaryKey) {
+            if (!is_array($primaryKey)) {
+                $primaryKey = ['id' => $primaryKey];
+            }
+
+            $where = [];
+
+            foreach ($primaryKey as $storageName => $value) {
+                $field = $definition->getFields()->getByStorageName($storageName);
+
+                if ($field instanceof IdField || $field instanceof FkField) {
+                    $value = Uuid::fromHexToBytes($value);
+                }
+
+                $key = 'pk' . Uuid::randomHex();
+
+                $accessor = EntityDefinitionQueryHelper::escape($definition->getEntityName()) . '.' . EntityDefinitionQueryHelper::escape($storageName);
+
+                $where[] = $accessor . ' = :' . $key;
+
+                $query->setParameter($key, $value);
+            }
+
+            $wheres[] = '(' . implode(' AND ', $where) . ')';
+        }
+
+        $wheres = implode(' OR ', $wheres);
+
+        $query->andWhere($wheres);
     }
 
     private function addQueries(EntityDefinition $definition, Criteria $criteria, QueryBuilder $query, Context $context): void
@@ -141,14 +223,15 @@ trait CriteriaQueryHelper
         }
     }
 
-    private function addSortings(EntityDefinition $definition, Criteria $criteria, QueryBuilder $query, Context $context): void
+    private function addSortings(EntityDefinition $definition, array $sortings, QueryBuilder $query, Context $context): void
     {
-        foreach ($criteria->getSorting() as $sorting) {
+        foreach ($sortings as $sorting) {
             $this->validateSortingDirection($sorting->getDirection());
 
             if ($sorting->getField() === '_score') {
                 $query->addOrderBy('_score', $sorting->getDirection());
                 $query->addState('_score');
+
                 continue;
             }
 
@@ -197,7 +280,7 @@ trait CriteriaQueryHelper
      */
     private function validateSortingDirection(string $direction): void
     {
-        if (!in_array(strtoupper($direction), [FieldSorting::ASCENDING, FieldSorting::DESCENDING], true)) {
+        if (!in_array(mb_strtoupper($direction), [FieldSorting::ASCENDING, FieldSorting::DESCENDING], true)) {
             throw new InvalidSortingDirectionException($direction);
         }
     }
@@ -212,7 +295,7 @@ trait CriteriaQueryHelper
         }
 
         $antiJoins = [];
-        $this->walkBottomUp($filter, static function (Filter $f) use (&$antiJoins) {
+        $this->walkBottomUp($filter, static function (Filter $f) use (&$antiJoins): void {
             if ($f instanceof AntiJoinFilter) {
                 $antiJoins[] = $f;
             }
@@ -253,7 +336,6 @@ trait CriteriaQueryHelper
     /**
      * Transforms NotFilter on associations into anti-joins
      *
-     *
      * Base case:
      *
      * NotFilter($op, [EqualsFilter, ContainsFilter])
@@ -289,6 +371,7 @@ trait CriteriaQueryHelper
                     || !$this->isAssociationPath($definition, $field)
                 ) {
                     $normalFilters[] = $childFilter;
+
                     continue;
                 }
                 $antiJoinFilters[] = $childFilter;
@@ -317,8 +400,8 @@ trait CriteriaQueryHelper
         $fieldName = str_replace('extensions.', '', $fieldName);
         $prefix = $definition->getEntityName() . '.';
 
-        if (strpos($fieldName, $prefix) === 0) {
-            $fieldName = substr($fieldName, \strlen($prefix));
+        if (mb_strpos($fieldName, $prefix) === 0) {
+            $fieldName = mb_substr($fieldName, \mb_strlen($prefix));
         }
 
         $fields = $definition->getFields();

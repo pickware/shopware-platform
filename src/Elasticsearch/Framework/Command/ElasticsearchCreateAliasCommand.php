@@ -9,6 +9,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 class ElasticsearchCreateAliasCommand extends Command
 {
+    protected static $defaultName = 'es:create:alias';
+
     /**
      * @var CreateAliasTaskHandler
      */
@@ -26,12 +28,13 @@ class ElasticsearchCreateAliasCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('es:create:alias')
             ->setDescription('Dev command to create alias immediately');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->handler->run();
+
+        return 0;
     }
 }

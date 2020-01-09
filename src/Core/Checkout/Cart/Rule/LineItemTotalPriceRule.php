@@ -67,7 +67,7 @@ class LineItemTotalPriceRule extends Rule
                 return FloatComparator::notEquals($price->getTotalPrice(), $this->amount);
 
             default:
-                throw new UnsupportedOperatorException($this->operator, __CLASS__);
+                throw new UnsupportedOperatorException($this->operator, self::class);
         }
     }
 
@@ -76,6 +76,7 @@ class LineItemTotalPriceRule extends Rule
         return [
             'amount' => [new NotBlank(), new Type('numeric')],
             'operator' => [
+                new NotBlank(),
                 new Choice(
                     [
                         self::OPERATOR_EQ,

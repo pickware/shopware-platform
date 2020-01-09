@@ -5,6 +5,7 @@ namespace Shopware\Core\Content\Test\Product\DataAbstractionLayer\Indexing;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
+use Shopware\Core\Content\Product\SalesChannel\Listing\ProductListingGateway;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
@@ -31,7 +32,9 @@ class VariantListingIndexerTest extends TestCase
     private $salesChannelId;
 
     private $optionIds = [];
+
     private $groupIds = [];
+
     private $variantIds = [];
 
     /**
@@ -39,15 +42,21 @@ class VariantListingIndexerTest extends TestCase
      */
     private $connection;
 
+    /**
+     * @var ProductListingGateway
+     */
+    private $listingGateway;
+
     protected function setUp(): void
     {
         $this->repository = $this->getContainer()->get('product.repository');
         $this->connection = $this->getContainer()->get(Connection::class);
+        $this->listingGateway = $this->getContainer()->get(ProductListingGateway::class);
 
         parent::setUp();
     }
 
-    public function testSingleGroup()
+    public function testSingleGroup(): void
     {
         $this->createProduct(['color']);
 
@@ -59,36 +68,7 @@ class VariantListingIndexerTest extends TestCase
         static::assertContains($this->optionIds['red'], $listing->optionIds);
     }
 
-    public function testInactive()
-    {
-        $this->createProduct(['color']);
-
-        $listing = $this->fetchListing();
-
-        static::assertContains($this->optionIds['green'], $listing->optionIds);
-        static::assertContains($this->optionIds['red'], $listing->optionIds);
-
-        static::assertCount(2, $listing->ids);
-
-        // update current listing variants and set them inactive
-        $update = array_map(function ($id) {
-            return ['id' => $id, 'active' => false];
-        }, $listing->ids);
-
-        $this->repository->update($update, Context::createDefaultContext());
-
-        $updated = $this->fetchListing();
-
-        static::assertCount(2, $updated->ids);
-        static::assertContains($this->optionIds['green'], $updated->optionIds);
-        static::assertContains($this->optionIds['red'], $updated->optionIds);
-
-        foreach ($updated->ids as $id) {
-            static::assertNotContains($id, $listing->ids);
-        }
-    }
-
-    public function testTwoGroups()
+    public function testTwoGroups(): void
     {
         $this->createProduct(['color', 'size']);
 
@@ -103,7 +83,7 @@ class VariantListingIndexerTest extends TestCase
         static::assertContains($this->optionIds['l'], $listing->optionIds);
     }
 
-    public function testAllGroups()
+    public function testAllGroups(): void
     {
         $this->createProduct(['color', 'size', 'material']);
 
@@ -111,22 +91,25 @@ class VariantListingIndexerTest extends TestCase
         static::assertCount(8, $listing->ids);
     }
 
-    public function testNoGroup()
+    public function testNoGroup(): void
     {
         $this->createProduct([]);
 
         $listing = $this->fetchListing();
 
-        static::assertCount(0, $listing->ids);
+        static::assertCount(1, $listing->ids);
 
         $listing = $this->connection->fetchAll(
-            'SELECT LOWER(HEX(id)) as id FROM product WHERE display_in_listing = 1 AND product.id = :parentId',
+            'SELECT LOWER(HEX(id)) as id FROM product WHERE display_group IS NOT NULL AND product.id = :parentId',
             ['parentId' => Uuid::fromHexToBytes($this->productId)]
         );
-        static::assertCount(1, $listing);
+        static::assertCount(0, $listing);
     }
 
-    private function createProduct($listingProperties)
+    /**
+     * @param string[] $listingProperties
+     */
+    private function createProduct(array $listingProperties): void
     {
         $this->productId = Uuid::randomHex();
 
@@ -353,8 +336,9 @@ class VariantListingIndexerTest extends TestCase
         $listing = $this->connection->fetchAll(
             'SELECT LOWER(HEX(id)) as id, option_ids 
              FROM product 
-             WHERE display_in_listing = 1 
-             AND product.parent_id = :parentId',
+             WHERE product.parent_id = :parentId
+             AND display_group IS NOT NULL
+             GROUP BY display_group',
             ['parentId' => Uuid::fromHexToBytes($this->productId)]
         );
 

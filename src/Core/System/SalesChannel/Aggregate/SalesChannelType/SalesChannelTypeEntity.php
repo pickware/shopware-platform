@@ -10,6 +10,7 @@ use Shopware\Core\System\SalesChannel\SalesChannelCollection;
 class SalesChannelTypeEntity extends Entity
 {
     use EntityIdTrait;
+
     /**
      * @var string|null
      */
@@ -135,7 +136,7 @@ class SalesChannelTypeEntity extends Entity
         return $this->salesChannels;
     }
 
-    public function setSalesChannels(?SalesChannelCollection $salesChannels): void
+    public function setSalesChannels(SalesChannelCollection $salesChannels): void
     {
         $this->salesChannels = $salesChannels;
     }

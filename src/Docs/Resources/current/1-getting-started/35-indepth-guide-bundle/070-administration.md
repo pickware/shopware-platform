@@ -14,8 +14,8 @@ Of course any Shopware 6 specific code will be explained, don't worry about that
 ### Setting up the the administration
 
 Each plugin has a main entry point to add custom javascript code to the administration. By default, Shopware 6 is looking for a 
-`main.js` file inside a `Resources/administration` directory in your plugin.
-Thus, create a new file `main.js` in the directory `<plugin root>/src/Resources/administration`. That's it, this file will now be considered when building
+`main.js` file inside a `Resources/app/administration/src` directory in your plugin.
+Thus, create a new file `main.js` in the directory `<plugin root>/src/Resources/app/administration/src`. That's it, this file will now be considered when building
 the administration.
 
 ### Setting up a new module
@@ -24,7 +24,7 @@ You want to have your very own menu entry in the administration, which then shou
 In the `Administration` core code, each module is defined in a directory called `module`, so simply stick to it.
 Inside of the `module` directory lies the list of several modules, each having their own directory named after the module itself. Makes sense, right?
 
-So, go ahead and create a new directory `<plugin root>/src/Resources/administration/module/swag-bundle`, so you can store your own modules files in there.
+So, go ahead and create a new directory `<plugin root>/src/Resources/app/administration/src/module/swag-bundle`, so you can store your own modules files in there.
 Right afterwards create a new file called `index.js` in there. This is necessary, because Shopware 6 is automatically requiring an `index.js` file
 for each module. Consider it to be the main file for your custom module.
 
@@ -40,24 +40,17 @@ Now your module's `index.js` will be executed.
 #### Registering the module
 
 Your `index.js` is still empty now, so let's get going to actually create a new module.
-This is technically done by calling the method `registerModule` method of our [ModuleFactory](https://github.com/shopware/platform/blob/master/src/Administration/Resources/administration/src/core/factory/module.factory.js),
+This is technically done by calling the method `registerModule` method of our [ModuleFactory](https://github.com/shopware/platform/blob/master/src/Administration/Resources/app/administration/src/core/factory/module.factory.js),
 but you're not going to use this directly.
 
 Instead, you're using the `Shopware.Module.register()` method, but why is that?
-Add this line to your `index.js` first:
-```js
-import { Module } from 'src/core/shopware';
-```
 
-This file was actually mainly created for third part developers, it is mainly the bridge between the Shopware Administration and our plugin.
-
-This line specifically is simply importing our `Module` wrapper into your `index.js`, because it comes with a `register` helper method to easily register your module.
+`Shopware` is a global object and it was created for third party developers. It is mainly the bridge between the Shopware Administration and our plugin.  
+The `Module` object comes with a `register` helper method to easily register your module.
 The method needs two parameters to be set, the first one being the module's name, the second being a javascript object, which contains your module's configuration.
 
 ```js
-import { Module } from 'src/core/shopware';
-
-Module.register('swag-bundle', {
+Shopware.Module.register('swag-bundle', {
     // configuration here
 });
 ```
@@ -87,7 +80,7 @@ Those routes are configured as an object in a property named `routes`.
 Before continuing to explain how they are defined, let's have a look at the actual routes and how they have to look like:
 
 ```js
-Module.register('swag-bundle', {
+Shopware.Module.register('swag-bundle', {
     color: '#ff3d58',
     icon: 'default-shopping-paper-bag-product',
     title: 'Bundle',
@@ -124,7 +117,7 @@ route name in the first route.
 
 Have a look at this example route configuration:
 ```js
-Module.register('example', {
+Shopware.Module.register('example', {
     routes: {
         exampleRoute: {
             component: 'my-custom-component',
@@ -256,7 +249,7 @@ Each file could then contain your translations as such an object, you only have 
 import deDE from './snippet/de-DE';
 import enGB from './snippet/en-GB';
 
-Module.register('swag-bundle', {
+Shopware.Module.register('swag-bundle', {
     ...
     snippets: {
         'de-DE': deDE,
@@ -309,14 +302,13 @@ This should be your snippet file now:
 And here's your final module:
 
 ```js
-import { Module } from 'src/core/shopware';
 import './page/swag-bundle-list';
 import './page/swag-bundle-detail';
 import './page/swag-bundle-create';
 import deDE from './snippet/de-DE';
 import enGB from './snippet/en-GB';
 
-Module.register('swag-bundle', {
+Shopware.Module.register('swag-bundle', {
     type: 'plugin',
     name: 'Bundle',
     title: 'swag-bundle.general.mainMenuItemGeneral',
@@ -371,9 +363,7 @@ Once again create a new file `index.js` in there as the main entry point for thi
 now guess what you're going to use to register a new component.
 
 ```js
-import { Component } from 'src/core/shopware';
-
-Component.register('swag-bundle-list', {
+Shopware.Component.register('swag-bundle-list', {
     // Component configuration here
 });
 ```
@@ -387,7 +377,7 @@ This is defined by adding an `metaInfo` function, which returns the desired titl
 And that's what will be done for this example.
 
 ```js
-Component.register('swag-bundle-list', {
+Shopware.Component.register('swag-bundle-list', {
     metaInfo() {
         return {
             title: this.$createTitle()
@@ -405,10 +395,9 @@ so just create a new file named after the component in the component's directory
 Afterwards import your `swag-bundle-list.html.twig` file in your component and assign it to the template property.
 
 ```js
-import { Component } from 'src/core/shopware';
 import template from './swag-bundle-list.html.twig';
 
-Component.register('swag-bundle-list', {
+Shopware.Component.register('swag-bundle-list', {
     template,
     
     metaInfo() {
@@ -424,10 +413,9 @@ Since you imported your template into the variable `template`, it perfectly fits
 
 For the sake of simplicity, you could also write it like that:
 ```js
-import { Component } from 'src/core/shopware';
 import template from './swag-bundle-list.html.twig';
 
-Component.register('swag-bundle-list', {
+Shopware.Component.register('swag-bundle-list', {
     template: template,
     
     metaInfo() {
@@ -547,7 +535,7 @@ bundles. This data should be available upon creation of your component. Fortunat
 Having a look at the official documentation, you'll figure out, that it is defined using a function, so add this function to your component.
 
 ```js
-Component.register('swag-bundle-list', {
+Shopware.Component.register('swag-bundle-list', {
     
     ...
     
@@ -571,8 +559,7 @@ that you will need in order to get your bundle repository.
 Add those lines to your component configuration:
 ```js
 inject: [
-    'repositoryFactory',
-    'context'
+    'repositoryFactory'
 ],
 ```
 
@@ -589,22 +576,11 @@ the `sw-entity-listing`? Right, the `repository`, thus save it as an property to
 ```
 
 Your repository provides a `search` method to actually request your repositories' data via API.
-You need to provide two parameters to the search method, a `Criteria` object and the current context.
-The `Criteria` object has to be instantiated by yourself, so you need to import it first.
+You need to provide two parameters to the search method, a `Criteria` object and the current `Shopware.Context.api`.
+The `Criteria` object has to be instantiated by yourself, so you need to access it via the Shopware global object first.
 
 ```js
-import Criteria from 'src/core/data-new/criteria.data';
-```
-
-The latter parameter, the `context`, is part of the DI container again, since it contains session and configuration options, such as the currently active `language_id` in the
-administration or the path to the API.
-Inject it, just like the `repositoryFactory`:
-
-```js
-inject: [
-    'repositoryFactory',
-    'context'
-],
+const Criteria = Shopware.Data.Criteria;
 ```
 
 Time to run the search method of your repository, because you've got everything ready now. The `search` method will return a [promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise),
@@ -616,7 +592,7 @@ created() {
     this.repository = this.repositoryFactory.create('swag_bundle');
 
     this.repository
-        .search(new Criteria(), this.context)
+        .search(new Criteria(), Shopware.Context.api)
         .then((result) => {
             this.bundles = result;
         });
@@ -640,7 +616,7 @@ Just set null here, this is the initial state and will be updated once your `cre
 all updates to those component properties being used in the template will automatically update in the template as well.
 
 
-So you've taken care about loading the `bundles` property, which is used in your twig template, same as the `repository`. Only the `columns` are missing now, another
+So you've taken care of loading the `bundles` property, which is used in your twig template, same as the `repository`. Only the `columns` are missing now, another
 component property you need to set.
 
 Let's talk about the structure of a column at first:
@@ -769,10 +745,9 @@ Register your component using `Component.register` and add a template in the con
 Also, set the default title again via `metaInfo` function.
 
 ```js
-import { Component, Mixin } from 'src/core/shopware';
 import template from './swag-bundle-detail.html.twig';
 
-Component.register('swag-bundle-detail', {
+Shopware.Component.register('swag-bundle-detail', {
     template,
     
     metaInfo() {
@@ -1045,7 +1020,7 @@ The `bundle` property has to contain the bundle data for the current detail page
 Do you still remember how you loaded the data for your `swag-bundle-list` component?
 In short: You used `created` lifecycle hook of your component and injected the `repositoryFactory` in order to get the repository for your bundle.
 The repository then executed the `search` method to fetch **all** bundles, but you only need a single one entity this time. This is done by using the `get` method instead,
-which only needs the entity's ID and the context. The latter was also injected into your component, remember?
+which only needs the entity's ID and the `Shopware.Context.api`.
 The ID can be retrieved from the route, which is available in your component like this: `this.$route.params.id`
 Once the `get` method is executed, it will return a [promise](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise), which
 then contains the result upon being resolved.
@@ -1053,15 +1028,13 @@ Also remember to have the `bundle` property set in the `data` method already, it
 
 Quite a lot of text, here's the code:
 ```js
-import { Component } from 'src/core/shopware';
 import template from './swag-bundle-detail.html.twig';
- 
-Component.register('swag-bundle-detail', {
+
+Shopware.Component.register('swag-bundle-detail', {
     template,
 
     inject: [
-        'repositoryFactory',
-        'context'
+        'repositoryFactory'
     ],
     
     metaInfo() {
@@ -1084,7 +1057,7 @@ Component.register('swag-bundle-detail', {
     methods: {
         getBundle() {
             this.repository
-                .get(this.$route.params.id, this.context)
+                .get(this.$route.params.id, Shopware.Context.api)
                 .then((entity) => {
                      this.bundle = entity;
                 });
@@ -1099,7 +1072,7 @@ Therefore the `repository` is saved as a property to the component, otherwise it
 ##### Saving the data
 
 The method `onClickSave` is executed once the user clicks the button and has to save the bundle using the repository again.
-That's where you can use the repository's `save` method, which asks for the entity itself and, again, the `context`. As always,
+That's where you can use the repository's `save` method, which asks for the entity itself and, again, the `Shopware.Context.api`. As always,
 this method will return a promise upon which you can react. This time, a small error handling will be added here as well.
 You may be wondering why there is error handling when saving, but not when reading. When reading data, you're just executing this search via default
 code, most times there's no user input involved. Saving data though requires somebody to enter data, which may or may not be valid, thus the shop manager
@@ -1108,7 +1081,7 @@ If you were to offer some kind of "filtering" due to user input, you might want 
 
 Let's have a look at the successful case first though.
 ```js
-Component.register('swag-bundle-detail', {
+Shopware.Component.register('swag-bundle-detail', {
     ...
     
     methods: {
@@ -1116,7 +1089,7 @@ Component.register('swag-bundle-detail', {
         
         onClickSave() {
             this.repository
-                .save(this.bundle, this.context)
+                .save(this.bundle, Shopware.Context.api)
                 .then(() => {
                     this.getBundle();
                 });
@@ -1134,7 +1107,7 @@ onClickSave() {
     this.isLoading = true;
     
     this.repository
-        .save(this.bundle, this.context)
+        .save(this.bundle, Shopware.Context.api)
         .then(() => {
             this.getBundle();
             this.isLoading = false;
@@ -1149,10 +1122,14 @@ You're doing this by adding a [catch](https://developer.mozilla.org/en-US/docs/W
 which only triggers once an error occurred. In this case, you want to show a message to the user by using the notification system.
 In order to show a notification to the user, you have to add the `notification` mixin to your component.
 
-First of all change the very first line of your component and simply add `Mixin` to the import
+First of all you have to access the `Mixin` object from the `Shopware` global object. This way you could simply call it with `Shopware.Mixin` just like `Shopware.Component`.
+But instead of writing this every time, you could also use [object destructuring](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment#Basic_assignment) and assign a `Component` and a `Mixin` variable at the same time.
+
 ```js
-import { Component, Mixin } from 'src/core/shopware';
+const { Component, Mixin } = Shopware;
 ```
+
+This can be very handy everytime you need to access multiple objects from `Shopware`.
 
 This [example documentation](https://vuejs.org/v2/guide/mixins.html) from VueJS describes quite good, what a `mixin` even is, in case you were wondering.
 The mixin comes with a method called `createNotificationError`, which you should use here. Its parameter has to be the object containing the config for the notification.
@@ -1164,7 +1141,7 @@ onClickSave() {
     this.isLoading = true;
 
     this.repository
-        .save(this.bundle, this.context)
+        .save(this.bundle, Shopware.Context.api)
         .then(() => {
             this.getBundle();
             this.isLoading = false;
@@ -1191,7 +1168,7 @@ onClickSave() {
     ...
 
     this.repository
-        .save(this.bundle, this.context)
+        .save(this.bundle, Shopware.Context.api)
         .then(() => {
             ...
             
@@ -1200,7 +1177,7 @@ onClickSave() {
 },
 ```
 
-The second thing you need to take care of, is the method `saveFinish`. It is executed by the [watch](https://github.com/shopware/platform/blob/master/src/Administration/Resources/administration/src/app/component/base/sw-button-process/index.js#L45) option,
+The second thing you need to take care of, is the method `saveFinish`. It is executed by the [watch](https://github.com/shopware/platform/blob/master/src/Administration/Resources/app/administration/src/app/component/base/sw-button-process/index.js#L45) option,
 which reacts on changes on the `processSuccess` property. Once a change happens to the `processSuccess` property, a timeout is applied and the event `process-finish` emitted once the timeout ran off.
 You're calling the `saveFinish` method in your template then, which is supposed to reset the `processSuccess` property to false, so the `sw-button-process` resets its state as well.
 
@@ -1242,15 +1219,15 @@ Even the product association is very easy to handle now for your shop manager.
 
 Here's the full example of your detail component:
 ```js
-import { Component, Mixin } from 'src/core/shopware';
 import template from './swag-bundle-detail.html.twig';
+
+const { Component, Mixin } = Shopware;
 
 Component.register('swag-bundle-detail', {
     template,
 
     inject: [
-        'repositoryFactory',
-        'context'
+        'repositoryFactory'
     ],
 
     mixins: [
@@ -1289,7 +1266,7 @@ Component.register('swag-bundle-detail', {
     methods: {
         getBundle() {
             this.repository
-                .get(this.$route.params.id, this.context)
+                .get(this.$route.params.id, Shopware.Context.api)
                 .then((entity) => {
                     this.bundle = entity;
                 });
@@ -1299,7 +1276,7 @@ Component.register('swag-bundle-detail', {
             this.isLoading = true;
 
             this.repository
-                .save(this.bundle, this.context)
+                .save(this.bundle, Shopware.Context.api)
                 .then(() => {
                     this.getBundle();
                     this.isLoading = false;
@@ -1333,9 +1310,7 @@ You're extending from a component by using the `extend` method of the `Component
 the second parameter the name of the component to extend from, the third paramter the configuration again.
 
 ```js
-import { Component } from 'src/core/shopware';
-
-Component.extend('swag-bundle-create', 'swag-bundle-detail', {
+Shopware.Component.extend('swag-bundle-create', 'swag-bundle-detail', {
     
 });
 ```
@@ -1343,15 +1318,13 @@ Component.extend('swag-bundle-create', 'swag-bundle-detail', {
 Now go ahead and implement your own `getBundle` method. While the original `getBundle` method had to fetch an actual bundle entity by its ID,
 you only have to create a new entity in this case. This does not send any request to the API, so also no need for a promise object here.
 You create a new entity using the `create` method of a repository. It does neither require an `Criteria` instance, nor an ID to fetch any bundle.
-It only needs the context to create a new entity.
+It only needs the `Shopware.Context.api` to create a new entity.
 
 ```js
-import { Component } from 'src/core/shopware';
-
-Component.extend('swag-bundle-create', 'swag-bundle-detail', {
+Shopware.Component.extend('swag-bundle-create', 'swag-bundle-detail', {
     methods: {
         getBundle() {
-            this.bundle = this.repository.create(this.context);
+            this.bundle = this.repository.create(Shopware.Context.api);
         }
     }
 });
@@ -1367,7 +1340,7 @@ onClickSave() {
     this.isLoading = true;
 
     this.repository
-        .save(this.bundle, this.context)
+        .save(this.bundle, Shopware.Context.api)
         .then(() => {
             this.isLoading = false;
             this.$router.push({ name: 'swag.bundle.detail', params: { id: this.bundle.id } });
@@ -1388,19 +1361,18 @@ That's it,you're done already! No need to set a custom template here or anything
 
 That's how your `swag-bundle-create` should look like now:
 ```js
-import { Component } from 'src/core/shopware';
 
-Component.extend('swag-bundle-create', 'swag-bundle-detail', {
+Shopware.Component.extend('swag-bundle-create', 'swag-bundle-detail', {
     methods: {
         getBundle() {
-            this.bundle = this.repository.create(this.context);
+            this.bundle = this.repository.create(Shopware.Context.api);
         },
 
         onClickSave() {
             this.isLoading = true;
 
             this.repository
-                .save(this.bundle, this.context)
+                .save(this.bundle, Shopware.Context.api)
                 .then(() => {
                     this.isLoading = false;
                     this.$router.push({ name: 'swag.bundle.detail', params: { id: this.bundle.id } });

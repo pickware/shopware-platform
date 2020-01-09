@@ -8,20 +8,20 @@ use Shopware\Core\Framework\Uuid\Uuid;
 
 class UuidTest extends TestCase
 {
-    public function testRandomHex()
+    public function testRandomHex(): void
     {
         static::assertNotEquals(Uuid::randomHex(), Uuid::randomHex());
         static::assertTrue(Uuid::isValid(Uuid::randomHex()));
         static::assertStringNotContainsString('-', Uuid::randomHex());
     }
 
-    public function testRandomBytes()
+    public function testRandomBytes(): void
     {
         static::assertNotEquals(Uuid::randomBytes(), Uuid::randomBytes());
-        static::assertSame(16, \strlen(Uuid::randomBytes()));
+        static::assertSame(16, \mb_strlen(Uuid::randomBytes(), '8bit'));
     }
 
-    public function testHexRoundtrip()
+    public function testHexRoundtrip(): void
     {
         $hex = Uuid::randomHex();
         $bytes = Uuid::fromHexToBytes($hex);
@@ -29,7 +29,7 @@ class UuidTest extends TestCase
         static::assertSame($hex, Uuid::fromBytesToHex($bytes));
     }
 
-    public function testBytesRoundtrip()
+    public function testBytesRoundtrip(): void
     {
         $bytes = Uuid::randomBytes();
         $hex = Uuid::fromBytesToHex($bytes);
@@ -37,13 +37,13 @@ class UuidTest extends TestCase
         static::assertSame($bytes, Uuid::fromHexToBytes($hex));
     }
 
-    public function testFromBytesToHexThrowsOnInvalidLength()
+    public function testFromBytesToHexThrowsOnInvalidLength(): void
     {
         $this->expectException(InvalidUuidLengthException::class);
         Uuid::fromBytesToHex('a');
     }
 
-    public function testValidity()
+    public function testValidity(): void
     {
         static::assertTrue(Uuid::isValid('bd5303139e5e47c68eeda68746b73436'));
         static::assertTrue(Uuid::isValid('1111aaabbbfff1111111111ccc111111'));
@@ -61,15 +61,15 @@ class UuidTest extends TestCase
         static::assertFalse(Uuid::isValid('74d25156-60e6-444c-a177-a96e67ecfc5f'));
     }
 
-    public function testUuidFormat()
+    public function testUuidFormat(): void
     {
         for ($i = 0; $i < 100; ++$i) {
             $uuid = Uuid::randomHex();
-            static::assertSame(32, strlen($uuid));
+            static::assertSame(32, mb_strlen($uuid));
             // uuid 4 is mostly random except the version is at pos 13 and pos 17 is either 8, 9, a or b
             static::assertSame('4', $uuid[12]);
             static::assertContains($uuid[16], ['8', '9', 'a', 'b']);
-            static::assertTrue($uuid === strtolower($uuid));
+            static::assertTrue($uuid === mb_strtolower($uuid));
         }
     }
 }

@@ -15,6 +15,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class ThemeCompileCommand extends Command
 {
+    protected static $defaultName = 'theme:compile';
+
     /**
      * @var SymfonyStyle
      */
@@ -32,12 +34,12 @@ class ThemeCompileCommand extends Command
 
     public function __construct(ThemeService $themeService, EntityRepositoryInterface $salesChannelRepository)
     {
-        parent::__construct('theme:compile');
+        parent::__construct();
         $this->themeService = $themeService;
         $this->salesChannelRepository = $salesChannelRepository;
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $this->io = new SymfonyStyle($input, $output);
         $context = Context::createDefaultContext();
@@ -56,6 +58,8 @@ class ThemeCompileCommand extends Command
         }
 
         $this->io->note(sprintf('Took %f seconds', (float) microtime(true) - $start));
+
+        return 0;
     }
 
     private function getSalesChannels(Context $context): SalesChannelCollection

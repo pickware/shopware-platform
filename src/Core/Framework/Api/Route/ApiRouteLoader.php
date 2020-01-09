@@ -5,7 +5,6 @@ namespace Shopware\Core\Framework\Api\Route;
 use Shopware\Core\Framework\Api\Controller\ApiController;
 use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityTranslationDefinition;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelApiController;
 use Shopware\Core\System\SalesChannel\Entity\SalesChannelDefinitionInstanceRegistry;
 use Symfony\Component\Config\Loader\Loader;
@@ -17,6 +16,7 @@ class ApiRouteLoader extends Loader
     private $definitionRegistry;
 
     private $isLoaded = false;
+
     /**
      * @var SalesChannelDefinitionInstanceRegistry
      */
@@ -104,11 +104,7 @@ class ApiRouteLoader extends Loader
             return $a->getEntityName() <=> $b->getEntityName();
         });
 
-        /** @var EntityDefinition $definition */
         foreach ($elements as $definition) {
-            if (is_subclass_of($definition, EntityTranslationDefinition::class)) {
-                continue;
-            }
             $entityName = $definition->getEntityName();
             $resourceName = str_replace('_', '-', $definition->getEntityName());
 

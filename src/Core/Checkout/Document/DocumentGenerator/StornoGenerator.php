@@ -2,7 +2,6 @@
 
 namespace Shopware\Core\Checkout\Document\DocumentGenerator;
 
-use Shopware\Core\Checkout\Cart\Tax\Struct\CalculatedTax;
 use Shopware\Core\Checkout\Document\DocumentConfiguration;
 use Shopware\Core\Checkout\Document\DocumentConfigurationFactory;
 use Shopware\Core\Checkout\Document\Twig\DocumentTemplateRenderer;
@@ -19,6 +18,7 @@ class StornoGenerator implements DocumentGeneratorInterface
      * @var string
      */
     private $rootDir;
+
     /**
      * @var DocumentTemplateRenderer
      */
@@ -49,18 +49,18 @@ class StornoGenerator implements DocumentGeneratorInterface
         $order = $this->handlePrices($order);
 
         $documentString = $this->documentTemplateRenderer->render(
-                $templatePath,
-                [
-                    'order' => $order,
-                    'config' => DocumentConfigurationFactory::mergeConfiguration($config, new DocumentConfiguration())->jsonSerialize(),
-                    'rootDir' => $this->rootDir,
-                    'context' => $context,
-                ],
-                $context,
-                $order->getSalesChannelId(),
-                $order->getLanguageId(),
-                $order->getLanguage()->getLocale()->getCode()
-            );
+            $templatePath,
+            [
+                'order' => $order,
+                'config' => DocumentConfigurationFactory::mergeConfiguration($config, new DocumentConfiguration())->jsonSerialize(),
+                'rootDir' => $this->rootDir,
+                'context' => $context,
+            ],
+            $context,
+            $order->getSalesChannelId(),
+            $order->getLanguageId(),
+            $order->getLanguage()->getLocale()->getCode()
+        );
 
         return $documentString;
     }
@@ -76,7 +76,6 @@ class StornoGenerator implements DocumentGeneratorInterface
             $lineItem->setUnitPrice($lineItem->getUnitPrice() / -1);
             $lineItem->setTotalPrice($lineItem->getTotalPrice() / -1);
         }
-        /** @var CalculatedTax $tax */
         foreach ($order->getPrice()->getCalculatedTaxes()->sortByTax()->getElements() as $tax) {
             $tax->setTax($tax->getTax() / -1);
         }

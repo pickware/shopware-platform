@@ -6,7 +6,6 @@ use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepositoryInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\EqualsFilter;
-use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\NotFilter;
 use Shopware\Core\Framework\Plugin\PluginCollection;
 use Shopware\Core\Framework\Plugin\PluginEntity;
 use Shopware\Core\Framework\Store\Services\StoreClient;
@@ -15,6 +14,17 @@ use Symfony\Component\HttpFoundation\RequestStack;
 
 class PluginCompatibility
 {
+    public const PLUGIN_COMPATIBILITY_COMPATIBLE = 'compatible';
+    public const PLUGIN_COMPATIBILITY_NOT_COMPATIBLE = 'notCompatible';
+    public const PLUGIN_COMPATIBILITY_UPDATABLE_NOW = 'updatableNow';
+    public const PLUGIN_COMPATIBILITY_UPDATABLE_FUTURE = 'updatableFuture';
+
+    public const PLUGIN_COMPATIBILITY_NOT_IN_STORE = 'notInStore';
+
+    public const PLUGIN_DEACTIVATION_FILTER_ALL = 'all';
+    public const PLUGIN_DEACTIVATION_FILTER_NOT_COMPATIBLE = 'notCompatible';
+    public const PLUGIN_DEACTIVATION_FILTER_NONE = '';
+
     /**
      * @var EntityRepositoryInterface
      */
@@ -37,11 +47,13 @@ class PluginCompatibility
         $this->requestStack = $requestStack;
     }
 
-    public function getPluginCompatibilities(Version $version): array
+    public function getPluginCompatibilities(Version $update, Context $context, ?PluginCollection $plugins = null): array
     {
         $currentLanguage = $this->requestStack->getCurrentRequest()->query->get('language', 'en-GB');
-        $plugins = $this->fetchPlugins();
-        $storeInfo = $this->storeClient->getPluginCompatibilities($version->version, $currentLanguage, $plugins);
+        if ($plugins === null) {
+            $plugins = $this->fetchActivePlugins($context);
+        }
+        $storeInfo = $this->storeClient->getPluginCompatibilities($update->version, $currentLanguage, $plugins);
         $storeInfoValues = array_column($storeInfo, 'name');
         $me = $this;
 
@@ -57,7 +69,7 @@ class PluginCompatibility
                     'statusVariant' => 'error',
                     'statusColor' => null,
                     'statusMessage' => '',
-                    'statusName' => 'notInStore',
+                    'statusName' => self::PLUGIN_COMPATIBILITY_NOT_IN_STORE,
                 ];
             }
 
@@ -73,13 +85,85 @@ class PluginCompatibility
         return $pluginInfo;
     }
 
-    private function fetchPlugins(): PluginCollection
+    /**
+     * @return PluginEntity[]
+     */
+    public function getPluginsToDeactivate(Version $update, Context $context, string $deactivationFilter = self::PLUGIN_DEACTIVATION_FILTER_NOT_COMPATIBLE): array
+    {
+        $deactivationFilter = trim($deactivationFilter);
+
+        if ($deactivationFilter === self::PLUGIN_DEACTIVATION_FILTER_NONE) {
+            return [];
+        }
+
+        $plugins = $this->fetchActivePlugins($context);
+        $compatibilities = $this->getPluginCompatibilities($update, $context, $plugins);
+
+        $pluginsToDeactivate = [];
+
+        foreach ($compatibilities as $compatibility) {
+            $skip = $compatibility['statusName'] === self::PLUGIN_COMPATIBILITY_COMPATIBLE
+                || $compatibility['statusName'] === self::PLUGIN_COMPATIBILITY_NOT_IN_STORE;
+
+            if ($deactivationFilter !== self::PLUGIN_DEACTIVATION_FILTER_ALL && $skip) {
+                continue;
+            }
+
+            /** @var PluginEntity|null $plugin */
+            $plugin = $plugins->filterByProperty('name', $compatibility['name'])->first();
+
+            if ($plugin && $plugin->getActive()) {
+                $pluginsToDeactivate[] = $plugin;
+            }
+        }
+
+        return $pluginsToDeactivate;
+    }
+
+    /**
+     * @return PluginEntity[]
+     */
+    public function getPluginsToReactivate(array $deactivatedPlugins, Version $newVersion, Context $context): array
+    {
+        $plugins = $this->fetchInactivePlugins($deactivatedPlugins, $context);
+        $compatibilities = $this->getPluginCompatibilities($newVersion, $context, $plugins);
+
+        $pluginsToReactivate = [];
+
+        foreach ($compatibilities as $compatibility) {
+            if ($compatibility['statusName'] !== self::PLUGIN_COMPATIBILITY_COMPATIBLE) {
+                continue;
+            }
+
+            /** @var PluginEntity|null $plugin */
+            $plugin = $plugins->filterByProperty('name', $compatibility['name'])->first();
+
+            if ($plugin && !$plugin->getActive()) {
+                $pluginsToReactivate[] = $plugin;
+            }
+        }
+
+        return $pluginsToReactivate;
+    }
+
+    private function fetchActivePlugins(Context $context): PluginCollection
     {
         $criteria = new Criteria();
-        $criteria->addFilter(new NotFilter(NotFilter::CONNECTION_AND, [new EqualsFilter('installedAt', null)]));
+        $criteria->addFilter(new EqualsFilter('active', 1));
 
         /** @var PluginCollection $collection */
-        $collection = $this->pluginRepository->search($criteria, Context::createDefaultContext())->getEntities();
+        $collection = $this->pluginRepository->search($criteria, $context)->getEntities();
+
+        return $collection;
+    }
+
+    private function fetchInactivePlugins(array $pluginIds, Context $context): PluginCollection
+    {
+        $criteria = new Criteria($pluginIds);
+        $criteria->addFilter(new EqualsFilter('active', 0));
+
+        /** @var PluginCollection $collection */
+        $collection = $this->pluginRepository->search($criteria, $context)->getEntities();
 
         return $collection;
     }

@@ -4,7 +4,7 @@ namespace Shopware\Core\Checkout\Order;
 
 use Shopware\Core\Checkout\Cart\Price\Struct\CalculatedPrice;
 use Shopware\Core\Checkout\Cart\Price\Struct\CartPrice;
-use Shopware\Core\Checkout\Document\DocumentEntity;
+use Shopware\Core\Checkout\Document\DocumentCollection;
 use Shopware\Core\Checkout\Order\Aggregate\OrderAddress\OrderAddressCollection;
 use Shopware\Core\Checkout\Order\Aggregate\OrderCustomer\OrderCustomerEntity;
 use Shopware\Core\Checkout\Order\Aggregate\OrderDelivery\OrderDeliveryCollection;
@@ -12,8 +12,8 @@ use Shopware\Core\Checkout\Order\Aggregate\OrderLineItem\OrderLineItemCollection
 use Shopware\Core\Checkout\Order\Aggregate\OrderTransaction\OrderTransactionCollection;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
-use Shopware\Core\Framework\Language\LanguageEntity;
 use Shopware\Core\System\Currency\CurrencyEntity;
+use Shopware\Core\System\Language\LanguageEntity;
 use Shopware\Core\System\SalesChannel\SalesChannelEntity;
 use Shopware\Core\System\StateMachine\Aggregation\StateMachineState\StateMachineStateEntity;
 use Shopware\Core\System\Tag\TagCollection;
@@ -56,6 +56,7 @@ class OrderEntity extends Entity
      * @var \DateTimeInterface
      */
     protected $orderDate;
+
     /**
      * @var CartPrice
      */
@@ -162,7 +163,7 @@ class OrderEntity extends Entity
     protected $customFields;
 
     /**
-     * @var DocumentEntity|null
+     * @var DocumentCollection|null
      */
     protected $documents;
 
@@ -170,6 +171,16 @@ class OrderEntity extends Entity
      * @var TagCollection|null
      */
     protected $tags;
+
+    /**
+     * @var string|null
+     */
+    protected $affiliateCode;
+
+    /**
+     * @var string|null
+     */
+    protected $campaignCode;
 
     public function getCurrencyId(): string
     {
@@ -441,12 +452,12 @@ class OrderEntity extends Entity
         $this->shippingTotal = $shippingTotal;
     }
 
-    public function getDocuments(): ?DocumentEntity
+    public function getDocuments(): ?DocumentCollection
     {
         return $this->documents;
     }
 
-    public function setDocuments(?DocumentEntity $documents): void
+    public function setDocuments(DocumentCollection $documents): void
     {
         $this->documents = $documents;
     }
@@ -479,16 +490,40 @@ class OrderEntity extends Entity
             return null;
         }
 
+        /** @var OrderLineItemCollection $roots */
         $roots = $lineItems->filterByProperty('parentId', null);
+        $roots->sortByPosition();
         $this->addChildren($lineItems, $roots);
 
         return $roots;
     }
 
+    public function getAffiliateCode(): ?string
+    {
+        return $this->affiliateCode;
+    }
+
+    public function setAffiliateCode(?string $affiliateCode): void
+    {
+        $this->affiliateCode = $affiliateCode;
+    }
+
+    public function getCampaignCode(): ?string
+    {
+        return $this->campaignCode;
+    }
+
+    public function setCampaignCode(?string $campaignCode): void
+    {
+        $this->campaignCode = $campaignCode;
+    }
+
     private function addChildren(OrderLineItemCollection $lineItems, OrderLineItemCollection $parents): void
     {
         foreach ($parents as $parent) {
+            /** @var OrderLineItemCollection $children */
             $children = $lineItems->filterByProperty('parentId', $parent->getId());
+            $children->sortByPosition();
 
             $parent->setChildren($children);
 

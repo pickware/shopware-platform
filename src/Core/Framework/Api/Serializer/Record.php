@@ -4,6 +4,7 @@ namespace Shopware\Core\Framework\Api\Serializer;
 
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityCollection;
+use Shopware\Core\Framework\Struct\ArrayEntity;
 
 class Record implements \JsonSerializable
 {
@@ -121,8 +122,18 @@ class Record implements \JsonSerializable
         $vars = get_object_vars($this);
 
         unset($vars['extensions']);
-        foreach ($vars['relationships'] as $i => $x) {
+        foreach ($vars['relationships'] as $i => $_x) {
             unset($vars['relationships'][$i]['tmp']);
+        }
+
+        // if links are empty it should be decoded as empty object instead of empty array: https://jsonapi.org/format/#document-links
+        if (count($vars['links']) === 0) {
+            $vars['links'] = new \stdClass();
+        }
+
+        // if attributes are empty it should be decoded as empty object instead of empty array: https://jsonapi.org/format/#document-resource-object-attributes
+        if (count($vars['attributes']) === 0) {
+            $vars['attributes'] = new \stdClass();
         }
 
         return $vars;
@@ -144,8 +155,20 @@ class Record implements \JsonSerializable
 
         $data = $entity->jsonSerialize();
 
-        foreach ($this->attributes as $key => $relationship) {
+        foreach ($this->attributes as $key => $_relationship) {
             $this->attributes[$key] = $data[$key] ?? null;
+        }
+
+        if ($entity->hasExtension('foreignKeys')) {
+            /** @var ArrayEntity $extension */
+            $extension = $entity->getExtension('foreignKeys');
+
+            foreach ($extension->jsonSerialize() as $property => $value) {
+                if (array_key_exists($property, $this->attributes)) {
+                    continue;
+                }
+                $this->attributes[$property] = $value;
+            }
         }
 
         foreach ($this->relationships as $key => &$relationship) {
