@@ -57,7 +57,7 @@ class RequirementsValidator
 
         $this->addRemainingRequirementsAsException($pluginRequirements, $exceptionStack);
 
-        $exceptionStack->tryToThrow($method);
+        //$exceptionStack->tryToThrow($method);
     }
 
     /**
