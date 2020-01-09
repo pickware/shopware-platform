@@ -1,7 +1,6 @@
 /* eslint-disable import/no-extraneous-dependencies */
 const path = require('path');
 const fs = require('fs');
-const VueLoaderPlugin = require('vue-loader/lib/plugin');
 const utils = require('./utils');
 const config = require('../config');
 
@@ -163,7 +162,4 @@ module.exports = {
             }
         ]
     },
-    plugins: [
-        new VueLoaderPlugin()
-    ]
 };
