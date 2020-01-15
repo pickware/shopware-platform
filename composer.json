@@ -146,10 +146,5 @@
         "exclude-from-classmap": [
             "src/**/Test/"
         ]
-    },
-    "extra": {
-        "branch-alias": {
-            "dev-demo-shop": "1.0.x-dev"
-        }
     }
 }
