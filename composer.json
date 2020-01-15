@@ -146,5 +146,10 @@
         "exclude-from-classmap": [
             "src/**/Test/"
         ]
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-package-plugin": "6.1.0-dev"
+        }
     }
 }
