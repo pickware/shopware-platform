@@ -44,6 +44,14 @@ export default function createConditionService() {
         isNoneOf: {
             identifier: '!=',
             label: 'global.sw-condition.operator.isNoneOf'
+        },
+        gross: {
+            identifier: false,
+            label: 'global.sw-condition.operator.gross'
+        },
+        net: {
+            identifier: true,
+            label: 'global.sw-condition.operator.net'
         }
     };
     const operatorSets = {
@@ -75,6 +83,10 @@ export default function createConditionService() {
             operators.lowerThan,
             operators.lowerThanEquals,
             operators.notEquals
+        ],
+        isNet: [
+            operators.gross,
+            operators.net
         ]
     };
 

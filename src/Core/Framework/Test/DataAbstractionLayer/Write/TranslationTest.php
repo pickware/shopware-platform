@@ -589,6 +589,14 @@ class TranslationTest extends TestCase
                 'minPurchase' => 1,
                 'shippingFree' => false,
                 'purchasePrice' => 0,
+                'purchasePrices' => [
+                    [
+                        'currencyId' => Defaults::CURRENCY,
+                        'gross' => 0,
+                        'net' => 0,
+                        'linked' => true,
+                    ],
+                ],
             ],
         ];
         $productRepo = $this->getContainer()->get('product.repository');

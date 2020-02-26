@@ -159,9 +159,16 @@ class ProductEntity extends Entity
     protected $shippingFree;
 
     /**
+     * @deprecated
+     *
      * @var float|null
      */
     protected $purchasePrice;
+
+    /**
+     * @var PriceCollection|null
+     */
+    protected $purchasePrices;
 
     /**
      * @var bool|null
@@ -587,14 +594,30 @@ class ProductEntity extends Entity
         $this->shippingFree = $shippingFree;
     }
 
+    /**
+     * @deprecated
+     */
     public function getPurchasePrice(): ?float
     {
         return $this->purchasePrice;
     }
 
+    /**
+     * @deprecated
+     */
     public function setPurchasePrice(?float $purchasePrice): void
     {
         $this->purchasePrice = $purchasePrice;
+    }
+
+    public function getPurchasePrices(): ?PriceCollection
+    {
+        return $this->purchasePrices;
+    }
+
+    public function setPurchasePrices(?PriceCollection $purchasePrices): void
+    {
+        $this->purchasePrices = $purchasePrices;
     }
 
     public function getMarkAsTopseller(): ?bool
