@@ -13,6 +13,7 @@ use Shopware\Core\Checkout\Cart\Price\Struct\CalculatedPrice;
 use Shopware\Core\Checkout\Cart\Price\Struct\PriceDefinitionInterface;
 use Shopware\Core\Checkout\Cart\Price\Struct\QuantityPriceDefinition;
 use Shopware\Core\Content\Media\MediaEntity;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection;
 use Shopware\Core\Framework\Rule\Rule;
 use Shopware\Core\Framework\Struct\Struct;
 
@@ -61,6 +62,11 @@ class LineItem extends Struct
      * @var CalculatedPrice|null
      */
     protected $price;
+
+    /**
+     * @var PriceCollection|null
+     */
+    protected $purchasePrice;
 
     /**
      * @var bool
@@ -314,6 +320,16 @@ class LineItem extends Struct
         $this->price = $price;
 
         return $this;
+    }
+
+    public function getPurchasePrice(): ?PriceCollection
+    {
+        return $this->purchasePrice;
+    }
+
+    public function setPurchasePrice(?PriceCollection $purchasePrice): void
+    {
+        $this->purchasePrice = $purchasePrice;
     }
 
     public function isGood(): bool

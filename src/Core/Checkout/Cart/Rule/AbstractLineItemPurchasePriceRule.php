@@ -4,6 +4,7 @@ namespace Shopware\Core\Checkout\Cart\Rule;
 
 use Shopware\Core\Checkout\Cart\Exception\PayloadKeyNotFoundException;
 use Shopware\Core\Checkout\Cart\LineItem\LineItem;
+use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Rule\Exception\UnsupportedOperatorException;
 use Shopware\Core\Framework\Rule\Rule;
 use Shopware\Core\Framework\Rule\RuleScope;
@@ -12,7 +13,7 @@ use Symfony\Component\Validator\Constraints\Choice;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Symfony\Component\Validator\Constraints\Type;
 
-class LineItemPurchasePriceRule extends Rule
+abstract class AbstractLineItemPurchasePriceRule extends Rule
 {
     /**
      * @var float
@@ -32,15 +33,10 @@ class LineItemPurchasePriceRule extends Rule
         $this->amount = $amount;
     }
 
-    public function getName(): string
-    {
-        return 'cartLineItemPurchasePrice';
-    }
-
     public function match(RuleScope $scope): bool
     {
         if ($scope instanceof LineItemScope) {
-            return $this->matchPurchasePriceCondition($scope->getLineItem());
+            return $this->matchPurchasePriceCondition($scope->getLineItem(), $scope->getContext());
         }
 
         if (!$scope instanceof CartRuleScope) {
@@ -48,7 +44,7 @@ class LineItemPurchasePriceRule extends Rule
         }
 
         foreach ($scope->getCart()->getLineItems() as $lineItem) {
-            if ($this->matchPurchasePriceCondition($lineItem)) {
+            if ($this->matchPurchasePriceCondition($lineItem, $scope->getContext())) {
                 return true;
             }
         }
@@ -76,39 +72,41 @@ class LineItemPurchasePriceRule extends Rule
         ];
     }
 
+    abstract public function getName(): string;
+
+    abstract protected function getPriceAmount(LineItem $lineItem, string $currencyId): ?float;
+
     /**
      * @throws PayloadKeyNotFoundException
      * @throws UnsupportedOperatorException
      */
-    private function matchPurchasePriceCondition(LineItem $lineItem): bool
+    private function matchPurchasePriceCondition(LineItem $lineItem, Context $context): bool
     {
-        $purchasePrice = $lineItem->getPayloadValue('purchasePrice');
-
-        if ($purchasePrice === null) {
+        $purchaseAmount = $this->getPriceAmount($lineItem, $context->getCurrencyId());
+        if (!$purchaseAmount) {
             return false;
         }
 
         $this->amount = (float) $this->amount;
 
-        /* @var float $purchasePrice */
         switch ($this->operator) {
             case self::OPERATOR_GTE:
-                return FloatComparator::greaterThanOrEquals($purchasePrice, $this->amount);
+                return FloatComparator::greaterThanOrEquals($purchaseAmount, $this->amount);
 
             case self::OPERATOR_LTE:
-                return FloatComparator::lessThanOrEquals($purchasePrice, $this->amount);
+                return FloatComparator::lessThanOrEquals($purchaseAmount, $this->amount);
 
             case self::OPERATOR_GT:
-                return FloatComparator::greaterThan($purchasePrice, $this->amount);
+                return FloatComparator::greaterThan($purchaseAmount, $this->amount);
 
             case self::OPERATOR_LT:
-                return FloatComparator::lessThan($purchasePrice, $this->amount);
+                return FloatComparator::lessThan($purchaseAmount, $this->amount);
 
             case self::OPERATOR_EQ:
-                return FloatComparator::equals($purchasePrice, $this->amount);
+                return FloatComparator::equals($purchaseAmount, $this->amount);
 
             case self::OPERATOR_NEQ:
-                return FloatComparator::notEquals($purchasePrice, $this->amount);
+                return FloatComparator::notEquals($purchaseAmount, $this->amount);
 
             default:
                 throw new UnsupportedOperatorException($this->operator, self::class);

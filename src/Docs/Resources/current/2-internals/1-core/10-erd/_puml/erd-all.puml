@@ -785,6 +785,7 @@ Table(ShopwareCoreContentProductProductDefinition, "product\n(Product)") {
    referenceUnit float
    shippingFree bool
    purchasePrice float
+   purchasePrices json
    markAsTopseller bool
    weight float
    width float
@@ -1536,6 +1537,7 @@ Table(ShopwareCoreCheckoutOrderAggregateOrderLineItemOrderLineItemDefinition, "o
    stackable bool
    not_null(price) calculatedPrice
    priceDefinition priceDefinition
+   purchase_price json
    unitPrice float
    totalPrice float
    description string

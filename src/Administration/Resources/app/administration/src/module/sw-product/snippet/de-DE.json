@@ -37,12 +37,12 @@
     "priceForm": {
       "labelTaxRate": "Steuersatz",
       "labelPurchasePriceGross": "Einkaufspreis (Brutto)",
+      "labelPurchasePriceNet": "Einkaufspreis (Netto)",
       "labelUnit": "Maßeinheit",
       "labelPurchaseUnit": "Verkaufseinheit",
       "labelReferenceUnit": "Grundeinheit",
       "labelPackUnit": "Verpackungseinheit",
       "placeholderTaxRate": "Wähle einen Steuersatz aus ...",
-      "placeholderPurchasePriceGross": "Gib den Einkaufspreis (Brutto) ein ...",
       "placeholderPurchaseUnit": "Gib die Verkaufseinheit an ...",
       "placeholderReferenceUnit": "Gib die Grundeinheit an ...",
       "placeholderPackUnit": "Gib die Verpackungseinheit an ...",

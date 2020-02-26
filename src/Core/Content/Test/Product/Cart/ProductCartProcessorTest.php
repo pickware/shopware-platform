@@ -4,11 +4,13 @@ namespace Shopware\Core\Content\Test\Product\Cart;
 
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Checkout\Cart\Delivery\Struct\DeliveryInformation;
+use Shopware\Core\Checkout\Cart\LineItem\LineItem;
 use Shopware\Core\Checkout\Cart\SalesChannel\CartService;
 use Shopware\Core\Content\Product\Aggregate\ProductVisibility\ProductVisibilityDefinition;
 use Shopware\Core\Content\Product\Cart\ProductLineItemFactory;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\Context;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Test\TestDataCollection;
 use Shopware\Core\Framework\Uuid\Uuid;
@@ -31,22 +33,7 @@ class ProductCartProcessorTest extends TestCase
 
     public function testDeliveryInformation(): void
     {
-        $this->createProduct();
-
-        $service = $this->getContainer()->get(CartService::class);
-
-        $product = $this->getContainer()->get(ProductLineItemFactory::class)
-            ->create($this->ids->get('product'));
-
-        $token = $this->ids->create('token');
-
-        $context = $this->getContainer()->get(SalesChannelContextService::class)
-            ->get(Defaults::SALES_CHANNEL, $token);
-
-        $cart = $service->getCart($token, $context);
-        $service->add($cart, $product, $context);
-
-        $product = $cart->get($product->getId());
+        $product = $this->getLineItem();
 
         static::assertInstanceOf(DeliveryInformation::class, $product->getDeliveryInformation());
 
@@ -55,6 +42,33 @@ class ProductCartProcessorTest extends TestCase
         static::assertEquals(101, $info->getHeight());
         static::assertEquals(102, $info->getWidth());
         static::assertEquals(103, $info->getLength());
+    }
+
+    public function testPurchasePrices(): void
+    {
+        $purchasePrice = $this->getLineItem()->getPurchasePrice();
+
+        static::assertInstanceOf(PriceCollection::class, $purchasePrice);
+        static::assertEquals(1.5, $purchasePrice->getCurrencyPrice(Defaults::CURRENCY)->getGross());
+        static::assertEquals(1.0, $purchasePrice->getCurrencyPrice(Defaults::CURRENCY)->getNet());
+    }
+
+    private function getLineItem(): LineItem
+    {
+        $this->createProduct();
+        $product = $this->getContainer()->get(ProductLineItemFactory::class)
+            ->create($this->ids->get('product'));
+
+        $service = $this->getContainer()->get(CartService::class);
+
+        $token = $this->ids->create('token');
+        $context = $this->getContainer()->get(SalesChannelContextService::class)
+            ->get(Defaults::SALES_CHANNEL, $token);
+
+        $cart = $service->getCart($token, $context);
+        $service->add($cart, $product, $context);
+
+        return $cart->get($product->getId());
     }
 
     private function createProduct(): void
@@ -66,6 +80,10 @@ class ProductCartProcessorTest extends TestCase
             'stock' => 10,
             'price' => [
                 ['currencyId' => Defaults::CURRENCY, 'gross' => 15, 'net' => 10, 'linked' => false],
+            ],
+            'purchasePrice' => 1.5,
+            'purchasePrices' => [
+                ['currencyId' => Defaults::CURRENCY, 'gross' => 1.5, 'net' => 1.0, 'linked' => false],
             ],
             'active' => true,
             'tax' => ['name' => 'test', 'taxRate' => 15],

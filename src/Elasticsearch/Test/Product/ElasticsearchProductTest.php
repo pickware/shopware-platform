@@ -1301,6 +1301,9 @@ class ElasticsearchProductTest extends TestCase
             'name' => $name,
             'stock' => $stock,
             'purchasePrice' => $purchasePrice,
+            'purchasePrices' => [
+                ['currencyId' => Defaults::CURRENCY, 'gross' => $purchasePrice, 'net' => $purchasePrice / 115 * 100, 'linked' => false],
+            ],
             'price' => [
                 ['currencyId' => Defaults::CURRENCY, 'gross' => $price, 'net' => $price / 115 * 100, 'linked' => false],
             ],

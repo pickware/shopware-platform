@@ -10,6 +10,7 @@ use Shopware\Core\Content\Media\MediaEntity;
 use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityIdTrait;
+use Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection;
 
 class OrderLineItemEntity extends Entity
 {
@@ -94,6 +95,11 @@ class OrderLineItemEntity extends Entity
      * @var PriceDefinitionInterface|null
      */
     protected $priceDefinition;
+
+    /**
+     * @var PriceCollection|null
+     */
+    protected $purchasePrice;
 
     /**
      * @var string[]|null
@@ -280,6 +286,16 @@ class OrderLineItemEntity extends Entity
     public function setPriceDefinition(?PriceDefinitionInterface $priceDefinition): void
     {
         $this->priceDefinition = $priceDefinition;
+    }
+
+    public function getPurchasePrice(): ?PriceCollection
+    {
+        return $this->purchasePrice;
+    }
+
+    public function setPurchasePrice(?PriceCollection $purchasePrice): void
+    {
+        $this->purchasePrice = $purchasePrice;
     }
 
     public function getPayload(): ?array

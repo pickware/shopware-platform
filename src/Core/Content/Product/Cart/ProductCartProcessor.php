@@ -205,6 +205,8 @@ class ProductCartProcessor implements CartProcessorInterface, CartDataCollectorI
             $lineItem->setPriceDefinition($prices->getQuantityPrice());
         }
 
+        $lineItem->setPurchasePrice($product->getPurchasePrices());
+
         $quantityInformation = new QuantityInformation();
 
         $quantityInformation->setMinPurchase(
@@ -221,6 +223,10 @@ class ProductCartProcessor implements CartProcessorInterface, CartDataCollectorI
 
         $lineItem->setQuantityInformation($quantityInformation);
 
+        $grossPurchasePrice = null;
+        if ($lineItem->getPurchasePrice()) {
+            $grossPurchasePrice = $product->getPurchasePrices()->getCurrencyPrice($context->getCurrency()->getId())->getGross();
+        }
         $lineItem->replacePayload([
             'isCloseout' => $product->getIsCloseout(),
             'customFields' => $product->getCustomFields(),
@@ -228,7 +234,7 @@ class ProductCartProcessor implements CartProcessorInterface, CartDataCollectorI
             'releaseDate' => $product->getReleaseDate() ? $product->getReleaseDate()->format(Defaults::STORAGE_DATE_TIME_FORMAT) : null,
             'isNew' => $product->isNew(),
             'markAsTopseller' => $product->getMarkAsTopseller(),
-            'purchasePrice' => $product->getPurchasePrice(),
+            'purchasePrice' => $grossPurchasePrice,
             'productNumber' => $product->getProductNumber(),
             'manufacturerId' => $product->getManufacturerId(),
             'taxId' => $product->getTaxId(),

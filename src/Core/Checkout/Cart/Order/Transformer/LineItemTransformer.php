@@ -42,6 +42,11 @@ class LineItemTransformer
             $productId = $lineItem->getReferencedId();
         }
 
+        $purchasePrice = null;
+        if ($lineItem->getPurchasePrice()) {
+            $purchasePrice = PriceTransformer::transformCollection($lineItem->getPurchasePrice());
+        }
+
         $data = [
             'id' => $id,
             'identifier' => $lineItem->getId(),
@@ -57,6 +62,7 @@ class LineItemTransformer
             'position' => $position,
             'price' => $lineItem->getPrice(),
             'priceDefinition' => $lineItem->getPriceDefinition(),
+            'purchasePrice' => $purchasePrice,
             'parentId' => $parentId,
             'coverId' => $lineItem->getCover() ? $lineItem->getCover()->getId() : null,
             'payload' => $lineItem->getPayload(),

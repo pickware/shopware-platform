@@ -269,7 +269,7 @@ To get the diff between two versions, go to https://github.com/shopware/platform
         * Extended permissions with subscribe event `SalesChannelContextPermissionsChangedEvent`, see detail at class `SalesChannelContextFactory`
     * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemIsNewRule` to check for newcomers in cart 
     * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemOfManufacturerRule` to check the manufacturer of a product in the cart
-    * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemPurchasePriceRule` to check the purchase price of a product in the cart
+    * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemPurchasePriceGrossRule` and `Shopware\Core\Checkout\Cart\Rule\LineItemPurchasePriceNetRule` to check the purchase price of a product in the cart
     * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemCreationDateRule` to check the creation date of a product in cart
     * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemReleaseDateRule` to check the release date of a product in the cart
     * Added new `Shopware\Core\Checkout\Cart\Rule\LineItemClearanceSaleRule` to check if a clearance sale product is in cart
@@ -337,6 +337,8 @@ To get the diff between two versions, go to https://github.com/shopware/platform
     * Deprecated `\Shopware\Storefront\Theme\Twig\ThemeTemplateFinder` use `TemplateNamespaceHierarchyBuilderInterface` instead
     * Added JS plugin to add a Google Analytics integration: `google-analytics.plugin.js` 
     * Added additional data to the JS plugin events `SearchWidget::handleInputEvent`, `FormValidation::onFormSubmit` and `AddToCart::beforeFormSubmit`
+    * Added `purchasePrice` to `Shopware\Core\Checkout\Order\Aggregate\OrderLineItem`
+    * Deprecated `purchasePrice` in `Shopware\Core\Content\Product` use `purchasePrices` instead
 
 **Removals**
 

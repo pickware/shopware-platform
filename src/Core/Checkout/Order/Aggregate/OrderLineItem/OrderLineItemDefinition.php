@@ -24,6 +24,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField
 use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ParentFkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceDefinitionField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\PriceField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ReferenceVersionField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\VersionField;
@@ -91,6 +92,7 @@ class OrderLineItemDefinition extends EntityDefinition
             (new CalculatedPriceField('price', 'price'))->setFlags(new Required()),
             new PriceDefinitionField('price_definition', 'priceDefinition'),
 
+            new PriceField('purchase_price', 'purchasePrice'),
             (new FloatField('unit_price', 'unitPrice'))->addFlags(new Computed()),
             (new FloatField('total_price', 'totalPrice'))->addFlags(new Computed()),
             new StringField('description', 'description'),
