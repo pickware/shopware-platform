@@ -294,6 +294,7 @@
                  class="Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerRegistry">
             <argument type="tagged" tag="shopware.dal_indexing.indexer"/>
             <argument type="service" id="event_dispatcher"/>
+            <argument type="service" id="logger"/>
 
             <tag name="kernel.event_subscriber"/>
         </service>
@@ -301,6 +302,7 @@
         <service id="Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue\IndexerHandler">
             <argument type="service" id="Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerRegistryInterface"/>
             <argument type="service" id="messenger.bus.shopware" />
+            <argument type="service" id="logger"/>
 
             <tag name="messenger.message_handler"/>
         </service>
@@ -308,6 +310,7 @@
         <service id="Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue\IndexerMessageSender" public="true">
             <argument type="service" id="messenger.bus.shopware" />
             <argument type="tagged" tag="shopware.dal_indexing.indexer"/>
+            <argument type="service" id="logger"/>
         </service>
 
         <service id="Shopware\Core\Framework\DataAbstractionLayer\Command\RefreshIndexCommand">

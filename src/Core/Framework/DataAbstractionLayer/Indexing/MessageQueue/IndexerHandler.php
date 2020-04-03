@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue;
 
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Indexing\IndexerRegistryInterface;
 use Shopware\Core\Framework\MessageQueue\Handler\AbstractMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -18,10 +19,14 @@ class IndexerHandler extends AbstractMessageHandler
      */
     private $bus;
 
-    public function __construct(IndexerRegistryInterface $registry, MessageBusInterface $bus)
+    /** @var LoggerInterface $logger */
+    private $logger;
+
+    public function __construct(IndexerRegistryInterface $registry, MessageBusInterface $bus, LoggerInterface $logger)
     {
         $this->registry = $registry;
         $this->bus = $bus;
+        $this->logger = $logger;
     }
 
     /**
@@ -31,6 +36,7 @@ class IndexerHandler extends AbstractMessageHandler
      */
     public function handle($message): void
     {
+        $this->logger->info('Handling', ['message' => $message]);
         $result = $this->registry->partial($message->getCurrentIndexerName(), $message->getOffset(), $message->getTimestamp());
         if ($result === null) {
             return;

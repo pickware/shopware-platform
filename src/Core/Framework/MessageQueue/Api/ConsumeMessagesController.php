@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\MessageQueue\Api;
 
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\MessageQueue\Subscriber\CountHandledMessagesListener;
 use Shopware\Core\Framework\Routing\Annotation\RouteScope;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -51,13 +52,19 @@ class ConsumeMessagesController extends AbstractController
      */
     private $dispatchPcntlSignalListener;
 
+    /**
+     * @var LoggerInterface;
+     */
+    private $logger;
+
     public function __construct(
         ServiceLocator $receiverLocator,
         MessageBusInterface $bus,
         int $pollInterval,
         StopWorkerOnRestartSignalListener $stopWorkerOnRestartSignalListener,
         StopWorkerOnSigtermSignalListener $stopWorkerOnSigtermSignalListener,
-        DispatchPcntlSignalListener $dispatchPcntlSignalListener
+        DispatchPcntlSignalListener $dispatchPcntlSignalListener,
+        LoggerInterface $logger
     ) {
         $this->receiverLocator = $receiverLocator;
         $this->bus = $bus;
@@ -65,6 +72,7 @@ class ConsumeMessagesController extends AbstractController
         $this->stopWorkerOnRestartSignalListener = $stopWorkerOnRestartSignalListener;
         $this->stopWorkerOnSigtermSignalListener = $stopWorkerOnSigtermSignalListener;
         $this->dispatchPcntlSignalListener = $dispatchPcntlSignalListener;
+        $this->logger = $logger;
     }
 
     /**
@@ -73,6 +81,10 @@ class ConsumeMessagesController extends AbstractController
     public function consumeMessages(Request $request): JsonResponse
     {
         $receiverName = $request->get('receiver');
+
+        global $cacheHash;
+
+        $this->logger->info('Consume cash hash: ' . $cacheHash);
 
         if (!$receiverName || !$this->receiverLocator->has($receiverName)) {
             throw new \RuntimeException('No receiver name provided.');

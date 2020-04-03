@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing;
 
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
@@ -31,16 +32,22 @@ class IndexerRegistry implements EventSubscriberInterface, IndexerRegistryInterf
     private $eventDispatcher;
 
     /**
+     * @var LoggerInterface
+     */
+    private $logger;
+
+    /**
      * Internal working state to prevent endless loop if an indexer fires the EntityWrittenContainerEvent
      *
      * @var bool
      */
     private $working = false;
 
-    public function __construct(iterable $indexer, EventDispatcherInterface $eventDispatcher)
+    public function __construct(iterable $indexer, EventDispatcherInterface $eventDispatcher, LoggerInterface $logger)
     {
         $this->indexer = $indexer;
         $this->eventDispatcher = $eventDispatcher;
+        $this->logger = $logger;
     }
 
     public static function getSubscribedEvents(): array
@@ -94,14 +101,33 @@ class IndexerRegistry implements EventSubscriberInterface, IndexerRegistryInterf
     {
         $indexers = $this->getIndexers();
 
+        global $cacheHash;
+        if ($lastIndexer) {
+            $this->logger->info('Trying to run ' . $lastIndexer);
+            $this->logger->info('Cache hash: ' . $cacheHash);
+            $this->logger->info('Registered indexers: ', ['indexers' => $indexers]);
+        }
+
         foreach ($indexers as $index => $indexer) {
+            $this->logger->info('Checking ' . $indexer::getName());
+
             if (!$lastIndexer) {
+                $this->logger->info('No lastIndexer given, just getting on with it!');
+
                 return $this->doPartial($indexer, $lastId, $index, $timestamp);
             }
 
             if ($lastIndexer === $indexer::getName()) {
+                $this->logger->info('Indexer ' . $indexer::getName() . ' matched!');
+
                 return $this->doPartial($indexer, $lastId, $index, $timestamp);
             }
+
+            $this->logger->info('No match for ' . $indexer::getName());
+        }
+
+        if ($lastIndexer) {
+            $this->logger->info('Indexer ' . $lastIndexer . ' not found!');
         }
 
         return null;

@@ -16,6 +16,8 @@ use Symfony\Component\HttpKernel\Kernel as HttpKernel;
 use Symfony\Component\Routing\Route;
 use Symfony\Component\Routing\RouteCollectionBuilder;
 
+global $cacheHash;
+
 class Kernel extends HttpKernel
 {
     use MicroKernelTrait;
@@ -211,6 +213,26 @@ class Kernel extends HttpKernel
         }
     }
 
+    public function getCacheHash()
+    {
+        $pluginHash = md5(implode('', array_keys($this->pluginLoader->getPluginInstances()->getActives())));
+
+        $cacheHashLocal = md5(
+            json_encode(
+                [
+                    $this->cacheId,
+                    mb_substr($this->shopwareVersionRevision, 0, 8),
+                    mb_substr($pluginHash, 0, 8),
+                ]
+            )
+        );
+
+        global $cacheHash;
+        $cacheHash = $cacheHashLocal;
+
+        return $cacheHashLocal;
+    }
+
     protected function configureContainer(ContainerBuilder $container, LoaderInterface $loader): void
     {
         $container->setParameter('container.dumper.inline_class_loader', true);
@@ -269,17 +291,6 @@ class Kernel extends HttpKernel
                 'kernel.supported_api_versions' => [1],
             ]
         );
-    }
-
-    protected function getCacheHash()
-    {
-        $pluginHash = md5(implode('', array_keys($this->pluginLoader->getPluginInstances()->getActives())));
-
-        return md5(json_encode([
-            $this->cacheId,
-            mb_substr($this->shopwareVersionRevision, 0, 8),
-            mb_substr($pluginHash, 0, 8),
-        ]));
     }
 
     protected function initializeDatabaseConnectionVariables(): void

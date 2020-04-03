@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Framework\DataAbstractionLayer\Indexing\MessageQueue;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -19,14 +20,21 @@ class IndexerMessageSender
      */
     private $indexers;
 
-    public function __construct(MessageBusInterface $bus, iterable $indexer)
+    /** @var LoggerInterface $logger */
+    private $logger;
+
+    public function __construct(MessageBusInterface $bus, iterable $indexer, LoggerInterface $logger)
     {
         $this->bus = $bus;
         $this->indexers = $indexer;
+        $this->logger = $logger;
     }
 
     public function partial(\DateTimeInterface $timestamp, ?array $indexers = null): void
     {
+        global $cacheHash;
+        $this->logger->info('Sender cache hash: ' . $cacheHash);
+
         $scheduledIndexers = [];
         foreach ($this->indexers as $indexer) {
             $indexerName = $indexer::getName();

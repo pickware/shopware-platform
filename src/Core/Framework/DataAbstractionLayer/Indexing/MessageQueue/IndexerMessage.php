@@ -32,6 +32,18 @@ class IndexerMessage
         $this->indexerNames = $indexers;
     }
 
+    public function __toString()
+    {
+        return print_r(
+            [
+                'timestamp' => $this->timestamp,
+                'offset' => $this->offset,
+                'indexerNames' => $this->indexerNames,
+            ],
+            true
+        );
+    }
+
     public function getCurrentIndexerName(): string
     {
         return @current($this->indexerNames);
