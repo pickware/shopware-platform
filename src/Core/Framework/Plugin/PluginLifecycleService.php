@@ -216,8 +216,8 @@ class PluginLifecycleService
             $plugin->getVersion(),
             $this->createMigrationCollection($pluginBaseClass),
             $keepUserData,
-            /* @deprecated tag:v6.3.0 - This default value will change to `true` */
-            false
+            /* @deprecated tag:v6.4.0 */
+            $keepUserData
         );
         $uninstallContext->setAutoMigrate(false);
 
