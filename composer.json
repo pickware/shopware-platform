@@ -6,7 +6,6 @@
         "framework",
         "shopware"
     ],
-    "version": "6.3.2.0",
     "homepage": "https://www.shopware.com",
     "license": "MIT",
     "replace": {
