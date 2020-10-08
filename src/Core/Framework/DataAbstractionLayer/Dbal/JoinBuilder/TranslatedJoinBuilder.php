@@ -5,26 +5,47 @@ namespace Shopware\Core\Framework\DataAbstractionLayer\Dbal\JoinBuilder;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntityDefinitionQueryHelper;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\QueryBuilder;
+use Shopware\Core\Framework\DataAbstractionLayer\DefinitionInstanceRegistry;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Field;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StorageAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslatedField;
+use Shopware\Core\Framework\DataAbstractionLayer\Field\TranslationsAssociationField;
 use Shopware\Core\Framework\Uuid\Uuid;
 
 class TranslatedJoinBuilder implements JoinBuilderInterface
 {
+    /**
+     * @var DefinitionInstanceRegistry
+     */
+    private $definitionInstanceRegistry;
+
+    public function __construct(DefinitionInstanceRegistry $definitionInstanceRegistry)
+    {
+        $this->definitionInstanceRegistry = $definitionInstanceRegistry;
+    }
+
     public function join(EntityDefinition $definition, string $joinType, $field, string $on, string $root, QueryBuilder $queryBuilder, Context $context): void
     {
         if (!$field instanceof TranslatedField) {
             throw new \InvalidArgumentException('Expected ' . TranslatedField::class);
         }
 
-        $query = $this->getTranslationQuery($definition, $on, $queryBuilder, $context);
+        /** @var TranslationsAssociationField $translationsAssociationField */
+        $translationsAssociationField = $definition->getFields()->filter(function (Field $field) {
+            return $field instanceof TranslationsAssociationField;
+        })->first();
+        $translationDefinition = $this->definitionInstanceRegistry->get(
+            $translationsAssociationField->getReferenceClass()
+        );
+
+        $query = $this->getTranslationQuery($definition, $translationDefinition, $on, $queryBuilder, $context);
 
         $variables = [
             '#alias#' => EntityDefinitionQueryHelper::escape($root),
-            '#foreignKey#' => EntityDefinitionQueryHelper::escape($definition->getEntityName() . '_id'),
+            '#foreignKey#' => EntityDefinitionQueryHelper::escape($translationsAssociationField->getReferenceField()),
             '#on#' => EntityDefinitionQueryHelper::escape($on),
+            '#localKey#' => EntityDefinitionQueryHelper::escape($translationsAssociationField->getLocalField()),
         ];
 
         $queryBuilder->leftJoin(
@@ -34,7 +55,7 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
             str_replace(
                 array_keys($variables),
                 array_values($variables),
-                '#alias#.#foreignKey# = #on#.`id`'
+                '#alias#.#foreignKey# = #on#.#localKey#'
             )
         );
 
@@ -46,12 +67,13 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
             return;
         }
 
-        $query = $this->getTranslationQuery($definition, $on . '.parent', $queryBuilder, $context);
+        $query = $this->getTranslationQuery($definition, $translationDefinition, $on . '.parent', $queryBuilder, $context);
 
         $variables = [
             '#alias#' => EntityDefinitionQueryHelper::escape($root . '.parent'),
-            '#foreignKey#' => EntityDefinitionQueryHelper::escape($definition->getEntityName() . '_id'),
+            '#foreignKey#' => EntityDefinitionQueryHelper::escape($translationsAssociationField->getReferenceField()),
             '#on#' => EntityDefinitionQueryHelper::escape($on . '.parent'),
+            '#localKey#' => EntityDefinitionQueryHelper::escape($translationsAssociationField->getLocalField()),
         ];
 
         $queryBuilder->leftJoin(
@@ -61,7 +83,7 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
             str_replace(
                 array_keys($variables),
                 array_values($variables),
-                '#alias#.#foreignKey# = #on#.`id`'
+                '#alias#.#foreignKey# = #on#.#localKey#'
             )
         );
     }
@@ -79,9 +101,9 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
         return implode(', ', $select);
     }
 
-    private function getTranslationQuery(EntityDefinition $definition, string $on, QueryBuilder $queryBuilder, Context $context): QueryBuilder
+    private function getTranslationQuery(EntityDefinition $definition, EntityDefinition $translationDefinition, string $on, QueryBuilder $queryBuilder, Context $context): QueryBuilder
     {
-        $table = $definition->getEntityName() . '_translation';
+        $table = $translationDefinition->getEntityName();
 
         $query = new QueryBuilder($queryBuilder->getConnection());
 
@@ -93,7 +115,13 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
         $first = array_shift($chain);
         $firstAlias = $on . '.translation';
 
-        $foreignKey = EntityDefinitionQueryHelper::escape($firstAlias) . '.' . $definition->getEntityName() . '_id';
+
+        /** @var TranslationsAssociationField $translationsAssociationField */
+        $translationsAssociationField = $definition->getFields()->filter(function (Field $field) {
+            return $field instanceof TranslationsAssociationField;
+        })->first();
+
+        $foreignKey = EntityDefinitionQueryHelper::escape($firstAlias) . '.' . $translationsAssociationField->getReferenceField();
 
         // used as join condition
         $query->addSelect($foreignKey);
@@ -138,7 +166,7 @@ class TranslatedJoinBuilder implements JoinBuilderInterface
             $alias = $on . '.translation.fallback_' . $i;
 
             $variables = [
-                '#column#' => EntityDefinitionQueryHelper::escape($definition->getEntityName() . '_id'),
+                '#column#' => EntityDefinitionQueryHelper::escape($translationsAssociationField->getReferenceField()),
                 '#alias#' => EntityDefinitionQueryHelper::escape($alias),
                 '#firstAlias#' => EntityDefinitionQueryHelper::escape($firstAlias),
             ];
