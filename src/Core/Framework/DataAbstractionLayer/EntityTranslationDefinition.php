@@ -50,16 +50,11 @@ abstract class EntityTranslationDefinition extends EntityDefinition
     protected function getBaseFields(): array
     {
         $translatedDefinition = $this->getParentDefinition();
-        $entityName = $translatedDefinition->getEntityName();
-
-        $propertyBaseName = \explode('_', $entityName);
-        $propertyBaseName = \array_map('ucfirst', $propertyBaseName);
-        $propertyBaseName = \lcfirst(\implode($propertyBaseName));
 
         $baseFields = [
-            (new FkField($entityName . '_id', $propertyBaseName . 'Id', $translatedDefinition->getClass()))->addFlags(new PrimaryKey(), new Required()),
+            (new FkField($this->getFkStorageName(), $this->getFkPropertyName(), $translatedDefinition->getClass()))->addFlags(new PrimaryKey(), new Required()),
             (new FkField('language_id', 'languageId', LanguageDefinition::class))->addFlags(new PrimaryKey(), new Required()),
-            new ManyToOneAssociationField($propertyBaseName, $entityName . '_id', $translatedDefinition->getClass(), 'id', false),
+            new ManyToOneAssociationField($this->getAssociationPropertyName(), $this->getFkStorageName(), $translatedDefinition->getClass(), $this->getAssociationReferenceField(), false),
             new ManyToOneAssociationField('language', 'language_id', LanguageDefinition::class, 'id', false),
         ];
 
@@ -68,5 +63,35 @@ abstract class EntityTranslationDefinition extends EntityDefinition
         }
 
         return $baseFields;
+    }
+
+    protected function getFkStorageName(): string
+    {
+        $translatedDefinition = $this->getParentDefinition();
+        $entityName = $translatedDefinition->getEntityName();
+
+        return $entityName . '_id';
+    }
+
+    protected function getFkPropertyName(): string
+    {
+        return $this->getAssociationPropertyName() . 'Id';
+    }
+
+    protected function getAssociationReferenceField(): string
+    {
+        return 'id';
+    }
+
+    protected function getAssociationPropertyName(): string
+    {
+        $translatedDefinition = $this->getParentDefinition();
+        $entityName = $translatedDefinition->getEntityName();
+
+        $propertyBaseName = \explode('_', $entityName);
+        $propertyBaseName = \array_map('ucfirst', $propertyBaseName);
+        $propertyBaseName = \lcfirst(\implode($propertyBaseName));
+
+        return $propertyBaseName;
     }
 }
