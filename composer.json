@@ -161,6 +161,5 @@
         "exclude-from-classmap": [
             "src/**/Test/"
         ]
-    },
-    "version": "6.4.2.0"
+    }
 }
