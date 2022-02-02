@@ -218,7 +218,6 @@
         "npm:admin": "@npm:admin:bin npm",
         "npm:storefront:bin": "export PROJECT_ROOT=\"$PWD\"; cd src/Storefront/Resources/app/storefront; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$PROJECT_ROOT\"/bin/exec-with-env ",
         "npm:storefront": "@npm:storefront:bin npm",
-
         "npm:e2e:bin": "export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env ",
         "npm:e2e": "@npm:e2e:bin npm",
         "npm:e2e:admin:bin": "@npm:e2e:bin ",
@@ -307,14 +306,12 @@
             "@putenv CYPRESS_localUsage=1",
             "@php bin/console e2e:dump-db"
         ],
-
         "e2e:cypress": [
             "export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env cypress"
         ],
         "e2e:percy": [
             "export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env percy"
         ],
-
         "e2e:admin:cypress": [
             "@e2e:cypress"
         ],
@@ -366,6 +363,5 @@
         "exclude-from-classmap": [
             "src/**/Test/"
         ]
-    },
-    "version": "6.4.8.0"
+    }
 }
