@@ -195,7 +195,6 @@
     "scripts": {
         "post-install-cmd": [
             "@composer bin all install --ansi"
-
         ],
         "post-update-cmd": [
             "@composer bin all update --ansi"
@@ -408,7 +407,6 @@
         "e2e:percy": [
             "export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env percy"
         ],
-
         "e2e:admin:cypress": [
             "@e2e:cypress"
         ],
@@ -477,7 +475,7 @@
         ]
     },
     "autoload": {
-        "files":[
+        "files": [
             "src/Core/Framework/Adapter/Doctrine/Patch/AbstractAsset.php",
             "src/Core/Framework/Adapter/Twig/functions.php"
         ],
@@ -509,6 +507,5 @@
             "Shopware\\Tests\\Bench\\": "tests/performance/bench/",
             "Shopware\\Tests\\Migration\\": "tests/migration/"
         }
-    },
-    "version": "6.5.0.0-rc3"
+    }
 }
