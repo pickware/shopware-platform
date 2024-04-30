@@ -95,6 +95,12 @@ class RequestCriteriaBuilder
         $searchException = new SearchRequestException();
 
         if (isset($payload['ids'])) {
+            if (\is_array($payload['ids']) && \count($payload['ids']) === 0) {
+                throw DataAbstractionLayerException::invalidApiCriteriaIds(
+                    DataAbstractionLayerException::invalidCriteriaIds($payload['ids'], 'Ids cannot be empty.'),
+                );
+            }
+
             if (\is_string($payload['ids'])) {
                 $ids = array_filter(explode('|', $payload['ids']));
             } else {

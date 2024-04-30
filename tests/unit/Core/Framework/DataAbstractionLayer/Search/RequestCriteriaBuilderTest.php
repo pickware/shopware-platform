@@ -118,6 +118,7 @@ class RequestCriteriaBuilderTest extends TestCase
         yield 'non string list' => [[123, 456]];
         yield 'non string key values' => [[[['foo'], ['bar']]]];
         yield 'non string values' => [[[['pk-1' => 123], ['pk-2' => 456]]]];
+        yield 'empty list' => [[]];
     }
 
     /**
