@@ -645,6 +645,10 @@ class Criteria extends Struct implements \Stringable
      */
     private function validateIds(array $ids): void
     {
+        if (count($ids) === 0) {
+            throw DataAbstractionLayerException::invalidCriteriaIds($ids, 'Ids should not be empty');
+        }
+
         foreach ($ids as $id) {
             if (!\is_string($id) && !\is_array($id)) {
                 throw DataAbstractionLayerException::invalidCriteriaIds($ids, 'Ids should be a list of strings or a list of key value pairs, for entities with combined primary keys');
