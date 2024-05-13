@@ -131,9 +131,7 @@ class Criteria extends Struct implements \Stringable
         }
 
         $ids = array_filter($ids);
-        if (empty($ids)) {
-            throw DataAbstractionLayerException::invalidCriteriaIds($ids, 'Ids should not be empty');
-        }
+
         $this->validateIds($ids);
 
         $this->ids = $ids;
@@ -645,7 +643,7 @@ class Criteria extends Struct implements \Stringable
      */
     private function validateIds(array $ids): void
     {
-        if (count($ids) === 0) {
+        if (\count($ids) === 0) {
             throw DataAbstractionLayerException::invalidCriteriaIds($ids, 'Ids should not be empty');
         }
 

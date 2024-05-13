@@ -657,10 +657,12 @@ class EntityReader implements EntityReaderInterface
         EntityCollection $collection,
         array $partial
     ): void {
-        // collect all ids of many to many association which already stored inside the struct instances
+        // collect all ids of many-to-many association which already stored inside the struct instances
         $ids = $this->collectManyToManyIds($collection, $association);
 
-        $criteria->setIds($ids);
+        if (\count($ids) !== 0) {
+            $criteria->setIds($ids);
+        }
 
         $referenceClass = $association->getToManyReferenceDefinition();
         /** @var EntityCollection<Entity> $collectionClass */
