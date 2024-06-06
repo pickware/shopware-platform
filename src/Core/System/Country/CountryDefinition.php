@@ -110,6 +110,7 @@ class CountryDefinition extends EntityDefinition
             (new StringField('advanced_postal_code_pattern', 'advancedPostalCodePattern'))->addFlags(new ApiAware()),
             (new TranslatedField('addressFormat'))->addFlags(new ApiAware()),
             (new StringField('default_postal_code_pattern', 'defaultPostalCodePattern', 1024))->addFlags(new ApiAware()),
+            (new BoolField('is_eu', 'isEu'))->addFlags(new ApiAware(), new Required()),
 
             (new OneToManyAssociationField('states', CountryStateDefinition::class, 'country_id', 'id'))
                 ->addFlags(new ApiAware(), new CascadeDelete()),
