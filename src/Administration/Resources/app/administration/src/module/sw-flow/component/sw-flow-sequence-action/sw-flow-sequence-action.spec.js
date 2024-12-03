@@ -64,13 +64,18 @@ function getSequencesCollection(collection = []) {
     );
 }
 
-async function createWrapper(propsData = {}, appFlowResponseData = [], flag = '') {
+async function createWrapper(propsData = {}, appFlowResponseData = [], flag = '', routerQuery = {}) {
     return mount(
         await wrapTestComponent('sw-flow-sequence-action', {
             sync: true,
         }),
         {
             global: {
+                mocks: {
+                    $route: {
+                        query: routerQuery,
+                    }
+                },
                 stubs: {
                     'sw-icon': {
                         template: '<div class="sw-icon"></div>',
@@ -366,6 +371,24 @@ describe('src/module/sw-flow/component/sw-flow-sequence-action', () => {
 
         sequencesState = Shopware.State.getters['swFlowState/sequences'];
         expect(sequencesState).toHaveLength(1);
+    });
+
+    it('should be highlighted if the action is marked as failed', async () => {
+        const wrapper = await createWrapper(
+            {
+                sequence: {
+                        ...sequencesFixture[0],
+                },
+            },
+            [],
+            '',
+            { failedFlowSequenceId: '2' },
+            );
+        await flushPromises();
+
+        const actionContainer = wrapper.find('.sw-flow-sequence-action__action-item');
+
+        expect(actionContainer.classes()).toContain('sw-flow-sequence-action__error');
     });
 
     it('should able to remove an action', async () => {

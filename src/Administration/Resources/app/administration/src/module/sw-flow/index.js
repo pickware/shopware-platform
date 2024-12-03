@@ -9,6 +9,7 @@ State.registerModule('swFlowState', flowState);
 /* eslint-disable max-len, sw-deprecation-rules/private-feature-declarations */
 Shopware.Component.register('sw-flow-index', () => import('./page/sw-flow-index'));
 Shopware.Component.register('sw-flow-detail', () => import('./page/sw-flow-detail'));
+Shopware.Component.register('sw-flow-detail-executions', () => import('./view/detail/sw-flow-detail-executions'));
 Shopware.Component.register('sw-flow-detail-flow', () => import('./view/detail/sw-flow-detail-flow'));
 Shopware.Component.register('sw-flow-sequence-modal', () => import('./component/sw-flow-sequence-modal'));
 Shopware.Component.register('sw-flow-detail-general', () => import('./view/detail/sw-flow-detail-general'));
@@ -138,6 +139,14 @@ Module.register('sw-flow', {
                 flow: {
                     component: 'sw-flow-detail-flow',
                     path: 'flow',
+                    meta: {
+                        parentPath: 'sw.flow.index',
+                        privilege: 'flow.viewer',
+                    },
+                },
+                executions: {
+                    component: 'sw-flow-detail-executions',
+                    path: 'executions',
                     meta: {
                         parentPath: 'sw.flow.index',
                         privilege: 'flow.viewer',

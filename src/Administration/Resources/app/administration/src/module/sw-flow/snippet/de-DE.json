@@ -16,13 +16,15 @@
       "buttonAddFlow": "Flow hinzufügen",
       "labelColumnActive": "Aktiv",
       "labelColumnName": "Name",
+      "labelColumnMostRecentFailedExecutionDate": "Letzte fehlgeschlagene Ausführung",
       "labelColumnTrigger": "Auslöser",
       "labelColumnDescription": "Beschreibung",
       "warningDeleteText": "Wenn Du diesen Flow löschst, werden für den Auslöser keine Aktionen mehr ausgeführt.",
       "confirmText": "Bist Du sicher, dass Du diesen Flow löschen möchtest?",
       "emptyStateTitle": "Noch keine Flows erstellt",
       "emptyStateSubTitle": "Füge Flows über den \"Hinzufügen\"-Button hinzu.",
-      "unknownTrigger": "Unbekannter Auslöser"
+      "unknownTrigger": "Unbekannter Auslöser",
+      "neverFailed": "Nie"
     },
     "template": {
       "create": "Neuen Flow aus Template erstellen"
@@ -70,11 +72,23 @@
         "noActions": "Keine Aktionen hinzugefügt",
         "noRule": "Noch keine Regeln definiert"
       },
+      "executions": {
+        "list": {
+          "labelColumnSuccessful": "Erfolgreich",
+          "labelColumnFailedAction": "Fehlerhafte Aktion",
+          "labelColumnErrorMessage": "Fehlermeldung",
+          "labelColumnDate": "Zeit",
+          "actionHighlightFailedSequence": "Fehlerhafte Aktion hervorheben",
+          "emptyStateTitle": "Noch keine Ausführungen",
+          "emptyStateSubTitle": "Hier werden alle Ausführungen des Flows angezeigt."
+        }
+      },
       "warningText": "Dieser Flow verwendet Aktionen, die aufgrund einer Änderung der gebuchten Edition bzw. durch Deaktivierung oder Deinstallation der dazugehörigen Erweiterungen, nicht mehr verfügbar sind. Wenn dieser Flow ausgelöst wird, werden nicht verfügbare Aktionen nicht ausgeführt."
     },
     "page": {
       "tabGeneral": "Allgemein",
-      "tabFlow": "Flow"
+      "tabFlow": "Flow",
+      "tabExecutions": "Ausführungen"
     },
     "flowNotification": {
       "messageDeleteSuccess": "Flow gelöscht.",

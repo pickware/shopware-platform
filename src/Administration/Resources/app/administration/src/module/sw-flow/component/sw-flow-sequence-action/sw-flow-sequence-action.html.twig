@@ -89,7 +89,7 @@
                                 disabled: !item.disabled
                             }"
                             class="sw-flow-sequence-action__action-item"
-                            :class="{'sw-flow-sequence-action__disabled': item.disabled}"
+                            :class="{'sw-flow-sequence-action__disabled': item.disabled, 'sw-flow-sequence-action__error': didActionFail(item.id)}"
                             role="button"
                             tabindex="0"
                             @click="(event) => onEditAction(item, event.target, key)"
@@ -125,9 +125,10 @@
                                     <div class="sw-flow-sequence-action__action-icon">
                                         <sw-icon
                                             v-if="!item.iconRaw"
-                                            :name="`${item.icon}`"
+                                            :name="didActionFail(item.id) ? 'regular-exclamation-triangle' : item.icon"
                                             size="12px"
                                             class="sw-icon-action"
+                                            :color="didActionFail(item.id) ? '#de294c' : ''"
                                         />
 
                                         <img

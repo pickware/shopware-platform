@@ -71,6 +71,16 @@
                 {% endblock %}
 
                 <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_tabs_header_builder %}
+                <sw-tabs-item
+                    class="sw-flow-detail__tab-executions"
+                    :route="routeDetailTab('executions')"
+                >
+                    {{ $tc('sw-flow.page.tabExecutions') }}
+                </sw-tabs-item>
+                {% endblock %}
+
+                <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
                 {% block sw_flow_tabs_header_extension %}{% endblock %}
             </sw-tabs>
             {% endblock %}

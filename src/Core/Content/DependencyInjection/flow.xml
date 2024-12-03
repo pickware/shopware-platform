@@ -13,6 +13,16 @@
             <tag name="shopware.entity.definition" />
         </service>
 
+        <service id="Shopware\Core\Content\Flow\Dispatching\Execution\FlowExecutionDefinition">
+            <tag name="shopware.entity.definition" />
+        </service>
+
+        <service id="Shopware\Core\Content\Flow\Subscriber\MostRecentFailedExecutionDateFieldCalculationSubscriber">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+
+            <tag name="kernel.event_subscriber"/>
+        </service>
+
         <service id="Shopware\Core\Content\Flow\Dispatching\FlowDispatcher" decorates="event_dispatcher" decoration-priority="1000">
             <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowDispatcher.inner"/>
             <argument type="service" id="logger"/>
@@ -24,6 +34,18 @@
             </call>
         </service>
 
+        <service id="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor">
+            <argument type="service" id="Doctrine\DBAL\Connection"/>
+            <argument type="service" id="logger"/>
+            <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
+            <argument type="service" id="flow_execution.repository"/>
+
+            <tag name="kernel.event_subscriber"/>
+
+            <call method="setContainer">
+                <argument type="service" id="service_container"/>
+            </call>
+        </service>
         <service id="Shopware\Core\Content\Flow\Rule\FlowRuleScopeBuilder">
             <argument type="service" id="Shopware\Core\Checkout\Cart\Order\OrderConverter"/>
             <argument type="service" id="Shopware\Core\Checkout\Cart\Delivery\DeliveryBuilder"/>

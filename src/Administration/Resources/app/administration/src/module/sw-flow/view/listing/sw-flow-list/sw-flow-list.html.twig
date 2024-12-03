@@ -68,6 +68,22 @@
                 </div>
             </template>
             {% endblock %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+            {% block sw_flow_list_grid_columns_most_recent_failed_execution_date %}
+            <template #column-mostRecentFailedExecutionDate="{ item }">
+                <router-link :to="{ name: 'sw.flow.detail.executions', params: { id: item.id } }">
+                    <sw-time-ago
+                        v-if="item.mostRecentFailedExecutionDate !== null"
+                        :date="item.mostRecentFailedExecutionDate"
+                    />
+
+                    <p v-else>
+                        {{ $tc('sw-flow.list.neverFailed') }}
+                    </p>
+                </router-link>
+            </template>
+            {% endblock %}
             {% endblock %}
 
             <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
