@@ -169,7 +169,7 @@ class FlowDispatcherTest extends TestCase
                 ->method('execute');
 
             $this->container->set(FlowLoader::class, $flowLoader);
-                $this->container->set(FlowExecutor::class, $flowExecutor);
+            $this->container->set(FlowExecutor::class, $flowExecutor);
         }
 
         $this->flowDispatcher->dispatch($event);
@@ -291,8 +291,6 @@ class FlowDispatcherTest extends TestCase
         $flowExecutor->expects(static::once())
             ->method('execute')
             ->willThrowException($internalException);
-
-        $this->container->method('get')->willReturnOnConsecutiveCalls($flowLoader, $flowExecutor);
 
         $this->connection->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
 

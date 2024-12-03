@@ -7,7 +7,6 @@ namespace Shopware\Core\Content\Flow\Dispatching;
 use Doctrine\DBAL\Connection;
 use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\StoppableEventInterface;
-use Psr\Log\LoggerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Event\FlowEventAware;
@@ -28,7 +27,6 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
     public function __construct(
         private readonly EventDispatcherInterface $dispatcher,
         private readonly ContainerInterface $container,
-        private readonly Connection $connection,
     ) {
     }
 
@@ -202,7 +200,7 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
                     'failed_flow_sequence_id' => null,
                 ]);
             } finally {
-                $this->connection->insert('flow_execution', $executionPayload);
+                $this->container->get(Connection::class)->insert('flow_execution', $executionPayload);
             }
         }
     }

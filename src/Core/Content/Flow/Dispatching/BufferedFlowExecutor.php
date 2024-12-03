@@ -5,41 +5,31 @@ declare(strict_types=1);
 namespace Shopware\Core\Content\Flow\Dispatching;
 
 use Doctrine\DBAL\Connection;
-use Psr\Log\LoggerInterface;
+use Psr\Container\ContainerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
  */
 #[Package('services-settings')]
-class BufferedFlowExecutor implements EventSubscriberInterface
+class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscriberInterface
 {
-    private ContainerInterface $container;
-
     /**
      * @var array<FlowEventAware>
      */
     private array $bufferedEvents = [];
 
     public function __construct(
-        private readonly Connection $connection,
-        private readonly LoggerInterface $logger,
-        private readonly FlowFactory $flowFactory,
+        private readonly ContainerInterface $container,
         private readonly EntityRepository $flowExecutionRepository,
     ) {
-    }
-
-    public function setContainer(ContainerInterface $container): void
-    {
-        $this->container = $container;
     }
 
     public static function getSubscribedEvents(): array
@@ -65,17 +55,27 @@ class BufferedFlowExecutor implements EventSubscriberInterface
             $events = $this->bufferedEvents;
             $this->bufferedEvents = [];
             $flowLoader = $this->container->get(FlowLoader::class);
-
-            if ($flowLoader === null) {
-                throw new ServiceNotFoundException(FlowExecutor::class);
-            }
-
             $flows = $flowLoader->load();
+
             foreach ($events as $event) {
-                $storableFlow = $this->flowFactory->create($event);
+                $storableFlow = $this->container->get(FlowFactory::class)->create($event);
                 $this->callFlowExecutor($storableFlow, $flows);
             }
         } while (!empty($this->bufferedEvents));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public static function getSubscribedServices(): array
+    {
+        return [
+            'logger',
+            Connection::class,
+            FlowFactory::class,
+            FlowExecutor::class,
+            FlowLoader::class,
+        ];
     }
 
     /**
@@ -91,10 +91,6 @@ class BufferedFlowExecutor implements EventSubscriberInterface
 
         $flowExecutor = $this->container->get(FlowExecutor::class);
 
-        if ($flowExecutor === null) {
-            throw new ServiceNotFoundException(FlowExecutor::class);
-        }
-
         foreach ($flows as $flow) {
             $flowExecutionPayload = [
                 'flowId' => $flow['id'],
@@ -106,7 +102,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface
 
                 $flowExecutionPayload['successful'] = true;
             } catch (ExecuteSequenceException $e) {
-                $this->logger->warning(
+                $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -139,7 +135,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface
                     throw $e->getPrevious();
                 }
             } catch (\Throwable $e) {
-                $this->logger->error(
+                $this->container->get('logger')->error(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -174,6 +170,6 @@ class BufferedFlowExecutor implements EventSubscriberInterface
 
     private function isInNestedTransaction(): bool
     {
-        return $this->connection->getTransactionNestingLevel() !== 1 && !$this->connection->getNestTransactionsWithSavepoints();
+        return $this->container->get(Connection::class)->getTransactionNestingLevel() !== 1 && !$this->container->get(Connection::class)->getNestTransactionsWithSavepoints();
     }
 }

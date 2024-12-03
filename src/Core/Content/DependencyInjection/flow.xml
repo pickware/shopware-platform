@@ -35,16 +35,16 @@
         </service>
 
         <service id="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor">
-            <argument type="service" id="Doctrine\DBAL\Connection"/>
-            <argument type="service" id="logger"/>
-            <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
+            <argument type="service_locator">
+                <argument type="service" key="logger" id="logger"/>
+                <argument type="service" key="Doctrine\DBAL\Connection" id="Doctrine\DBAL\Connection"/>
+                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowFactory" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
+                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
+                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowLoader" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
+            </argument>
             <argument type="service" id="flow_execution.repository"/>
 
             <tag name="kernel.event_subscriber"/>
-
-            <call method="setContainer">
-                <argument type="service" id="service_container"/>
-            </call>
         </service>
         <service id="Shopware\Core\Content\Flow\Rule\FlowRuleScopeBuilder">
             <argument type="service" id="Shopware\Core\Checkout\Cart\Order\OrderConverter"/>

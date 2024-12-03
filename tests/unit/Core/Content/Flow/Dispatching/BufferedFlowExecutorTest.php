@@ -27,7 +27,6 @@ use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 
 /**
  * @internal
@@ -57,12 +56,9 @@ class BufferedFlowExecutorTest extends TestCase
         $this->flowExecutionRepositoryMock = $this->createMock(EntityRepository::class);
 
         $this->flowExecutor = new BufferedFlowExecutor(
-            $this->connectionMock,
-            $this->loggerMock,
-            $this->flowFactoryMock,
+            $this->containerMock,
             $this->flowExecutionRepositoryMock
         );
-        $this->flowExecutor->setContainer($this->containerMock);
     }
 
     public function testDoesNotRegisterEvents(): void
@@ -70,9 +66,7 @@ class BufferedFlowExecutorTest extends TestCase
         Feature::skipTestIfActive('v6.7.0.0', $this);
 
         $executor = new BufferedFlowExecutor(
-            $this->createMock(Connection::class),
-            $this->createMock(LoggerInterface::class),
-            $this->createMock(FlowFactory::class),
+            $this->createMock(ContainerInterface::class),
             $this->createMock(EntityRepository::class)
         );
 
@@ -112,7 +106,11 @@ class BufferedFlowExecutorTest extends TestCase
         $flowExecutor->expects(static::once())
             ->method('execute');
 
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls($flowLoader, $flowExecutor);
+        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
+            $flowLoader,
+            $this->flowFactoryMock,
+            $flowExecutor,
+        );
 
         $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
 
@@ -129,24 +127,6 @@ class BufferedFlowExecutorTest extends TestCase
                 $context,
             );
 
-        $this->flowExecutor->executeBufferedEvents();
-    }
-
-    public function testExecuteBufferedEventsWithoutFlowLoader(): void
-    {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
-
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
-
-        $this->expectException(ServiceNotFoundException::class);
         $this->flowExecutor->executeBufferedEvents();
     }
 
@@ -174,50 +154,13 @@ class BufferedFlowExecutorTest extends TestCase
             ->method('load')
             ->willReturn([]);
 
-        $this->containerMock->expects(static::once())
-            ->method('get')
-            ->willReturnOnConsecutiveCalls($flowLoader);
-
-        $this->flowExecutor->executeBufferedEvents();
-    }
-
-    public function testExecuteBufferedEventsWithoutFlowExecutor(): void
-    {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
-
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
-
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
-        $this->flowFactoryMock->expects(static::once())
-            ->method('create')
-            ->willReturn($flow);
-
-        $flowLoader = $this->createMock(FlowLoader::class);
-        $flowLoader->expects(static::once())
-            ->method('load')
-            ->willReturn([
-                'state_enter.order.state.in_progress' => [
-                    [
-                        'id' => Uuid::randomHex(),
-                        'name' => 'Order enters status in progress',
-                        'payload' => [],
-                    ],
-                ],
-            ]);
-
         $this->containerMock->expects(static::exactly(2))
             ->method('get')
-            ->willReturnOnConsecutiveCalls($flowLoader, null);
+            ->willReturnOnConsecutiveCalls(
+                $flowLoader,
+                $this->flowFactoryMock
+            );
 
-        $this->expectException(ServiceNotFoundException::class);
         $this->flowExecutor->executeBufferedEvents();
     }
 
@@ -266,7 +209,14 @@ class BufferedFlowExecutorTest extends TestCase
             ));
 
         $this->connectionMock->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls($flowLoader, $flowExecutor);
+        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
+            $flowLoader,
+            $this->flowFactoryMock,
+            $flowExecutor,
+            $this->loggerMock,
+            $this->connectionMock,
+            $this->connectionMock,
+        );
 
         $this->loggerMock->expects(static::once())
             ->method('warning')
@@ -333,7 +283,14 @@ class BufferedFlowExecutorTest extends TestCase
             ->method('execute')
             ->willThrowException($internalException);
 
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls($flowLoader, $flowExecutor);
+        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
+            $flowLoader,
+            $this->flowFactoryMock,
+            $flowExecutor,
+            $this->loggerMock,
+            $this->connectionMock,
+            $this->connectionMock,
+        );
 
         $this->connectionMock->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
 
@@ -405,7 +362,14 @@ class BufferedFlowExecutorTest extends TestCase
                 $internalException
             ));
 
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls($flowLoader, $flowExecutor);
+        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
+            $flowLoader,
+            $this->flowFactoryMock,
+            $flowExecutor,
+            $this->loggerMock,
+            $this->connectionMock,
+            $this->connectionMock,
+        );
 
         $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
         $this->connectionMock->method('getNestTransactionsWithSavepoints')->willReturn(true);
