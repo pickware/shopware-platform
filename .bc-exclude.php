@@ -48,5 +48,8 @@ return [
 
         // Added new optional parameter to those classes
         'Parameter cacheDir was added to Method createTwigEnvironment\(\) of class Shopware\\\\Core\\\\Content\\\\Seo\\\\SeoUrlTwigFactory',
-    ],
+
+        // Version related const values changed for 7.2 update
+        'Value of constant Symfony\\\\Component\\\\HttpKernel\\\\Kernel'
+        ],
 ];

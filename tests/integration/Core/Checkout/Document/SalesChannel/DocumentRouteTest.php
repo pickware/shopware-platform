@@ -88,7 +88,6 @@ class DocumentRouteTest extends TestCase
             );
 
         $response = $this->browser->getResponse();
-        static::assertNotNull($this->browser->getResponse());
 
         $assertionCallback($response);
     }

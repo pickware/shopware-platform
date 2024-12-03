@@ -8,7 +8,7 @@
         <defaults public="true" />
 
         <service id="Shopware\Storefront\Controller\Api\CaptchaController" public="true">
-            <argument type="tagged" tag="shopware.storefront.captcha"/>
+            <argument type="tagged_iterator" tag="shopware.storefront.captcha"/>
             <call method="setContainer">
                 <argument type="service" id="service_container"/>
             </call>

@@ -144,7 +144,7 @@
         </service>
 
         <service id="Shopware\Storefront\Framework\Media\StorefrontMediaValidatorRegistry" public="true">
-            <argument type="tagged" tag="storefront.media.upload.validator"/>
+            <argument type="tagged_iterator" tag="storefront.media.upload.validator"/>
         </service>
 
         <service id="Shopware\Storefront\Framework\Media\Validator\StorefrontMediaImageValidator">
@@ -465,7 +465,7 @@
         </service>
 
         <service id="Shopware\Storefront\Framework\Captcha\CaptchaRouteListener">
-            <argument type="tagged" tag="shopware.storefront.captcha"/>
+            <argument type="tagged_iterator" tag="shopware.storefront.captcha"/>
             <argument type="service" id="Shopware\Core\System\SystemConfig\SystemConfigService"/>
             <argument type="service" id="service_container" />
 
