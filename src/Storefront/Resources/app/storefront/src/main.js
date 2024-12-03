@@ -154,7 +154,25 @@ window.Feature = Feature;
 /*
 run plugins
 */
-document.addEventListener('DOMContentLoaded', () => PluginManager.initializePlugins(), false);
+document.addEventListener('DOMContentLoaded', () => {
+    PluginManager.initializePlugins();
+
+    /**
+     * Fix bootstrap modal accessibility errors.
+     *
+     * The bootstrap modal adds the `aria-hidden` attribute on the modal element when closed.
+     * This leads to console errors in some browsers, if an element within the modal still has focus.
+     */
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach((modal) => {
+        modal.addEventListener('hide.bs.modal', () => {
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+        });
+    });
+
+}, false);
 
 // Set webpack publicPath at runtime because we don't know the theme seed hash when running webpack
 // https://webpack-v3.jsx.app/guides/public-path/#on-the-fly
@@ -166,3 +184,4 @@ run utils
 new TimezoneUtil();
 
 BootstrapUtil.initBootstrapPlugins();
+

@@ -13,11 +13,9 @@ use Shopware\Core\Framework\Test\TestCaseBase\KernelLifecycleManager;
 use Shopware\Core\Framework\Test\TestCaseBase\SalesChannelApiTestBehaviour;
 use Shopware\Core\System\Salutation\SalutationCollection;
 use Shopware\Core\System\SystemConfig\SystemConfigService;
-use Shopware\Storefront\Controller\ErrorController;
 use Shopware\Storefront\Framework\Captcha\AbstractCaptcha;
 use Shopware\Storefront\Framework\Captcha\BasicCaptcha;
 use Shopware\Storefront\Framework\Captcha\CaptchaRouteListener;
-use Shopware\Storefront\Framework\Captcha\Exception\CaptchaInvalidException;
 use Shopware\Storefront\Test\Controller\StorefrontControllerTestBehaviour;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\ParameterBag;
@@ -49,12 +47,12 @@ class CaptchaRouteListenerTest extends TestCase
     {
         $event = $this->getControllerEventMock();
 
-        $this->expectException(CaptchaInvalidException::class);
+        $this->expectExceptionMessage('The provided value for captcha');
 
         (new CaptchaRouteListener(
             $this->getCaptchas(true, false),
-            $this->getContainer()->get(ErrorController::class),
-            $this->getContainer()->get(SystemConfigService::class)
+            $this->getContainer()->get(SystemConfigService::class),
+            $this->getContainer()
         ))->validateCaptcha($event);
     }
 

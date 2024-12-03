@@ -103,8 +103,8 @@ class CartRestorerTest extends TestCase
         $guestToken = Uuid::randomHex();
         $guestContext = $this->createSalesChannelContext($guestToken, $this->customerId);
 
-        $this->contextPersister->save($currentContextToken, [], $currentContext->getSalesChannel()->getId());
-        $this->contextPersister->save($guestToken, [], $guestContext->getSalesChannel()->getId());
+        $this->contextPersister->save($currentContextToken, [], $currentContext->getSalesChannelId());
+        $this->contextPersister->save($guestToken, [], $guestContext->getSalesChannelId());
 
         $this->eventDispatcher->addListener(SalesChannelContextRestoredEvent::class, $this->callbackFn);
 
@@ -133,6 +133,74 @@ class CartRestorerTest extends TestCase
         static::assertSame(2, $restoredLineItem1->getQuantity());
         static::assertSame($productLineItem2->getQuantity(), $restoredLineItem2->getQuantity());
         static::assertSame(3, $restoredLineItem2->getQuantity());
+    }
+
+    public function testRestoreByTokenIsMergedWithGuestCart(): void
+    {
+        $guestToken = Uuid::randomHex();
+        $guestContext = $this->createSalesChannelContext($guestToken);
+        $this->contextPersister->save($guestToken, [], $guestContext->getSalesChannelId());
+
+        $guestProductQuantity = 3;
+        $guestProductLineItem1 = $this->createLineItem($guestContext, 1);
+        $guestProductLineItem2 = $this->createLineItem($guestContext, $guestProductQuantity);
+
+        // Create Guest cart
+        $guestCart = $this->createAndSaveUnmodifiedCart($guestContext, $guestProductLineItem1, $guestProductLineItem2);
+
+        // Create Saved Customer cart
+        $customerToken = Uuid::randomHex();
+        $customerContext = $this->createSalesChannelContext($customerToken, $this->customerId);
+        $this->contextPersister->save(
+            $customerToken,
+            [],
+            $customerContext->getSalesChannelId(),
+            $this->customerId
+        );
+
+        $customerLineItemQuantity = 4;
+        $customerLineItem1 = $this->createLineItem($customerContext, $customerLineItemQuantity);
+        $customerLineItem2 = $this->createLineItem($customerContext, 3);
+
+        $customerCart = $this->createAndSaveUnmodifiedCart(
+            $customerContext,
+            $customerLineItem1,
+            $customerLineItem2
+        );
+        $combinedLineItemsCount = $guestCart->getLineItems()->count() + $customerCart->getLineItems()->count();
+
+        $restoredContext = $this->cartRestorer->restoreByToken(
+            $customerToken,
+            $this->customerId,
+            $guestContext
+        );
+
+        $restoredCart = $this->cartService->getCart($restoredContext->getToken(), $restoredContext);
+        $restoredLineItems = $restoredCart->getLineItems();
+
+        static::assertFalse($restoredCart->isModified());
+        static::assertCount($combinedLineItemsCount, $restoredLineItems);
+
+        static::assertIsString($guestProductLineItem1->getReferencedId());
+        static::assertIsString($guestProductLineItem2->getReferencedId());
+        static::assertIsString($customerLineItem1->getReferencedId());
+        static::assertIsString($customerLineItem2->getReferencedId());
+
+        $restoredGuestProductLineItem1 = $restoredLineItems->get($guestProductLineItem1->getReferencedId());
+        static::assertNotNull($restoredGuestProductLineItem1);
+        static::assertSame(1, $restoredGuestProductLineItem1->getQuantity());
+
+        $restoredGuestProductLineItem2 = $restoredLineItems->get($guestProductLineItem2->getReferencedId());
+        static::assertNotNull($restoredGuestProductLineItem2);
+        static::assertSame($guestProductQuantity, $restoredGuestProductLineItem2->getQuantity());
+
+        $restoredCustomerLineItem1 = $restoredLineItems->get($customerLineItem1->getReferencedId());
+        static::assertNotNull($restoredCustomerLineItem1);
+        static::assertSame($customerLineItemQuantity, $restoredCustomerLineItem1->getQuantity());
+
+        $restoredCustomerLineItem2 = $restoredLineItems->get($customerLineItem2->getReferencedId());
+        static::assertNotNull($restoredCustomerLineItem2);
+        static::assertSame(3, $restoredCustomerLineItem2->getQuantity());
     }
 
     public function testRestoreByTokenWithNotExistingToken(): void

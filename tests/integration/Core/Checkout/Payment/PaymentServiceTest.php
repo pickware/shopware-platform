@@ -228,7 +228,7 @@ class PaymentServiceTest extends TestCase
         $paymentMethodId = $this->createPaymentMethod($this->context, DefaultPayment::class);
 
         $response = $this->paymentService->finalizeTransaction($token, $request, $this->getSalesChannelContext($paymentMethodId));
-        static::assertInstanceof(PaymentException::class, $response->getException());
+        static::assertInstanceOf(PaymentException::class, $response->getException());
         static::assertEquals('The provided token ' . $token . ' is expired and the payment could not be processed.', $response->getException()->getMessage());
     }
 

@@ -138,6 +138,7 @@ class RecalculationServiceTest extends TestCase
             ->addAssociation('lineItems')
             ->addAssociation('transactions')
             ->addAssociation('deliveries.shippingMethod.tax')
+            ->addAssociation('deliveries.shippingMethod.deliveryTime')
             ->addAssociation('deliveries.positions.orderLineItem')
             ->addAssociation('deliveries.shippingOrderAddress.country')
             ->addAssociation('deliveries.shippingOrderAddress.countryState');

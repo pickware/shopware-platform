@@ -215,6 +215,9 @@ class ProductDetailRouteTest extends TestCase
                 'associations' => [
                     'media' => [
                         'sort' => [['field' => 'position']],
+                        'associations' => [
+                            'media' => [],
+                        ],
                     ],
                     'manufacturer' => [],
                     'crossSellings' => [],

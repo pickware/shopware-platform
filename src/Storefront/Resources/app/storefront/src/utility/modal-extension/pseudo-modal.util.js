@@ -116,6 +116,18 @@ export default class PseudoModalUtil {
         this._modal.addEventListener('hidden.bs.modal', this._modalWrapper.remove);
         this._modal.addEventListener('shown.bs.modal', cb);
 
+        /**
+         * Fix bootstrap modal accessibility errors.
+         *
+         * The bootstrap modal adds the `aria-hidden` attribute on the modal element when closed.
+         * This leads to console errors in some browsers, if an element within the modal still has focus.
+         */
+        this._modal.addEventListener('hide.bs.modal', () => {
+            if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+            }
+        });
+
         this._modalInstance.show();
     }
 

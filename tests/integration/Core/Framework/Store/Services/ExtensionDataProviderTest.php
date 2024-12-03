@@ -102,6 +102,7 @@ class ExtensionDataProviderTest extends TestCase
 
         $installedExtensions = $this->extensionDataProvider->getInstalledExtensions($this->context);
         $installedExtensions = $installedExtensions->filter(fn (ExtensionStruct $extension) => $extension->getName() !== 'SwagCommercial');
+
         static::assertCount(7, $installedExtensions);
     }
 

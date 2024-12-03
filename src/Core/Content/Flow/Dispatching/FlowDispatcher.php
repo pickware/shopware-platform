@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Shopware\Core\Content\Flow\Dispatching;
 
 use Doctrine\DBAL\Connection;
+use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\StoppableEventInterface;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
@@ -14,30 +15,21 @@ use Shopware\Core\Framework\Event\FlowLogEvent;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Uuid\Uuid;
-use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\DependencyInjection\Exception\ServiceNotFoundException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
  */
 #[Package('services-settings')]
-class FlowDispatcher implements EventDispatcherInterface
+class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInterface
 {
-    private ContainerInterface $container;
-
     public function __construct(
         private readonly EventDispatcherInterface $dispatcher,
-        private readonly LoggerInterface $logger,
-        private readonly FlowFactory $flowFactory,
+        private readonly ContainerInterface $container,
         private readonly Connection $connection,
     ) {
-    }
-
-    public function setContainer(ContainerInterface $container): void
-    {
-        $this->container = $container;
     }
 
     /**
@@ -70,7 +62,7 @@ class FlowDispatcher implements EventDispatcherInterface
             return $event;
         }
 
-        $storableFlow = $this->flowFactory->create($event);
+        $storableFlow = $this->container->get(FlowFactory::class)->create($event);
         $this->callFlowExecutor($storableFlow);
 
         return $event;
@@ -118,9 +110,23 @@ class FlowDispatcher implements EventDispatcherInterface
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public static function getSubscribedServices(): array
+    {
+        return [
+            'logger',
+            Connection::class,
+            FlowFactory::class,
+            FlowExecutor::class,
+            FlowLoader::class,
+        ];
+    }
+
+    /**
      * @deprecated tag:v6.7.0 - reason:replaced - flows will be executed by the BufferedFlowExecutor
      */
-    public function callFlowExecutor(StorableFlow $event): void
+    private function callFlowExecutor(StorableFlow $event): void
     {
         Feature::triggerDeprecationOrThrow('v6.7.0.0', 'Flows will be executed by the BufferedFlowExecutor');
         $flows = $this->getFlows($event->getName());
@@ -130,10 +136,6 @@ class FlowDispatcher implements EventDispatcherInterface
         }
 
         $flowExecutor = $this->container->get(FlowExecutor::class);
-
-        if ($flowExecutor === null) {
-            throw new ServiceNotFoundException(FlowExecutor::class);
-        }
 
         foreach ($flows as $flow) {
             $executionPayload = [
@@ -152,7 +154,7 @@ class FlowDispatcher implements EventDispatcherInterface
                     'failed_flow_sequence_id' => null,
                 ]);
             } catch (ExecuteSequenceException $e) {
-                $this->logger->warning(
+                $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -186,7 +188,7 @@ class FlowDispatcher implements EventDispatcherInterface
                     throw $e->getPrevious();
                 }
             } catch (\Throwable $e) {
-                $this->logger->error(
+                $this->container->get('logger')->error(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -211,11 +213,6 @@ class FlowDispatcher implements EventDispatcherInterface
     private function getFlows(string $eventName): array
     {
         $flowLoader = $this->container->get(FlowLoader::class);
-
-        if ($flowLoader === null) {
-            throw new ServiceNotFoundException(FlowExecutor::class);
-        }
-
         $flows = $flowLoader->load();
 
         $result = [];
@@ -228,6 +225,6 @@ class FlowDispatcher implements EventDispatcherInterface
 
     private function isInNestedTransaction(): bool
     {
-        return $this->connection->getTransactionNestingLevel() !== 1 && !$this->connection->getNestTransactionsWithSavepoints();
+        return $this->container->get(Connection::class)->getTransactionNestingLevel() !== 1 && !$this->container->get(Connection::class)->getNestTransactionsWithSavepoints();
     }
 }

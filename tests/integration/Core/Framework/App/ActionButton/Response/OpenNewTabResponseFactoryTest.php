@@ -32,6 +32,7 @@ class OpenNewTabResponseFactoryTest extends TestCase
     {
         $this->factory = $this->getContainer()->get(OpenNewTabResponseFactory::class);
         $app = new AppEntity();
+        $app->setName('TestApp');
         $app->setId(Uuid::randomHex());
         $app->setAppSecret('app-secret');
 

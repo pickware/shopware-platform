@@ -32,6 +32,7 @@ class ActionButtonResponseFactoryTest extends TestCase
     {
         $this->actionButtonResponseFactory = $this->getContainer()->get(ActionButtonResponseFactory::class);
         $app = new AppEntity();
+        $app->setName('TestApp');
         $app->setId(Uuid::randomHex());
         $app->setAppSecret('app-secret');
         $this->action = new AppAction(

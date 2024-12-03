@@ -525,6 +525,7 @@ class EntityReaderTest extends TestCase
         $this->productRepository->create($products, Context::createDefaultContext());
 
         $criteria = new Criteria([$parentId, $greenId, $redId]);
+        $criteria->addAssociation('tax');
         $context = Context::createDefaultContext();
         $context->setConsiderInheritance(false);
         $products = $this->productRepository
@@ -556,6 +557,7 @@ class EntityReaderTest extends TestCase
         static::assertEquals(100, $green->getCurrencyPrice(Defaults::CURRENCY)->getGross());
 
         $criteria = new Criteria([$parentId, $greenId, $redId]);
+        $criteria->addAssociation('tax');
         $context = Context::createDefaultContext();
         $context->setConsiderInheritance(true);
         $products = $this->productRepository
@@ -2023,7 +2025,7 @@ class EntityReaderTest extends TestCase
 
         $this->productRepository->create([$data], $context);
         $criteria = new Criteria([$data['id']]);
-        $criteria->addAssociation('cover');
+        $criteria->addAssociation('cover.media');
         $results = $this->productRepository
             ->search($criteria, $context)
             ->getEntities();
@@ -2506,6 +2508,7 @@ class EntityReaderTest extends TestCase
         $media = $criteria->getAssociation('media');
         $media->addSorting(new FieldSorting('position', FieldSorting::ASCENDING));
         $media->assign($criteriaConfig);
+        $media->addAssociation('media');
 
         $context->setConsiderInheritance(true);
 

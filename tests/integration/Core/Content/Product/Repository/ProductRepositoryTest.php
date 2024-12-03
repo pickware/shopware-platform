@@ -1139,6 +1139,7 @@ class ProductRepositoryTest extends TestCase
 
         $criteria = new Criteria([$child]);
         $criteria->addAssociation('manufacturer');
+        $criteria->addAssociation('tax');
         $products = $this->repository->search($criteria, Context::createDefaultContext())->getEntities();
         static::assertTrue($products->has($child));
         $product = $products->get($child);
@@ -1241,6 +1242,7 @@ class ProductRepositoryTest extends TestCase
 
         $criteria = new Criteria([$child]);
         $criteria->addAssociation('manufacturer');
+        $criteria->addAssociation('tax');
 
         $products = $this->repository->search($criteria, Context::createDefaultContext())->getEntities();
         static::assertTrue($products->has($child));

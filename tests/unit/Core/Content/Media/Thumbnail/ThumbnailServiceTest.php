@@ -380,7 +380,7 @@ class ThumbnailServiceTest extends TestCase
         $mediaEntity->setMetaData(['example' => 'metadata']);
         $mediaType = new ImageType();
         $mediaEntity->setMediaType($mediaType);
-        $mediaEntity->setFilesize(100);
+        $mediaEntity->setFileSize(100);
         $mediaEntity->setPath(__DIR__ . '/shopware-logo.png');
         $mediaEntity->setPrivate(false);
         $mediaEntity->setTitle('Test Image');

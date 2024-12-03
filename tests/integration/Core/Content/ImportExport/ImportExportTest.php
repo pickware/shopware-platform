@@ -831,7 +831,7 @@ SWTEST;1;' . $productName . ';9.35;10;0c17372fe6aa46059a97fc28b40f46c4;7;7%%;%s'
 
             $criteria = new Criteria();
             $criteria->addFilter(new EqualsFilter('name', $productName));
-            $criteria->addAssociation('cover');
+            $criteria->addAssociation('cover.media');
             $product = $this->productRepository->search($criteria, $context)->getEntities()->first();
             static::assertInstanceOf(ProductEntity::class, $product);
 

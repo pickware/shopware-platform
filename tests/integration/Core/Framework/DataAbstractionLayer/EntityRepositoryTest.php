@@ -617,10 +617,6 @@ class EntityRepositoryTest extends TestCase
         $listener->expects(static::once())->method('__invoke');
         $this->addEventListener($dispatcher, 'product_manufacturer.loaded', $listener);
 
-        $listener = $this->getMockBuilder(CallableClass::class)->getMock();
-        $listener->expects(static::once())->method('__invoke');
-        $this->addEventListener($dispatcher, 'tax.loaded', $listener);
-
         $criteria = new Criteria([$id, $id2]);
         $criteria->addAssociation('manufacturer');
 
@@ -751,10 +747,6 @@ class EntityRepositoryTest extends TestCase
         $listener = $this->getMockBuilder(CallableClass::class)->getMock();
         $listener->expects(static::once())->method('__invoke');
         $this->addEventListener($dispatcher, 'product_manufacturer.loaded', $listener);
-
-        $listener = $this->getMockBuilder(CallableClass::class)->getMock();
-        $listener->expects(static::once())->method('__invoke');
-        $this->addEventListener($dispatcher, 'tax.loaded', $listener);
 
         $listener = $this->getMockBuilder(CallableClass::class)->getMock();
         $listener->expects(static::once())->method('__invoke');

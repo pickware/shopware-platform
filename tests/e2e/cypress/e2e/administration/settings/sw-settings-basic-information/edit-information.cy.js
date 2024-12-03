@@ -2,7 +2,7 @@
 
 import SalesChannelPageObject from '../../../../support/pages/module/sw-sales-channel.page-object';
 
-describe('Basic Informaion: Edit assignments', () => {
+describe('Basic Information: Edit assignments', () => {
     beforeEach(() => {
         cy.openInitialPage(`${Cypress.env('admin')}#/sw/settings/basic/information/index`);
         cy.get('.sw-skeleton').should('not.exist');
@@ -134,6 +134,7 @@ describe('Basic Informaion: Edit assignments', () => {
         cy.get('.sw-settings-captcha-select-v2 .sw-multi-select input').type('3');
         cy.get('.sw-select-result').should('be.visible');
         cy.get('.sw-select-result.sw-select-option--0').contains('Google reCAPTCHA v3').click();
+        cy.get('.sw-settings-captcha-select-v2 .sw-multi-select input').type('{esc}');
 
         cy.get('.sw-settings-captcha-select-v2__google-recaptcha-v3').scrollIntoView();
         cy.get('.sw-settings-captcha-select-v2__google-recaptcha-v3 input[name="googleReCaptchaV3ThresholdScore"]').clear().type('0.5');

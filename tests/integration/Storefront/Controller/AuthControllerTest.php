@@ -709,7 +709,6 @@ class AuthControllerTest extends TestCase
             $this->getContainer()->get(AccountRecoverPasswordPageLoader::class)
         );
         $controller->setContainer($this->getContainer());
-        $controller->setTwig($this->getContainer()->get('twig'));
 
         return $controller;
     }

@@ -284,7 +284,7 @@ class ManyToOneAssociationFieldResolverTest extends TestCase
         $connection->executeStatement('UPDATE product SET product_media_version_id = NULL WHERE product_media_id IS NULL');
 
         $criteria = new Criteria([$ids->get('p1'), $ids->get('p2')]);
-        $criteria->addAssociation('cover');
+        $criteria->addAssociation('cover.media');
 
         $products = array_values($this->productRepository->search($criteria, $context)->getElements());
 

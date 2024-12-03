@@ -22,7 +22,11 @@
             {% endif %}
                 <div class="base-slider image-slider{% if sliderConfig.navigationArrows.value == "outside" %} has-nav-outside{% endif %}{% if sliderConfig.navigationDots.value == "outside" %} has-dots-outside{% endif %}"
                      data-base-slider="true"
-                     data-base-slider-options='{{ baseSliderOptions|json_encode }}'>
+                     data-base-slider-options='{{ baseSliderOptions|json_encode }}'
+                     role="region"
+                     aria-label="{{ 'component.cms.imageGallery.ariaLabel'|trans({ '%total%': element.data.sliderItems|length })|sw_sanitize }}"
+                     tabindex="0"
+                >
 
                     {% block element_image_slider_inner %}
                         <div class="image-slider-container"

@@ -31,6 +31,7 @@ class QuerySignerTest extends TestCase
     protected function setUp(): void
     {
         $this->app = new AppEntity();
+        $this->app->setName('TestApp');
         $this->app->setId('app-id');
         $this->app->setAppSecret('lksf#$osck$FSFDSF#$#F43jjidjsfisj-333');
 

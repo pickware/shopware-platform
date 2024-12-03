@@ -56,6 +56,7 @@ class AppRecurringHandlerTest extends AbstractAppPaymentHandlerTestCase
             'url' => $this->shopUrl,
             'shopId' => $this->shopIdProvider->getShopId(),
             'appVersion' => '1.0.0',
+            'inAppPurchases' => null,
         ], $content['source']);
 
         $this->assertOrderTransactionState(OrderTransactionStates::STATE_PAID, $transactionId);

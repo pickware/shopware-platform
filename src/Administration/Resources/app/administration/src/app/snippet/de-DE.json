@@ -201,7 +201,8 @@
     },
     "sw-price-field": {
       "labelPriceGross": "Preis (Brutto)",
-      "labelPriceNet": "Preis (Netto)"
+      "labelPriceNet": "Preis (Netto)",
+      "toggleLinkedCurrency": "Verknüpfung von Brutto- und Nettopreis umschalten"
     },
     "sw-list-price-field": {
       "labelListPriceGross": "Streichpreis (Brutto)",
@@ -237,10 +238,15 @@
       "labelColumnHide": "Spalte ausblenden",
       "labelSelectionCount": "Ausgewählt:",
       "labelDeSelectAll": "Alle abwählen",
-      "maximumSelectionExceed": "Maximale Anzahl Einträge ausgewählt"
+      "maximumSelectionExceed": "Maximale Anzahl Einträge ausgewählt",
+      "columnsActions": "Spaltenaktionen",
+      "actionsMenu": "Aktionen-Menü öffnen"
     },
     "sw-pagination": {
-      "labelItemsPerPage": "Einträge pro Seite:"
+      "labelItemsPerPage": "Einträge pro Seite:",
+      "previousPage": "Zur vorherigen Seite gehen",
+      "nextPage": "Zur nächsten Seite gehen",
+      "page": "Gehe zu Seite {page}"
     },
     "sw-modal": {
       "labelClose": "Schließen"
@@ -448,6 +454,7 @@
       "caption": "Dateien zum Hochladen hierhin ziehen"
     },
     "sw-media-upload-v2": {
+      "switchMode": "Wechseln Sie den Upload-Modus",
       "buttonFileUpload": "Dateien hochladen",
       "buttonFilesUpload": "Dateien hochladen",
       "buttonUrlUpload": "Über URL hochladen",
@@ -524,6 +531,9 @@
     },
     "sw-select": {
       "messageNoResults": "Es wurden keine Ergebnisse für \"{term}\" gefunden."
+    },
+    "sw-select-base": {
+      "buttonClear": "Alle Elemente löschen"
     },
     "sw-select-result-list": {
       "messageNoResults": "Es wurden keine Ergebnisse gefunden."
@@ -1173,6 +1183,9 @@
         "linkText": "Supportanfrage erstellen",
         "linkUrl": "https://account.shopware.com/shops/support"
       }
+    },
+    "sw-page": {
+      "backButton": "Zurückgehen"
     }
   },
   "sw-text-editor-toolbar": {
@@ -1598,6 +1611,9 @@
   "sw-ai-copilot-warning": {
     "text": "AI-Antworten können ungenau oder irreführend sein."
   },
+  "sw-in-app-purchase-checkout": {
+    "exsTitle": "Shopware Extension Store aktivieren"
+  },
   "help-center": {
     "sidebar": {
       "title": "Hilfe",
@@ -1627,5 +1643,8 @@
     "datetime": {
       "placeholder": "Datum und Zeit auswählen ..."
     }
+  },
+  "sw-context-button": {
+    "ariaLabel": "Kontextmenü öffnen"
   }
 }

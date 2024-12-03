@@ -329,8 +329,8 @@ class ProductSerializerTest extends TestCase
         $criteria->addAssociation('visibilities');
         $criteria->addAssociation('tax');
         $criteria->addAssociation('categories');
-        $criteria->addAssociation('cover');
-        $criteria->addAssociation('media');
+        $criteria->addAssociation('cover.media');
+        $criteria->addAssociation('media.media');
         $criteria->getAssociation('media')->addSorting(new FieldSorting('position', FieldSorting::ASCENDING));
 
         $product = $productRepository->search($criteria, Context::createDefaultContext())->first();

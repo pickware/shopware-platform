@@ -414,6 +414,11 @@ frame-ancestors 'none';
             <tag name="twig.extension"/>
         </service>
 
+        <service id="Shopware\Core\Framework\Adapter\Twig\Extension\InAppPurchaseExtension">
+            <argument type="service" id="Shopware\Core\Framework\Store\InAppPurchase"/>
+            <tag name="twig.extension"/>
+        </service>
+
         <service id="Shopware\Core\Framework\Adapter\Twig\StringTemplateRenderer">
             <argument type="service" id="twig"/>
             <argument>%twig.cache%</argument>
@@ -467,7 +472,6 @@ frame-ancestors 'none';
             <argument type="service" id="sales_channel.repository"/>
             <argument type="service" id="Shopware\Core\Framework\Validation\DataValidator"/>
             <argument type="service" id="Shopware\Core\System\SalesChannel\Context\SalesChannelContextPersister"/>
-            <argument type="service" id="Shopware\Core\Framework\Routing\SalesChannelRequestContextResolver"/>
             <argument type="service" id="Shopware\Core\System\SalesChannel\Context\SalesChannelContextService"/>
             <argument type="service" id="event_dispatcher"/>
             <argument type="service" id="Shopware\Core\Checkout\Cart\ApiOrderCartService"/>
@@ -670,10 +674,8 @@ frame-ancestors 'none';
             <argument type="service" id="Doctrine\DBAL\Connection"/>
         </service>
 
-        <service id="messenger.bus.shopware" class="Shopware\Core\Framework\Adapter\Messenger\MessageBus" decorates="messenger.default_bus">
-            <argument type="service" id=".inner"/>
-            <argument type="collection"></argument>
-            <argument>%shopware.messenger.routing_overwrite%</argument>
+        <service id="messenger.bus.shopware" alias="messenger.default_bus">
+            <deprecated package="shopware/core" version="6.7.0.0">tag:v6.7.0 - The %alias_id% service will be removed in v6.7.0.0 use messenger.default_bus instead</deprecated>
         </service>
 
         <service id="http_kernel" class="Shopware\Core\Framework\Adapter\Kernel\HttpKernel" public="true">

@@ -156,7 +156,6 @@ class ControllerRateLimiterTest extends TestCase
             $this->getContainer()->get(AccountRecoverPasswordPageLoader::class)
         );
         $controller->setContainer($this->getContainer());
-        $controller->setTwig($this->getContainer()->get('twig'));
 
         $request = $this->createRequest('frontend.account.guest.login.page', [
             'redirectTo' => 'frontend.account.order.single.page',
@@ -224,7 +223,6 @@ class ControllerRateLimiterTest extends TestCase
             $this->getContainer()->get(NewsletterUnsubscribeRoute::class),
         );
         $controller->setContainer($this->getContainer());
-        $controller->setTwig($this->getContainer()->get('twig'));
 
         $response = $controller->sendContactForm(new RequestDataBag([
         ]), $this->salesChannelContext);

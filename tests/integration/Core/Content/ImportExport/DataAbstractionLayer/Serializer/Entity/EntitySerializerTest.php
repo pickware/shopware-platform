@@ -374,6 +374,11 @@ class TestExtension extends EntityExtension
     {
         return ProductDefinition::class;
     }
+
+    public function getEntityName(): string
+    {
+        return ProductDefinition::ENTITY_NAME;
+    }
 }
 
 /**

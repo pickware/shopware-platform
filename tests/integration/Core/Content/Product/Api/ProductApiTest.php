@@ -277,6 +277,9 @@ class ProductApiTest extends TestCase
                 'product' => ['id', 'name', 'tax'],
                 'tax' => ['id', 'name'],
             ],
+            'associations' => [
+                'tax' => [],
+            ],
         ], \JSON_THROW_ON_ERROR));
 
         $response = $this->getBrowser()->getResponse();

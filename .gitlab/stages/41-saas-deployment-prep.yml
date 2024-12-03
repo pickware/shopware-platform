@@ -92,3 +92,13 @@ create deployment merge request:
     project: "shopware/6/product/saas"
     branch: "trunk"
     strategy: "depend"
+
+post last deployment slack message:
+  stage: downstream
+  needs:
+    - job: "create deployment merge request"
+      artifacts: false
+  rules:
+    - *rules_deployment_preparation
+  script:
+    - .github/bin/post_last_deployment.bash

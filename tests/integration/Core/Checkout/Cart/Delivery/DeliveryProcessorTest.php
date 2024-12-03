@@ -25,6 +25,7 @@ use Shopware\Core\Checkout\Shipping\ShippingMethodEntity;
 use Shopware\Core\Defaults;
 use Shopware\Core\Framework\DataAbstractionLayer\Pricing\Price;
 use Shopware\Core\Framework\DataAbstractionLayer\Pricing\PriceCollection;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Criteria;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Test\TestCaseBase\IntegrationTestBehaviour;
 use Shopware\Core\Framework\Uuid\Uuid;
@@ -48,6 +49,14 @@ class DeliveryProcessorTest extends TestCase
     {
         $this->salesChannelContext = $this->getContainer()->get(SalesChannelContextFactory::class)
             ->create(Uuid::randomHex(), TestDefaults::SALES_CHANNEL);
+
+        $shippingMethodCriteria = new Criteria([$this->salesChannelContext->getShippingMethod()->getId()]);
+        $shippingMethodCriteria->addAssociation('media');
+        $shippingMethodCriteria->addAssociation('deliveryTime');
+
+        $this->salesChannelContext->assign([
+            'shippingMethod' => $this->getContainer()->get('shipping_method.repository')->search($shippingMethodCriteria, $this->salesChannelContext->getContext())->first(),
+        ]);
 
         $shippingMethodPriceEntity = new ShippingMethodPriceEntity();
         $shippingMethodPriceEntity->setUniqueIdentifier('test');

@@ -156,7 +156,7 @@ class CartLineItemControllerTest extends TestCase
     }
 
     /**
-     * @return array<int, array<int, bool|string>>
+     * @return list<array{0: string, 1: string, 2?: bool}>
      */
     public static function productNumbers(): array
     {
@@ -173,23 +173,12 @@ class CartLineItemControllerTest extends TestCase
         ];
     }
 
-    /**
-     * @return array<int, array<int, string>>
-     */
-    public static function promotions(): array
-    {
-        return [
-            ['testCode'],
-        ];
-    }
-
-    #[DataProvider('promotions')]
-    public function testAddPromotion(string $code): void
+    public function testAddPromotion(): void
     {
         $contextToken = Uuid::randomHex();
 
         $cartService = $this->getContainer()->get(CartService::class);
-        $request = $this->createRequest(['code' => $code]);
+        $request = $this->createRequest(['code' => 'testCode']);
 
         $salesChannelContext = $this->createSalesChannelContext($contextToken);
         $this->getContainer()->get(CartLineItemController::class)->addPromotion(
@@ -201,7 +190,7 @@ class CartLineItemControllerTest extends TestCase
         $flashBagEntries = $this->getFlashBag()->all();
 
         static::assertArrayHasKey('danger', $flashBagEntries);
-        static::assertSame($this->getContainer()->get('translator')->trans('checkout.promotion-not-found', ['%code%' => \strip_tags($code)]), $flashBagEntries['danger'][0]);
+        static::assertSame($this->getContainer()->get('translator')->trans('checkout.promotion-not-found', ['%code%' => \strip_tags('testCode')]), $flashBagEntries['danger'][0]);
         static::assertCount(0, $cartService->getCart($contextToken, $salesChannelContext)->getLineItems());
     }
 

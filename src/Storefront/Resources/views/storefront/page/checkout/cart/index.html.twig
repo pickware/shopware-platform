@@ -131,9 +131,11 @@
                                        aria-controls="collapseExample">
                                         {{ 'checkout.shippingCosts'|trans|sw_sanitize }}
 
-                                        {% block page_checkout_cart_shipping_costs_trigger_icon %}
-                                            {% sw_icon 'arrow-medium-right' style { pack:'solid', size: 'sm' } %}
-                                        {% endblock %}
+                                        {%- if not feature('ACCESSIBILITY_TWEAKS') -%}
+                                            {% block page_checkout_cart_shipping_costs_trigger_icon %}
+                                                {% sw_icon 'arrow-medium-right' style { pack:'solid', size: 'sm' } %}
+                                            {% endblock %}
+                                        {% endif %}
                                     </a>
                                 {% endif %}
                             {% endblock %}

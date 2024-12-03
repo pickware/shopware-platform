@@ -44,12 +44,14 @@ class IconCacheTwigFilterTest extends TestCase
     {
         $twig = $this->createFinder([
             new BundleFixture('StorefrontTest', __DIR__ . '/fixtures/Storefront/'),
-            new BundleFixture('Storefront', \dirname((string) ReflectionHelper::getFilename(Storefront::class))),
+            new BundleFixture('Storefront', \dirname((string) ReflectionHelper::getFileName(Storefront::class))),
         ]);
 
+        $container = $this->getContainer();
+        $container->set('twig', $twig);
+
         $controller = new TestController();
-        $controller->setTwig($twig);
-        $controller->setContainer($this->getContainer());
+        $controller->setContainer($container);
         $controller->setTemplateFinder($twig->getExtension(NodeExtension::class)->getFinder());
 
         $controller->systemConfigService = self::createMock(SystemConfigService::class);

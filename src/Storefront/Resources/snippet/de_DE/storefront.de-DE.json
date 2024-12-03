@@ -151,6 +151,7 @@
     "loginPasswordLabel": "Ihr Passwort",
     "loginPasswordPlaceholder": "Passwort eingeben ...",
     "loginPasswordRecover": "Ich habe mein Passwort vergessen.",
+    "loginRegistrationHeader": "Anmelden oder Konto erstellen",
     "loginSubmit": "Anmelden",
     "loginBadCredentials": "Es konnte kein Account mit den angegebenen Zugangsdaten gefunden werden.",
     "loginThrottled": "Zu viele Anmeldeversuche. Bitte warten Sie %seconds% Sekunden, bevor Sie erneut versuchen, sich anzumelden.",
@@ -483,7 +484,7 @@
     "finishPaymentFailed": "Leider ist der Zahlungsprozess fehlgeschlagen. Bitte ändern Sie die Zahlungsart um Ihre Bestellung abzuschließen. <a href=\"%editOrderUrl%\">Zahlung ändern</a>",
     "codeAddedSuccessful": "Gutscheincode erfolgreich hinzugefügt.",
     "addToCartSuccess": "{1} 1 Produkt zum Warenkorb hinzugefügt.|]1,Inf[ %count% Produkte zum Warenkorb hinzugefügt.",
-    "shippingCosts": "Versanddetails",
+    "shippingCosts": "Versanddetails öffnen",
     "shippingCountry": "Lieferland",
     "paymentMethod": "Zahlungsart",
     "shippingMethod": "Versandart",
@@ -680,7 +681,9 @@
     "moveTheDeviceToStart": "Bewegen Sie das Gerät, um zu beginnen",
     "tapToPlaceTheObject": "Tippen Sie, um das Objekt zu platzieren",
     "openAugmentedRealityView": "Augmented-Reality-Ansicht öffnen",
-    "openArView": "AR-Ansicht öffnen"
+    "augmentedRealityView": "Augmented-Reality-Ansicht",
+    "openArView": "AR-Ansicht öffnen",
+    "openArViewDescription": "Augmented-Reality-Ansicht öffnen"
   },
   "wishlist": {
     "cartTitle": "Ihr Merkzettel",
@@ -781,9 +784,14 @@
         "acceptButtonLabel": "Akzeptieren"
       },
       "imageGallery": {
+        "ariaLabel": "Bildergalerie",
         "touchMove": "Drücken und drehen",
         "clickMove": "Klicken und drehen",
-        "sliderDotLabel": "Zeige Bild %index% von %total%"
+        "sliderDotLabel": "Zeige Bild %index% von %total%",
+        "ariaLabel": "Bildgalerie mit %total% Elementen"
+      },
+      "productGallery": {
+        "ariaLabel": "Produktgalerie mit %total% Elementen"
       },
       "defaultMedia": {
         "preview_camera_large": {
