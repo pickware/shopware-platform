@@ -61,8 +61,8 @@ class CrossSellingRouteTest extends TestCase
                 'taxCalculationType' => SalesChannelDefinition::CALCULATION_TYPE_VERTICAL,
             ])
         );
-        $this->productRepository = $this->getContainer()->get('product.repository');
-        $this->route = $this->getContainer()->get(ProductCrossSellingRoute::class);
+        $this->productRepository = static::getContainer()->get('product.repository');
+        $this->route = static::getContainer()->get(ProductCrossSellingRoute::class);
 
         $this->browser = $this->createCustomSalesChannelBrowser([
             'id' => TestDefaults::SALES_CHANNEL,
@@ -144,7 +144,7 @@ class CrossSellingRouteTest extends TestCase
     public function testLoadForProductWithCloseoutAndFilterDisabled(): void
     {
         // disable hideCloseoutProductsWhenOutOfStock filter
-        $this->getContainer()->get(SystemConfigService::class)
+        static::getContainer()->get(SystemConfigService::class)
             ->set('core.listing.hideCloseoutProductsWhenOutOfStock', false);
 
         $productId = Uuid::randomHex();
@@ -184,7 +184,7 @@ class CrossSellingRouteTest extends TestCase
     public function testLoadForProductWithCloseoutAndFilterEnabled(): void
     {
         // enable hideCloseoutProductsWhenOutOfStock filter
-        $this->getContainer()->get(SystemConfigService::class)
+        static::getContainer()->get(SystemConfigService::class)
             ->set('core.listing.hideCloseoutProductsWhenOutOfStock', true);
 
         $productId = Uuid::randomHex();
@@ -224,7 +224,7 @@ class CrossSellingRouteTest extends TestCase
     public function testLoadForProductWithCloseoutAndFilterEnabledAllProductsOfOfStock(): void
     {
         // enable hideCloseoutProductsWhenOutOfStock filter
-        $this->getContainer()->get(SystemConfigService::class)
+        static::getContainer()->get(SystemConfigService::class)
             ->set('core.listing.hideCloseoutProductsWhenOutOfStock', true);
 
         $productId = Uuid::randomHex();
@@ -251,7 +251,7 @@ class CrossSellingRouteTest extends TestCase
     public function testLoadForProductWithProductCrossSellingAssignedProducts(): void
     {
         // enable hideCloseoutProductsWhenOutOfStock filter
-        $this->getContainer()->get(SystemConfigService::class)
+        static::getContainer()->get(SystemConfigService::class)
             ->set('core.listing.hideCloseoutProductsWhenOutOfStock', false);
 
         $productId = Uuid::randomHex();
@@ -319,7 +319,7 @@ class CrossSellingRouteTest extends TestCase
     public function testLoadForProductWithProductCrossSellingAssignedProductsOutOfStock(): void
     {
         // enable hideCloseoutProductsWhenOutOfStock filter
-        $this->getContainer()->get(SystemConfigService::class)
+        static::getContainer()->get(SystemConfigService::class)
             ->set('core.listing.hideCloseoutProductsWhenOutOfStock', true);
 
         $productId = Uuid::randomHex();
@@ -451,7 +451,7 @@ class CrossSellingRouteTest extends TestCase
     public function testCrossSellingEventSubscriberCanUpdateCriteria(): void
     {
         $eventDispatcher = new EventDispatcher();
-        $productRepository = $this->getContainer()->get('product.repository');
+        $productRepository = static::getContainer()->get('product.repository');
         $eventDispatcher->addListener(
             ProductCrossSellingIdsCriteriaEvent::class,
             static function (ProductCrossSellingIdsCriteriaEvent $event) use ($productRepository): void {
@@ -465,10 +465,10 @@ class CrossSellingRouteTest extends TestCase
         );
 
         $route = new ProductCrossSellingRoute(
-            $this->getContainer()->get('product_cross_selling.repository'),
+            static::getContainer()->get('product_cross_selling.repository'),
             $eventDispatcher,
             $this->createMock(ProductStreamBuilderInterface::class),
-            $this->getContainer()->get('sales_channel.product.repository'),
+            static::getContainer()->get('sales_channel.product.repository'),
             $this->createMock(SystemConfigService::class),
             $this->createMock(ProductListingLoader::class),
             $this->createMock(AbstractProductCloseoutFilterFactory::class),
@@ -537,7 +537,7 @@ class CrossSellingRouteTest extends TestCase
             $randomProductIds .= '|' . $includedProductId;
         }
 
-        $this->getContainer()->get('product_stream.repository')->create([
+        static::getContainer()->get('product_stream.repository')->create([
             [
                 'id' => $id,
                 'filters' => [

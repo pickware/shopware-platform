@@ -43,7 +43,7 @@ class EditOrderPageTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->paymentMethodRepository = $this->getContainer()->get('payment_method.repository');
+        $this->paymentMethodRepository = static::getContainer()->get('payment_method.repository');
     }
 
     public function testEditOrderPageShouldLoad(): void
@@ -123,7 +123,7 @@ class EditOrderPageTest extends TestCase
         $ruleCriteria->addFilter(new EqualsFilter('name', 'Customers from USA'));
 
         /** @var EntityRepository<RuleCollection> $ruleRepository */
-        $ruleRepository = $this->getContainer()->get('rule.repository');
+        $ruleRepository = static::getContainer()->get('rule.repository');
 
         $ruleId = $ruleRepository->search($ruleCriteria, $context->getContext())->getEntities()->first()?->getId();
         static::assertNotNull($ruleId);
@@ -190,7 +190,7 @@ class EditOrderPageTest extends TestCase
 
     protected function getPageLoader(): AccountEditOrderPageLoader
     {
-        return $this->getContainer()->get(AccountEditOrderPageLoader::class);
+        return static::getContainer()->get(AccountEditOrderPageLoader::class);
     }
 
     private function setOrderToTransactionState(
@@ -200,7 +200,7 @@ class EditOrderPageTest extends TestCase
     ): void {
         $order = $this->getOrder($orderId, $context);
 
-        $stateMachineRegistry = $this->getContainer()->get(StateMachineRegistry::class);
+        $stateMachineRegistry = static::getContainer()->get(StateMachineRegistry::class);
 
         static::assertInstanceOf(OrderTransactionCollection::class, $order->getTransactions());
 
@@ -221,7 +221,7 @@ class EditOrderPageTest extends TestCase
     private function getOrder(string $orderId, SalesChannelContext $context): OrderEntity
     {
         /** @var EntityRepository<OrderCollection> $orderRepository */
-        $orderRepository = $this->getContainer()->get('order.repository');
+        $orderRepository = static::getContainer()->get('order.repository');
         $criteria = new Criteria([$orderId]);
 
         $criteria->addAssociations(['stateMachineState', 'transactions.stateMachineState']);

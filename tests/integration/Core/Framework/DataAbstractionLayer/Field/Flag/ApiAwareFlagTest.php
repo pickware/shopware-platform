@@ -27,8 +27,8 @@ class ApiAwareFlagTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->mediaRepository = $this->getContainer()->get('media.repository');
-        $this->productRepository = $this->getContainer()->get('product.repository');
+        $this->mediaRepository = static::getContainer()->get('media.repository');
+        $this->productRepository = static::getContainer()->get('product.repository');
     }
 
     public function testReadWithoutPermissionForAdminSourceWithJsonApiType(): void

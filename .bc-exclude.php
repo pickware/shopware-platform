@@ -50,6 +50,9 @@ return [
         'Parameter cacheDir was added to Method createTwigEnvironment\(\) of class Shopware\\\\Core\\\\Content\\\\Seo\\\\SeoUrlTwigFactory',
 
         // Version related const values changed for 7.2 update
-        'Value of constant Symfony\\\\Component\\\\HttpKernel\\\\Kernel'
-        ],
+        'Value of constant Symfony\\\\Component\\\\HttpKernel\\\\Kernel',
+
+        // Class is marked as @final
+        'Parameter clearHttp was added to Method clear\(\) of class Shopware\\\\Core\\\\Framework\\\\Adapter\\\\Cache\\\\CacheClearer',
+    ],
 ];

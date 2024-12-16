@@ -18,7 +18,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "PHP lint"
     steps:
       - name: Checkout
@@ -65,7 +65,7 @@ jobs:
         run: composer run lint:snippets
 
   phpstan:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "PHPStan"
     steps:
       - name: Setup Shopware
@@ -81,7 +81,7 @@ jobs:
         run: composer run phpstan -- --error-format=github --no-progress
 
   bc-checker:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "BC check"
     steps:
       - name: Clone shopware
@@ -111,7 +111,7 @@ jobs:
         run: composer run bc-check -- --from="origin/${{ github.base_ref }}"
 
   openapi-lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       APP_ENV: test
       APP_URL: http://localhost:8000
@@ -150,7 +150,7 @@ jobs:
   phpunit:
     name: "PHPUnit for ${{ matrix.suite }}"
     continue-on-error: ${{ !matrix.stable }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -197,7 +197,7 @@ jobs:
           files: coverage.xml
 
   license-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "PHP license check"
     steps:
       - name: Setup Shopware
@@ -215,7 +215,7 @@ jobs:
         run: vendor/bin/composer-license-checker check $(xargs -n1 echo -a < .allowed-licenses)
 
   composer-audit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "composer audit"
     steps:
       - name: Clone shopware

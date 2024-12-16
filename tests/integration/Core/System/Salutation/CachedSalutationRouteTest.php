@@ -52,14 +52,14 @@ class CachedSalutationRouteTest extends TestCase
         Feature::skipTestIfActive('cache_rework', $this);
         parent::setUp();
 
-        $this->context = $this->getContainer()->get(SalesChannelContextFactory::class)
+        $this->context = static::getContainer()->get(SalesChannelContextFactory::class)
             ->create(Uuid::randomHex(), TestDefaults::SALES_CHANNEL);
     }
 
     #[AfterClass]
     public function cleanup(): void
     {
-        $this->getContainer()->get('cache.object')
+        static::getContainer()->get('cache.object')
             ->invalidateTags([CachedSalutationRoute::ALL_TAG]);
     }
 
@@ -79,9 +79,9 @@ class CachedSalutationRouteTest extends TestCase
         $route = new CachedSalutationRoute(
             $core,
             new TagAwareAdapter(new ArrayAdapter(100)),
-            $this->getContainer()->get(EntityCacheKeyGenerator::class),
-            $this->getContainer()->get(CacheTracer::class),
-            $this->getContainer()->get('event_dispatcher'),
+            static::getContainer()->get(EntityCacheKeyGenerator::class),
+            static::getContainer()->get(CacheTracer::class),
+            static::getContainer()->get('event_dispatcher'),
             [],
         );
 
@@ -109,25 +109,25 @@ class CachedSalutationRouteTest extends TestCase
     #[DataProvider('invalidationProvider')]
     public function testInvalidation(\Closure $before, \Closure $after, int $calls): void
     {
-        $this->getContainer()->get('cache.object')
+        static::getContainer()->get('cache.object')
             ->invalidateTags([CachedSalutationRoute::ALL_TAG]);
 
-        $route = $this->getContainer()->get(SalutationRoute::class);
+        $route = static::getContainer()->get(SalutationRoute::class);
 
         static::assertInstanceOf(CachedSalutationRoute::class, $route);
 
-        $dispatcher = $this->getContainer()->get('event_dispatcher');
+        $dispatcher = static::getContainer()->get('event_dispatcher');
         $listener = $this->getMockBuilder(CallableClass::class)->getMock();
 
         $listener->expects(static::exactly($calls))->method('__invoke');
         $this->addEventListener($dispatcher, 'salutation.loaded', $listener);
 
-        $before($this->getContainer());
+        $before(static::getContainer());
 
         $route->load(new Request(), $this->context, new Criteria());
         $route->load(new Request(), $this->context, new Criteria());
 
-        $after($this->getContainer());
+        $after(static::getContainer());
 
         $route->load(new Request(), $this->context, new Criteria());
         $route->load(new Request(), $this->context, new Criteria());

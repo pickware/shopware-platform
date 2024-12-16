@@ -51,7 +51,7 @@ class PaymentMethodRouteTest extends TestCase
             ],
         ]);
 
-        $this->salesChannelContext = $this->getContainer()
+        $this->salesChannelContext = static::getContainer()
             ->get(SalesChannelContextFactory::class)
             ->create(Uuid::randomHex(), TestDefaults::SALES_CHANNEL);
     }
@@ -70,13 +70,13 @@ class PaymentMethodRouteTest extends TestCase
         static::assertContains($this->ids->get('payment2'), $ids);
         static::assertContains($this->ids->get('payment3'), $ids);
 
-        $traces = $this->getContainer()->get(ScriptTraces::class)->getTraces();
+        $traces = static::getContainer()->get(ScriptTraces::class)->getTraces();
         static::assertArrayHasKey(PaymentMethodRouteHook::HOOK_NAME, $traces);
     }
 
     public function testSorting(): void
     {
-        $paymentMethodRoute = $this->getContainer()->get(PaymentMethodRoute::class);
+        $paymentMethodRoute = static::getContainer()->get(PaymentMethodRoute::class);
 
         $request = new Request();
 
@@ -90,7 +90,7 @@ class PaymentMethodRouteTest extends TestCase
         static::assertNotNull($selectedPaymentMethodResult->getPaymentMethods()->first());
         static::assertSame($lastPaymentMethodId, $selectedPaymentMethodResult->getPaymentMethods()->first()->getId());
 
-        $traces = $this->getContainer()->get(ScriptTraces::class)->getTraces();
+        $traces = static::getContainer()->get(ScriptTraces::class)->getTraces();
         static::assertArrayHasKey(PaymentMethodRouteHook::HOOK_NAME, $traces);
     }
 
@@ -131,7 +131,7 @@ class PaymentMethodRouteTest extends TestCase
         static::assertCount(2, $response['elements']);
         static::assertNotContains($this->ids->get('payment3'), array_column($response['elements'], 'id'));
 
-        $traces = $this->getContainer()->get(ScriptTraces::class)->getTraces();
+        $traces = static::getContainer()->get(ScriptTraces::class)->getTraces();
         static::assertArrayHasKey(PaymentMethodRouteHook::HOOK_NAME, $traces);
     }
 
@@ -151,7 +151,7 @@ class PaymentMethodRouteTest extends TestCase
         static::assertCount(2, $response['elements']);
         static::assertNotContains($this->ids->get('payment3'), array_column($response['elements'], 'id'));
 
-        $traces = $this->getContainer()->get(ScriptTraces::class)->getTraces();
+        $traces = static::getContainer()->get(ScriptTraces::class)->getTraces();
         static::assertArrayHasKey(PaymentMethodRouteHook::HOOK_NAME, $traces);
     }
 
@@ -226,7 +226,7 @@ class PaymentMethodRouteTest extends TestCase
             ],
         ];
 
-        $this->getContainer()->get('payment_method.repository')
+        static::getContainer()->get('payment_method.repository')
             ->create($data, Context::createDefaultContext());
     }
 }

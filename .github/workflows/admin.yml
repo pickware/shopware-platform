@@ -13,7 +13,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Setup Shopware
         uses: shopware/setup-shopware@main
@@ -41,7 +41,7 @@ jobs:
         run: npm run lint:scss
 
   admin:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "Jest Admin"
     env:
       APP_ENV: prod
@@ -63,7 +63,7 @@ jobs:
         run: npm --prefix src/Administration/Resources/app/administration run unit -- --silent
 
   license-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "License check"
     env:
       WHITELISTED_JS_PACKAGES: 'abab@2.0.1;administration;taffydb@2.6.2'

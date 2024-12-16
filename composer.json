@@ -231,24 +231,13 @@
         "build:js:component-library": "Builds the component library",
         "build:js:storefront": "Builds the Storefront's JavaScript",
         "check:license": "Check thrid-party dependency licenses",
-        "e2e:cypress": " ",
-        "e2e:cypress-repeat": " ",
-        "e2e:open": "Launches the Cypress E2E test-suite UI",
-        "e2e:prepare": "Installs the Admin Extension SDK test plugin with fixtures and dumps the database",
-        "e2e:setup": "Installs a clean shopware instance for E2E environment and launches 'e2e:prepare'",
-        "e2e:vue3": "Launches the Cypress E2E test-suite UI with the Vue3 feature flag enabled",
-        "e2e:web-update:open": " ",
-        "e2e:web-update:prepare": " ",
-        "e2e:web-update:start": " ",
         "ecs": "Checks all files regarding the PHP-CS-Fixer",
         "ecs-fix": "Checks all files regarding the PHP-CS-Fixer and fixes them if possible",
-        "eslint": "Codestyle checks all (Administration/Storefront/E2E) JS/TS files",
+        "eslint": "Codestyle checks all (Administration/Storefront) JS/TS files",
         "eslint:admin": "Codestyle checks Administration JS/TS files",
         "eslint:admin:fix": "Codestyle checks Administration JS/TS files and fixes them if possible",
         "format:admin": "Dry run Prettier for the Administration",
         "format:admin:fix": "Format the Administration with Prettier",
-        "eslint:e2e": "Codestyle checks all E2E JS/TS files",
-        "eslint:e2e:fix": "Codestyle checks all E2E JS/TS files and fixes them if possible",
         "eslint:storefront": "Codestyle checks all Storefront JS/TS files",
         "framework:schema:dump": " ",
         "hook:pre-commit": " ",
@@ -256,7 +245,6 @@
         "hook:pre-push": " ",
         "hook:pre-push:install": " ",
         "init:db": " ",
-        "init:e2e": " ",
         "init:js": " ",
         "init:testdb": "Initializes the test database",
         "lint": "Shorthand for the composer commands 'stylelint', 'eslint', 'ecs', 'lint:changelog' and 'lint:snippets'",
@@ -270,8 +258,6 @@
         "npm:admin:check-license": "Check thrid-party dependency licenses for administration",
         "npm:component-library": " ",
         "npm:component-library:bin": " ",
-        "npm:e2e": " ",
-        "npm:e2e:bin": " ",
         "npm:storefront": " ",
         "npm:storefront:bin": " ",
         "npm:storefront:check-license": "Check thrid-party dependency licenses for storefront",
@@ -359,76 +345,16 @@
             "@php bin/console assets:install"
         ],
         "check:license": "bash -c \"vendor/bin/composer-license-checker check -a $(sed -z 's/\\n/ -a /g' .allowed-licenses)\"",
-        "e2e:cypress": [
-            "export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env cypress"
-        ],
-        "e2e:cypress-repeat": [
-            "export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env cypress-repeat"
-        ],
-        "e2e:open": [
-            "Composer\\Config::disableProcessTimeout",
-            "@e2e:cypress open"
-        ],
-        "e2e:prepare": [
-            "@putenv APP_ENV=e2e",
-            "@putenv CYPRESS_localUsage=1",
-            "@php bin/console e2e:dump-db"
-        ],
-        "e2e:setup": [
-            "@putenv APP_ENV=e2e",
-            "@setup",
-            "@init:e2e",
-            "@e2e:prepare"
-        ],
-        "e2e:vue3": [
-            "Composer\\Config::disableProcessTimeout",
-            "export CYPRESS_VUE3=\"true\"; export CYPRESS_grepTags=\"VUE3\"; export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env cypress open"
-        ],
-        "e2e:web-update:open": [
-            "Composer\\Config::disableProcessTimeout",
-            "@e2e:web-update:start",
-            "export CYPRESS_baseUrl=${INSTALL_URL-${CYPRESS_baseUrl-http://localhost:8000}}; export APP_ENV=e2e; export CYPRESS_localUsage=1; export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env cypress open"
-        ],
-        "e2e:web-update:prepare": [
-            "rm -rf shop",
-            "wget -q -O install.zip https://releases.shopware.com/sw6/install_v6.4.17.2_4d2c85fb448571fa4f30edce635f33a67dda1d76.zip",
-            "unzip -q -o -d shop install.zip",
-            "rm install.zip",
-            "cd shop; bin/console system:setup --database-url mysql://${CYPRESS_dbUser-root}:${CYPRESS_dbPassword-root}@${CYPRESS_dbHost-localhost}/${CYPRESS_dbName-shopware} --app-url ${INSTALL_URL-${CYPRESS_baseUrl-http://localhost:8000}} -f -n",
-            "echo PROJECT_ROOT=$PWD/shop >> shop/.env",
-            "cd shop; APP_URL=${INSTALL_URL-${CYPRESS_baseUrl-http://localhost:8000}} bin/console system:install --basic-setup --create-database --drop-database --force -n",
-            "cd shop; bin/console system:config:set core.frw.completedAt '2019-10-07T10:46:23+00:00'",
-            "cd shop; bin/console system:config:set core.store.apiUri http://localhost:8060",
-            "cd shop; bin/console system:config:set core.update.apiUri http://localhost:8060",
-            "cd shop; composer config repositories.0 '{\"type\": \"path\", \"url\": \"../src/*\"}'",
-            "cd shop; sed -i '/\\$this->verifyResponseSignature(\\$response);/d' vendor/shopware/core/Framework/Update/Services/ApiClient.php",
-            "cd shop; sed -i 's/\\$signatureHeaderName = self::SHOPWARE_SIGNATURE_HEADER;/return \\$response;/g' vendor/shopware/core/Framework/Store/Services/VerifyResponseSignatureMiddleware.php",
-            "cd src/WebInstaller; composer install",
-            "cd src/WebInstaller; composer build-phar",
-            "mv src/WebInstaller/shopware-installer.phar.php shop/public/shopware-installer.phar.php"
-        ],
-        "e2e:web-update:start": [
-            "@putenv SW_RECOVERY_NEXT_VERSION=6.6.99.9",
-            "@putenv SW_RECOVERY_NEXT_BRANCH=dev-trunk",
-            "@putenv CYPRESS_SKIP_INIT=1",
-            "symfony local:server:stop --dir=shop",
-            "symfony local:server:stop --dir=tests/e2e/update-api-mock",
-            "APP_URL=${INSTALL_URL-${CYPRESS_baseUrl-http://localhost:8000}} symfony local:server:start --dir=shop --port=8050 -d",
-            "symfony local:server:start --dir=tests/e2e/update-api-mock --port=8060 -d"
-        ],
         "ecs": "php-cs-fixer fix --dry-run --diff",
         "ecs-fix": "php-cs-fixer fix",
         "eslint": [
             "@eslint:admin",
-            "@eslint:storefront",
-            "@eslint:e2e"
+            "@eslint:storefront"
         ],
         "eslint:admin": "@npm:admin run lint:all",
         "eslint:admin:fix": "@npm:admin run lint:fix",
         "format:admin": "@npm:admin run format",
         "format:admin:fix": "@npm:admin run format:fix",
-        "eslint:e2e": "@npm:e2e run lint",
-        "eslint:e2e:fix": "@npm:e2e run lint:fix",
         "eslint:storefront": "@npm:storefront run lint:js",
         "eslint:storefront:fix": "@npm:storefront run lint:js:fix",
         "framework:schema:dump": "@php bin/console -e prod framework:schema -s 'entity-schema' src/Administration/Resources/app/administration/test/_mocks_/entity-schema.json",
@@ -447,7 +373,6 @@
         "init:db": [
             "@php bin/console system:install --drop-database --basic-setup --force --no-assign-theme"
         ],
-        "init:e2e": "@npm:e2e clean-install --no-audit --prefer-offline",
         "init:js": [
             "@npm:admin clean-install --no-audit --prefer-offline",
             "@npm:storefront clean-install --no-audit --prefer-offline",
@@ -475,8 +400,6 @@
         "npm:admin:check-license": "export ALLOWED_LICENSES=\"$(sed -z 's/\\n/;/g' .allowed-licenses)\"; cd src/Administration/Resources/app/administration; bash -c \"node_modules/.bin/license-checker-rseidelsohn --onlyAllow \\\"$ALLOWED_LICENSES\\\" --excludePrivatePackages\"",
         "npm:component-library": "@npm:component-library:bin npm",
         "npm:component-library:bin": "export PROJECT_ROOT=\"$PWD\"; cd src/Administration/Resources/app/administration/build/nuxt-component-library; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$PROJECT_ROOT\"/bin/exec-with-env ",
-        "npm:e2e": "@npm:e2e:bin npm",
-        "npm:e2e:bin": "export CYPRESS_shopwareRoot=\"$PWD\"; cd tests/e2e; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$CYPRESS_shopwareRoot\"/bin/exec-with-env ",
         "npm:storefront": "@npm:storefront:bin npm",
         "npm:storefront:bin": "export PROJECT_ROOT=\"$PWD\"; cd src/Storefront/Resources/app/storefront; export PATH=\"$PWD/node_modules/.bin/:$PATH\"; \"$PROJECT_ROOT\"/bin/exec-with-env ",
         "npm:storefront:check-license": "export ALLOWED_LICENSES=\"$(sed -z 's/\\n/;/g' .allowed-licenses)\"; cd src/Storefront/Resources/app/storefront; bash -c \"node_modules/.bin/license-checker-rseidelsohn --onlyAllow \\\"$ALLOWED_LICENSES\\\" --excludePrivatePackages\"",

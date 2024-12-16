@@ -31,7 +31,7 @@ class AclCriteriaValidatorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->validator = $this->getContainer()->get(AclCriteriaValidator::class);
+        $this->validator = static::getContainer()->get(AclCriteriaValidator::class);
     }
 
     /**

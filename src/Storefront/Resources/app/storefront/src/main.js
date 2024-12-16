@@ -28,9 +28,10 @@ import TimezoneUtil from 'src/utility/timezone/timezone.util';
 import BootstrapUtil from 'src/utility/bootstrap/bootstrap.util';
 
 /*
-import plugins
+import (synchronously) plugins
  */
 import SetBrowserClassPlugin from 'src/plugin/set-browser-class/set-browser-class.plugin';
+import SpeculationRulesPlugin from 'src/plugin/speculation-rules/speculation-rules.plugin';
 
 window.eventEmitter = new NativeEventEmitter();
 window.focusHandler = new FocusHandler();
@@ -78,6 +79,7 @@ PluginManager.register('GallerySlider', () => import('src/plugin/slider/gallery-
 PluginManager.register('ProductSlider', () => import('src/plugin/slider/product-slider.plugin'), '[data-product-slider]');
 PluginManager.register('ZoomModal', () => import('src/plugin/zoom-modal/zoom-modal.plugin'), '[data-zoom-modal]');
 PluginManager.register('Magnifier', () => import('src/plugin/magnifier/magnifier.plugin'), '[data-magnifier]');
+PluginManager.register('SpeculationRules', SpeculationRulesPlugin, '[data-speculation-rules]');
 PluginManager.register('VariantSwitch', () => import('src/plugin/variant-switch/variant-switch.plugin'), '[data-variant-switch]');
 PluginManager.register('RemoteClick', () => import('src/plugin/remote-click/remote-click.plugin'), '[data-remote-click]');
 PluginManager.register('AddressEditor', () => import('src/plugin/address-editor/address-editor.plugin'), '[data-address-editor]');

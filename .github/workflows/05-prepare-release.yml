@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'shopware/shopware'
     env:
       SHOPWARE_ADMIN_SKIP_SOURCEMAP_GENERATION: "1"
@@ -53,7 +53,7 @@ jobs:
             !vendor-bin
 
   check-recipe:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'shopware/shopware'
     env:
       GH_TOKEN: ${{ github.token }}
@@ -71,7 +71,7 @@ jobs:
 
   split:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     # we use this image to get an older git version, which does not suffer from a performance regression
     container: alpine:3.19
@@ -133,7 +133,7 @@ jobs:
 
   draft-release-notes:
     needs: split
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'shopware/shopware'
     permissions:
       contents: write
@@ -153,7 +153,7 @@ jobs:
 
   create-sbp-release:
     needs: split
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.repository == 'shopware/shopware'
     strategy:
       matrix:

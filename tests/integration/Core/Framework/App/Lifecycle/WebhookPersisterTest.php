@@ -22,8 +22,8 @@ class WebhookPersisterTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->persister = $this->getContainer()->get(WebhookPersister::class);
-        $this->connection = $this->getContainer()->get(Connection::class);
+        $this->persister = static::getContainer()->get(WebhookPersister::class);
+        $this->connection = static::getContainer()->get(Connection::class);
     }
 
     public function testUpdateWebhooksFromArray(): void
@@ -211,7 +211,7 @@ class WebhookPersisterTest extends TestCase
             ],
         ];
 
-        $this->getContainer()->get('app.repository')->create([$app], Context::createDefaultContext());
+        static::getContainer()->get('app.repository')->create([$app], Context::createDefaultContext());
 
         return $id;
     }

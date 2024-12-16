@@ -52,7 +52,7 @@ class KeyFetcherTest extends TestCase
             $client,
             $storeRequestOptionsProvider,
             new StaticSystemConfigService(),
-            $this->getContainer()->get('logger')
+            static::getContainer()->get('logger')
         );
 
         $key = $keyFetcher->getKey(Context::createDefaultContext());
@@ -84,7 +84,7 @@ class KeyFetcherTest extends TestCase
             new StaticSystemConfigService([
                 KeyFetcher::CORE_STORE_JWKS => $jwks,
             ]),
-            $this->getContainer()->get('logger')
+            static::getContainer()->get('logger')
         );
 
         $key = $keyFetcher->getKey(Context::createDefaultContext());
@@ -122,7 +122,7 @@ class KeyFetcherTest extends TestCase
             $client,
             $storeRequestOptionsProvider,
             new StaticSystemConfigService(),
-            $this->getContainer()->get('logger')
+            static::getContainer()->get('logger')
         );
 
         $key = $keyFetcher->getKey(Context::createDefaultContext(), true);

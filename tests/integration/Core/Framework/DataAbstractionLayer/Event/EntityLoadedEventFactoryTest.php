@@ -35,8 +35,8 @@ class EntityLoadedEventFactoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->productRepository = $this->getContainer()->get('product.repository');
-        $this->entityLoadedEventFactory = $this->getContainer()->get(EntityLoadedEventFactory::class);
+        $this->productRepository = static::getContainer()->get('product.repository');
+        $this->entityLoadedEventFactory = static::getContainer()->get(EntityLoadedEventFactory::class);
         $this->ids = new IdsCollection();
     }
 

@@ -52,10 +52,10 @@ class InAppPurchaseTest extends TestCase
                 new StaticSystemConfigService(),
                 new JWTDecoder(),
                 new KeyFetcher(
-                    $this->getContainer()->get('shopware.store_client'),
-                    $this->getContainer()->get(StoreRequestOptionsProvider::class),
+                    static::getContainer()->get('shopware.store_client'),
+                    static::getContainer()->get(StoreRequestOptionsProvider::class),
                     new StaticSystemConfigService(),
-                    $this->getContainer()->get('logger')
+                    static::getContainer()->get('logger')
                 )
             )
         );
@@ -99,10 +99,10 @@ class InAppPurchaseTest extends TestCase
                 $this->staticSystemConfigService,
                 new JWTDecoder(),
                 new KeyFetcher(
-                    $this->getContainer()->get('shopware.store_client'),
-                    $this->getContainer()->get(StoreRequestOptionsProvider::class),
+                    static::getContainer()->get('shopware.store_client'),
+                    static::getContainer()->get(StoreRequestOptionsProvider::class),
                     $this->staticSystemConfigService,
-                    $this->getContainer()->get('logger')
+                    static::getContainer()->get('logger')
                 )
             )
         );

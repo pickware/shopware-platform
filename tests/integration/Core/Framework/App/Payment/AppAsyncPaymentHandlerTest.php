@@ -421,6 +421,6 @@ class AppAsyncPaymentHandlerTest extends AbstractAppPaymentHandlerTestCase
         static::assertNotEmpty($token);
         static::assertIsString($token);
 
-        return $this->getContainer()->get(JWTFactoryV2::class)->parseToken($token);
+        return static::getContainer()->get(JWTFactoryV2::class)->parseToken($token);
     }
 }

@@ -9,7 +9,7 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
       COMPOSER_ROOT_VERSION: 6.6.9999999-dev
@@ -47,7 +47,7 @@ jobs:
 
   jest:
     name: "Jest Storefront"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       APP_ENV: prod
       APP_URL: http://localhost:8000
@@ -71,7 +71,7 @@ jobs:
           npm run unit -- --silent
 
   license-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: "License check"
     env:
       WHITELISTED_JS_PACKAGES: "abab@2.0.1;administration;taffydb@2.6.2"

@@ -60,10 +60,10 @@ class CartRestorerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = $this->getContainer()->get(Connection::class);
-        $this->cartService = $this->getContainer()->get(CartService::class);
+        $this->connection = static::getContainer()->get(Connection::class);
+        $this->cartService = static::getContainer()->get(CartService::class);
 
-        $this->eventDispatcher = $this->getContainer()->get('event_dispatcher');
+        $this->eventDispatcher = static::getContainer()->get('event_dispatcher');
 
         $this->events = [];
 
@@ -71,11 +71,11 @@ class CartRestorerTest extends TestCase
             $this->events[$event::class] = $event;
         };
 
-        $this->contextPersister = $this->getContainer()->get(SalesChannelContextPersister::class);
+        $this->contextPersister = static::getContainer()->get(SalesChannelContextPersister::class);
         /** @var AbstractSalesChannelContextFactory $contextFactory */
-        $contextFactory = $this->getContainer()->get(SalesChannelContextFactory::class);
-        $cartRuleLoader = $this->getContainer()->get(CartRuleLoader::class);
-        $requestStack = $this->getContainer()->get(RequestStack::class);
+        $contextFactory = static::getContainer()->get(SalesChannelContextFactory::class);
+        $cartRuleLoader = static::getContainer()->get(CartRuleLoader::class);
+        $requestStack = static::getContainer()->get(RequestStack::class);
 
         $this->customerId = $this->createCustomer()->getId();
 
@@ -272,7 +272,7 @@ class CartRestorerTest extends TestCase
 
         static::assertCount(1, $cart->getLineItems());
 
-        $this->getContainer()->get('product.repository')->delete([[
+        static::getContainer()->get('product.repository')->delete([[
             'id' => $productLineItem->getReferencedId(),
         ]], $customerContext->getContext());
 
@@ -324,7 +324,7 @@ class CartRestorerTest extends TestCase
         );
 
         // Delete 1 saved item
-        $this->getContainer()->get('product.repository')->delete([[
+        static::getContainer()->get('product.repository')->delete([[
             'id' => $productLineItem3->getReferencedId(),
         ]], $customerContext->getContext());
 
@@ -376,7 +376,7 @@ class CartRestorerTest extends TestCase
         $this->contextPersister->save($customerToken, [], $currentContext->getSalesChannel()->getId(), $this->customerId);
 
         $customerCart = new Cart($customerToken);
-        $this->getContainer()->get(CartPersister::class)->save($customerCart, $customerContext);
+        static::getContainer()->get(CartPersister::class)->save($customerCart, $customerContext);
 
         $this->eventDispatcher->addListener(BeforeCartMergeEvent::class, $this->callbackFn);
         $this->eventDispatcher->addListener(CartMergedEvent::class, $this->callbackFn);
@@ -411,7 +411,7 @@ class CartRestorerTest extends TestCase
 
         $currentContext = $this->createSalesChannelContext($currentContextToken);
 
-        $con = $this->getContainer()->get(Connection::class);
+        $con = static::getContainer()->get(Connection::class);
 
         $con->insert('sales_channel_api_context', [
             'token' => Uuid::randomHex(),
@@ -444,7 +444,7 @@ class CartRestorerTest extends TestCase
                 ['salesChannelId' => TestDefaults::SALES_CHANNEL, 'visibility' => ProductVisibilityDefinition::VISIBILITY_ALL],
             ],
         ];
-        $this->getContainer()->get('product.repository')->create([$data], $context);
+        static::getContainer()->get('product.repository')->create([$data], $context);
 
         return $productId;
     }
@@ -456,7 +456,7 @@ class CartRestorerTest extends TestCase
             $salesChannelData[SalesChannelContextService::CUSTOMER_ID] = $customerId;
         }
 
-        return $this->getContainer()->get(SalesChannelContextFactory::class)->create(
+        return static::getContainer()->get(SalesChannelContextFactory::class)->create(
             $contextToken,
             TestDefaults::SALES_CHANNEL
         );
@@ -518,7 +518,7 @@ class CartRestorerTest extends TestCase
             $customer['defaultPaymentMethodId'] = $this->getValidPaymentMethodId();
         }
 
-        $repo = $this->getContainer()->get('customer.repository');
+        $repo = static::getContainer()->get('customer.repository');
 
         $repo->create([$customer], Context::createDefaultContext());
 
@@ -555,7 +555,7 @@ class CartRestorerTest extends TestCase
         $cart->addLineItems(new LineItemCollection($lineItems));
         $cart->markUnmodified();
 
-        $this->getContainer()->get(CartPersister::class)->save($cart, $context);
+        static::getContainer()->get(CartPersister::class)->save($cart, $context);
 
         static::assertTrue($this->cartExists($context->getToken()));
         static::assertTrue($this->contextExists($context->getToken()));

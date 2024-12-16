@@ -42,7 +42,7 @@ class AdminExtensionApiControllerTest extends TestCase
 
     protected function setUp(): void
     {
-        $container = $this->getContainer();
+        $container = static::getContainer();
         $this->appRepository = $container->get('app.repository');
         $this->executor = $this->createMock(Executor::class);
         $this->context = Context::createDefaultContext();

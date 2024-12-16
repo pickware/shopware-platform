@@ -74,15 +74,15 @@ class ManyToOneAssociationFieldResolverTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->resolver = $this->getContainer()->get(ManyToOneAssociationFieldResolver::class);
-        $this->queryBuilder = new QueryBuilder($this->getContainer()->get(Connection::class));
-        $this->definitionInstanceRegistry = $this->getContainer()->get(DefinitionInstanceRegistry::class);
-        $this->orderRepository = $this->getContainer()->get('order.repository');
-        $this->productRepository = $this->getContainer()->get('product.repository');
-        $this->documentRepository = $this->getContainer()->get('document.repository');
-        $this->connection = $this->getContainer()->get(Connection::class);
+        $this->resolver = static::getContainer()->get(ManyToOneAssociationFieldResolver::class);
+        $this->queryBuilder = new QueryBuilder(static::getContainer()->get(Connection::class));
+        $this->definitionInstanceRegistry = static::getContainer()->get(DefinitionInstanceRegistry::class);
+        $this->orderRepository = static::getContainer()->get('order.repository');
+        $this->productRepository = static::getContainer()->get('product.repository');
+        $this->documentRepository = static::getContainer()->get('document.repository');
+        $this->connection = static::getContainer()->get(Connection::class);
         $this->context = Context::createDefaultContext();
-        $this->salesChannelContext = $this->getContainer()->get(SalesChannelContextFactory::class)->create(
+        $this->salesChannelContext = static::getContainer()->get(SalesChannelContextFactory::class)->create(
             Uuid::randomHex(),
             TestDefaults::SALES_CHANNEL,
             [SalesChannelContextService::CUSTOMER_ID => $this->createCustomer()]
@@ -275,7 +275,7 @@ class ManyToOneAssociationFieldResolverTest extends TestCase
                     ->build()
             );
 
-        $connection = $this->getContainer()->get(Connection::class);
+        $connection = static::getContainer()->get(Connection::class);
 
         $context = Context::createDefaultContext();
         $this->productRepository->create([$p->build()], $context);

@@ -61,6 +61,9 @@
     "sw-desktop": {
       "stagingBarText": "The Shop is in staging mode."
     },
+    "sw-skip-link": {
+      "label": "Skip to content"
+    },
     "notification-center": {
       "title": "Notifications",
       "emptyText": "Nothing going on lately.",
@@ -150,6 +153,7 @@
       "textProjectName": "Administration",
       "administrator": "Administrator",
       "navigation": {
+        "label": "Main navigation",
         "mainMenuItemCatalogue": "Catalogues",
         "mainMenuItemContent": "Content",
         "mainMenuItemMarketing": "Marketing"
@@ -165,6 +169,9 @@
         "emptyMessageNoProducts": "No products found",
         "emptyMessageNoSearchResults": "No products found for \"{term}\""
       }
+    },
+    "accessibility": {
+      "optionWarning": "In the interest of accessibility, it is not recommended to activate this option."
     },
     "sw-field": {
       "notification": {
@@ -240,7 +247,9 @@
       "labelDeSelectAll": "Deselect all",
       "maximumSelectionExceed": "Maximum amount of items selected",
       "columnsActions": "Column actions",
-      "actionsMenu": "Open actions menu"
+      "actionsMenu": "Open actions menu",
+      "labelSelectAll": "Select all",
+      "labelSelected": "Selected"
     },
     "sw-pagination": {
       "labelItemsPerPage": "Items per page:",
@@ -721,14 +730,13 @@
         "orderTagRule": "Order with tag",
         "orderTrackingCodeRule": "Tracking code",
         "orderDeliveryStatusRule": "Delivery status",
-        "orderCreatedByAdminRule": "Order created by admin",
+        "orderCreatedByAdminRule": "Order created by administrator (flow)",
+        "adminSalesChannelSourceRule": "Applicable in Administration",
         "orderTransactionStatusRule": "Payment status",
         "orderStatusRule": "Order status",
         "orderCustomFieldRule": "Order with custom field",
         "orderDocumentTypeRule": "Order with document",
         "orderDocumentTypeSentRule": "Order with sent document",
-        "yes": "Yes",
-        "no": "No",
         "withTime": "Including timestamp",
         "withoutTime": "Excluding timestamp",
         "and": "And",
@@ -965,23 +973,28 @@
       },
       "orderCreatedByAdmin": {
         "shouldOrderBeCreatedByAdmin": {
-          "placeholder": "Select condition ..."
+          "placeholder": "Select condition..."
+        }
+      },
+      "adminSalesChannelSource": {
+        "hasAdminSalesChannelSource": {
+          "placeholder": "Select condition..."
         }
       },
       "orderTransactionStatus": {
         "stateIds": {
-          "placeholder": "Select state ..."
+          "placeholder": "Select state..."
         },
         "operator": {
-          "placeholder": "Select operator ..."
+          "placeholder": "Select operator..."
         }
       },
       "orderStatus": {
         "stateIds": {
-          "placeholder": "Select state ..."
+          "placeholder": "Select state..."
         },
         "operator": {
-          "placeholder": "Select operator ..."
+          "placeholder": "Select operator..."
         }
       }
     },
@@ -1269,6 +1282,14 @@
       "textDeleteChildrenConfirm": "All subcategories will be deleted too."
     }
   },
+  "sw-tree-item": {
+    "toggleTreeItem": "Toggle tree item \"{name}\"",
+    "toggleItem": "Toggle item \"{name}\"",
+    "childrenLabel": "Subitems for \"{name}\""
+  },
+  "sw-sidebar-collapse": {
+    "collapseIndicator": "Collapse sidebar"
+  },
   "sw-category-tree-field": {
     "emptySearchResults": "No categories found."
   },
@@ -1524,7 +1545,6 @@
         "explanationHeader": "We have noticed a change in your shop domain.",
         "explanation": "Installed apps are still connected with the old domain and won't work with the new domain. There are three options from here to proceed.",
         "confirmation": "Confirm",
-        "cancellation": "Cancel",
         "success": "Domain changed.",
         "error": "Error while changing domain for apps"
       },

@@ -45,12 +45,12 @@ class CustomerVatIdentificationValidatorTest extends TestCase
         $this->countries = $this->getCountries();
 
         $this->executionContext = new ExecutionContext(
-            $this->getContainer()->get(HappyPathValidator::class),
+            static::getContainer()->get(HappyPathValidator::class),
             null,
-            $this->getContainer()->get(TranslatorInterface::class),
+            static::getContainer()->get(TranslatorInterface::class),
         );
 
-        $connection = $this->getContainer()->get(Connection::class);
+        $connection = static::getContainer()->get(Connection::class);
 
         $this->validator = new CustomerVatIdentificationValidator($connection);
 
@@ -351,7 +351,7 @@ class CustomerVatIdentificationValidatorTest extends TestCase
 
         $criteria->addFilter(new EqualsAnyFilter('iso', self::COUNTRY_ISO));
 
-        $repo = $this->getContainer()->get('country.repository');
+        $repo = static::getContainer()->get('country.repository');
 
         $countries = $repo->search($criteria, $context)->fmap(function (CountryEntity $country) {
             return $country->getIso();

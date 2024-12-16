@@ -22,7 +22,7 @@ class Migration1733136208AddH1ToCmsCategoryListingTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->connection = $this->getContainer()->get(Connection::class);
+        $this->connection = static::getContainer()->get(Connection::class);
     }
 
     public function testMigrationAddsH1ToDefaultListingLayout(): void

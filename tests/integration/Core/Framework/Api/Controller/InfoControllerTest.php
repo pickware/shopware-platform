@@ -20,6 +20,7 @@ use Shopware\Core\Framework\Api\Route\ApiRouteInfoResolver;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Event\BusinessEventCollector;
 use Shopware\Core\Framework\Event\CustomerAware;
+use Shopware\Core\Framework\Event\CustomerGroupAware;
 use Shopware\Core\Framework\Event\MailAware;
 use Shopware\Core\Framework\Event\OrderAware;
 use Shopware\Core\Framework\Event\SalesChannelAware;
@@ -319,6 +320,8 @@ class InfoControllerTest extends TestCase
                 'aware' => [
                     CustomerAware::class,
                     lcfirst((new \ReflectionClass(CustomerAware::class))->getShortName()),
+                    CustomerGroupAware::class,
+                    lcfirst((new \ReflectionClass(CustomerGroupAware::class))->getShortName()),
                     MailAware::class,
                     lcfirst((new \ReflectionClass(MailAware::class))->getShortName()),
                     SalesChannelAware::class,
@@ -389,9 +392,9 @@ class InfoControllerTest extends TestCase
             static::getContainer()->get(AppUrlVerifier::class),
             static::getContainer()->get('router'),
             $eventCollector,
-            $this->getContainer()->get(SystemConfigService::class),
-            $this->getContainer()->get(ApiRouteInfoResolver::class),
-            $this->getContainer()->get(InAppPurchase::class),
+            static::getContainer()->get(SystemConfigService::class),
+            static::getContainer()->get(ApiRouteInfoResolver::class),
+            static::getContainer()->get(InAppPurchase::class),
         );
 
         $infoController->setContainer($this->createMock(Container::class));
@@ -454,9 +457,9 @@ class InfoControllerTest extends TestCase
             static::getContainer()->get(AppUrlVerifier::class),
             static::getContainer()->get('router'),
             $eventCollector,
-            $this->getContainer()->get(SystemConfigService::class),
-            $this->getContainer()->get(ApiRouteInfoResolver::class),
-            $this->getContainer()->get(InAppPurchase::class),
+            static::getContainer()->get(SystemConfigService::class),
+            static::getContainer()->get(ApiRouteInfoResolver::class),
+            static::getContainer()->get(InAppPurchase::class),
         );
 
         $infoController->setContainer($this->createMock(Container::class));
@@ -533,9 +536,9 @@ class InfoControllerTest extends TestCase
             static::getContainer()->get(AppUrlVerifier::class),
             static::getContainer()->get('router'),
             $eventCollector,
-            $this->getContainer()->get(SystemConfigService::class),
-            $this->getContainer()->get(ApiRouteInfoResolver::class),
-            $this->getContainer()->get(InAppPurchase::class),
+            static::getContainer()->get(SystemConfigService::class),
+            static::getContainer()->get(ApiRouteInfoResolver::class),
+            static::getContainer()->get(InAppPurchase::class),
         );
 
         $infoController->setContainer($this->createMock(Container::class));

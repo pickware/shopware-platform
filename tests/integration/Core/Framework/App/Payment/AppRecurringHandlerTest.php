@@ -33,7 +33,7 @@ class AppRecurringHandlerTest extends AbstractAppPaymentHandlerTestCase
 
         $this->appendNewResponse($this->signResponse($response->jsonSerialize()));
 
-        $paymentHandler = $this->getContainer()->get(AppPaymentHandler::class);
+        $paymentHandler = static::getContainer()->get(AppPaymentHandler::class);
         $paymentHandler->recurring($this->getRecurringStruct(), Context::createDefaultContext());
 
         $request = $this->getLastRequest();
@@ -74,7 +74,7 @@ class AppRecurringHandlerTest extends AbstractAppPaymentHandlerTestCase
 
         $this->appendNewResponse($this->signResponse($response->jsonSerialize()));
 
-        $paymentHandler = $this->getContainer()->get(AppPaymentHandler::class);
+        $paymentHandler = static::getContainer()->get(AppPaymentHandler::class);
 
         try {
             $paymentHandler->recurring($this->getRecurringStruct(), Context::createDefaultContext());
@@ -103,7 +103,7 @@ FOO_BAR_ERROR_MESSAGE', $e->getMessage());
 
         $this->appendNewResponse(new Response(200, [], $json));
 
-        $paymentHandler = $this->getContainer()->get(AppPaymentHandler::class);
+        $paymentHandler = static::getContainer()->get(AppPaymentHandler::class);
 
         try {
             $paymentHandler->recurring($this->getRecurringStruct(), Context::createDefaultContext());
@@ -131,7 +131,7 @@ FOO_BAR_ERROR_MESSAGE', $e->getMessage());
 
         $this->appendNewResponse(new Response(200, ['shopware-app-signature' => 'invalid'], $json));
 
-        $paymentHandler = $this->getContainer()->get(AppPaymentHandler::class);
+        $paymentHandler = static::getContainer()->get(AppPaymentHandler::class);
 
         try {
             $paymentHandler->recurring($this->getRecurringStruct(), Context::createDefaultContext());

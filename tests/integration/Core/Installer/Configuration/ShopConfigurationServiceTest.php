@@ -20,7 +20,7 @@ class ShopConfigurationServiceTest extends TestCase
     {
         $service = new ShopConfigurationService();
 
-        $connection = $this->getContainer()->get(Connection::class);
+        $connection = static::getContainer()->get(Connection::class);
 
         $service->updateShop([
             'name' => 'test-shop',

@@ -23,7 +23,6 @@ parameters:
         - src/WebInstaller/stub.php
         - src/WebInstaller/vendor(?)
         - src/WebInstaller/Tests/_fixtures
-        - tests/e2e/cypress
 
         # vendor patches over autoload files
         - src/Core/Framework/Adapter/Doctrine/Patch/AbstractAsset.php

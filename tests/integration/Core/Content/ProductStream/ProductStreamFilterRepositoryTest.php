@@ -38,8 +38,8 @@ class ProductStreamFilterRepositoryTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->repository = $this->getContainer()->get('product_stream_filter.repository');
-        $this->productStreamRepository = $this->getContainer()->get('product_stream.repository');
+        $this->repository = static::getContainer()->get('product_stream_filter.repository');
+        $this->productStreamRepository = static::getContainer()->get('product_stream.repository');
         $this->streamId = Uuid::randomHex();
         $this->context = Context::createDefaultContext();
         $this->productStreamRepository->upsert([['id' => $this->streamId, 'name' => 'Test stream']], $this->context);

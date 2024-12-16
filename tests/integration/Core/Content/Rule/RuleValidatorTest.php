@@ -39,8 +39,8 @@ class RuleValidatorTest extends TestCase
     protected function setUp(): void
     {
         $this->context = Context::createDefaultContext();
-        $this->ruleRepository = $this->getContainer()->get('rule.repository');
-        $this->ruleConditionRepository = $this->getContainer()->get('rule_condition.repository');
+        $this->ruleRepository = static::getContainer()->get('rule.repository');
+        $this->ruleConditionRepository = static::getContainer()->get('rule_condition.repository');
     }
 
     /**
