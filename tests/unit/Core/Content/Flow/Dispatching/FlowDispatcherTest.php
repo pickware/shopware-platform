@@ -21,6 +21,7 @@ use Shopware\Core\Content\Flow\Dispatching\StorableFlow;
 use Shopware\Core\Content\Flow\Dispatching\Struct\Flow;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Content\Flow\FlowException;
+use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Event\FlowLogEvent;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
@@ -90,8 +91,6 @@ class FlowDispatcherTest extends TestCase
     public function testDispatchWithoutFlows(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
@@ -134,7 +133,7 @@ class FlowDispatcherTest extends TestCase
         }
 
         if (!Feature::isActive('v6.7.0.0')) {
-            $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
+            $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
             $this->flowFactory->expects(static::once())
                 ->method('create')
                 ->willReturn($flow);
@@ -158,13 +157,7 @@ class FlowDispatcherTest extends TestCase
     public function testSequenceExceptionsAreLogged(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
         $this->dispatcher->expects(static::exactly(2))
@@ -233,8 +226,6 @@ class FlowDispatcherTest extends TestCase
     public function testGenericExceptionsAreLogged(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
@@ -295,8 +286,6 @@ class FlowDispatcherTest extends TestCase
     public function testExceptionsAreLoggedAndExecutionContinuesWhenNestedTransactionsWithSavePointsIsEnabled(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $this->dispatcher->method('dispatch')->willReturnOnConsecutiveCalls(
