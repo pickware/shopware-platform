@@ -26,6 +26,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Uuid\Uuid;
+use Shopware\Core\Test\Generator;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -75,19 +76,13 @@ class BufferedFlowExecutorTest extends TestCase
 
     public function testExecutesBufferedEvents(): void
     {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
 
         $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
 
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
+        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
         $flowLoader = $this->createMock(FlowLoader::class);
@@ -124,7 +119,7 @@ class BufferedFlowExecutorTest extends TestCase
                         'successful' => true,
                     ],
                 ],
-                $context,
+                $event->getContext(),
             );
 
         $this->flowExecutor->executeBufferedEvents();
@@ -132,19 +127,13 @@ class BufferedFlowExecutorTest extends TestCase
 
     public function testExecuteBufferedEventsWithoutFlows(): void
     {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
 
         $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
 
-        $flow = new StorableFlow('name', $context, [], []);
+        $flow = new StorableFlow('name', $event->getContext(), [], []);
         $this->flowFactoryMock->expects(static::once())
             ->method('create')
             ->willReturn($flow);
@@ -166,19 +155,13 @@ class BufferedFlowExecutorTest extends TestCase
 
     public function testSequenceExceptionsAreLogged(): void
     {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
 
         $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
 
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
+        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
         $flowLoader = $this->createMock(FlowLoader::class);
@@ -239,7 +222,7 @@ class BufferedFlowExecutorTest extends TestCase
                         'failedFlowSequenceId' => 'sequence-1',
                     ],
                 ],
-                $context,
+                $event->getContext(),
             );
 
         $this->flowExecutor->executeBufferedEvents();
@@ -247,19 +230,13 @@ class BufferedFlowExecutorTest extends TestCase
 
     public function testGenericExceptionsAreLogged(): void
     {
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
 
         $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
 
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
+        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
         $flowLoader = $this->createMock(FlowLoader::class);
@@ -313,7 +290,7 @@ class BufferedFlowExecutorTest extends TestCase
                         'errorMessage' => 'Flow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found',
                     ],
                 ],
-                $context,
+                $event->getContext(),
             );
 
         $this->flowExecutor->executeBufferedEvents();
@@ -322,19 +299,13 @@ class BufferedFlowExecutorTest extends TestCase
     public function testExceptionsAreLoggedAndExecutionContinuesWhenNestedTransactionsWithSavePointsIsEnabled(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
-        $context = Context::createDefaultContext();
-        $order = new OrderEntity();
-        $event = new CheckoutOrderPlacedEvent(
-            $context,
-            $order,
-            Defaults::SALES_CHANNEL_TYPE_STOREFRONT
-        );
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
 
         $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
 
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $context, [], []);
+        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
         $flowLoader = $this->createMock(FlowLoader::class);
@@ -394,9 +365,16 @@ class BufferedFlowExecutorTest extends TestCase
                         'failedFlowSequenceId' => 'sequence-1',
                     ],
                 ],
-                $context,
+                $event->getContext(),
             );
 
         $this->flowExecutor->executeBufferedEvents();
+    }
+
+    private function createCheckoutOrderPlacedEvent(OrderEntity $order): CheckoutOrderPlacedEvent
+    {
+        $context = Generator::createSalesChannelContext();
+
+        return new CheckoutOrderPlacedEvent($context, $order);
     }
 }
