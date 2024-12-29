@@ -50,6 +50,10 @@ async function createWrapper(privileges = [], customFlowExecutionData = [{}], cu
                 'sw-context-menu-item': await wrapTestComponent('sw-context-menu-item'),
                 'sw-empty-state': true,
                 'sw-search-bar': true,
+                'sw-ai-copilot-badge': true,
+                'sw-extension-component-section': true,
+                'sw-context-button': true,
+                'sw-loader': true,
                 'sw-time-ago': true,
                 'router-link': true,
             },
@@ -76,6 +80,7 @@ async function createWrapper(privileges = [], customFlowExecutionData = [{}], cu
                         return customActionTitle;
                     }
                 },
+                searchRankingService: {},
             },
             mocks: {
                 $tc: (key) => {
