@@ -1,0 +1,116 @@
+<!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+{% block sw_flow_detail_executions %}
+<div class="sw-flow-executions-list">
+    <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+    {% block sw_flow_detail_executions_list_content %}
+    <sw-card
+        class="sw-flow-detail-executions-list-card"
+        position-identifier="sw-flow-detail-executions-list-card"
+    >
+        <sw-entity-listing
+            class="sw-flow-detail-executions-list__grid"
+            :show-settings="false"
+            :allow-column-edit="false"
+            :allow-view="acl.can('flow.viewer')"
+            :columns="flowExecutionColumns"
+            :sort-by="sortBy"
+            :sort-direction="sortDirection"
+            :repository="flowExecutionRepository"
+            :criteria="flowExecutionCriteria"
+            :items="flowExecutions"
+            :is-loading="isLoading"
+            :full-page="false"
+            :plain-appearance="false"
+            :show-selection="false"
+            @selection-change="selectionChange"
+        >
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+            {% block sw_flow_execution_list_grid_columns %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_execution_list_columns_date %}
+            <template #column-date="{ item }">
+                <sw-time-ago :date="item.createdAt" />
+            </template>
+                {% endblock %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_execution_list_grid_columns_successful %}
+            <template #column-successful="{ item }">
+                <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                        {% block sw_flow_execution_list_columns_successful_label %}
+                <sw-icon
+                    size="12px"
+                    :color="item.successful ? `#37d046` : `#de294c`"
+                    :name="item.successful ? `regular-checkmark-xs` : `regular-times-s`"
+                    style="align-self: center"
+                />
+                        {% endblock %}
+            </template>
+                {% endblock %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_execution_list_columns_failed_action_name %}
+            <template #column-failedActionName="{ item }">
+                <router-link
+                    v-if="item.failedFlowSequenceId"
+                    :to="{ name: 'sw.flow.detail.flow', params: { id: this.flow.id }, query: { failedFlowSequenceId: item.failedFlowSequenceId } }"
+                >
+                    {{ getActionName(item.failedFlowSequence) }}
+                </router-link>
+            </template>
+                {% endblock %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_execution_list_columns_error_message %}
+            <template #column-errorMessage="{ item }">
+                <p>{{ item.errorMessage }}</p>
+            </template>
+                {% endblock %}
+            {% endblock %}
+
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+            {% block sw_flow_list_grid_actions %}
+            <template #actions="{ item }">
+
+                <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                    {% block sw_flow_list_grid_actions_highlight_failed_sequence %}
+                <sw-context-menu-item
+                    class="sw-flow-list__item-highlight-failed-sequence"
+                    :disabled="!acl.can('flow.viewer') || !item.failedFlowSequence"
+                    @click="onHighlightFailedSequence(item.failedFlowSequenceId)"
+                >
+                    {{ $tc('sw-flow.detail.executions.list.actionHighlightFailedSequence') }}
+                </sw-context-menu-item>
+                    {% endblock %}
+            </template>
+            {% endblock %}
+        </sw-entity-listing>
+
+        <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+        {% block sw_flow_list_empty_state %}
+        <sw-empty-state
+            v-if="!total && !isLoading"
+            class="sw-flow-list__empty-state"
+            :title="$tc('sw-flow.detail.executions.list.emptyStateTitle')"
+            :subline="$tc('sw-flow.detail.executions.list.emptyStateSubTitle')"
+        >
+            <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+                {% block sw_flow_list_empty_state_icon %}
+            <template #icon>
+                <img
+                    :alt="$tc('sw-flow.detail.executions.list.emptyStateTitle')"
+                    :src="assetFilter('/administration/static/img/empty-states/settings-empty-state.svg')"
+                >
+            </template>
+                {% endblock %}
+        </sw-empty-state>
+        {% endblock %}
+
+        <!-- eslint-disable-next-line sw-deprecation-rules/no-twigjs-blocks -->
+        {% block sw_flow_list_modal_content_custom %}
+        {% endblock %}
+    </sw-card>
+    {% endblock %}
+</div>
+{% endblock %}

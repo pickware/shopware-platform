@@ -72,6 +72,7 @@ async function createWrapper(privileges = [], hasSnippetFromApp = false, customF
                 'sw-ai-copilot-badge': true,
                 'sw-context-button': true,
                 'sw-loader': true,
+                'sw-time-ago': true,
                 'router-link': true,
             },
             provide: {

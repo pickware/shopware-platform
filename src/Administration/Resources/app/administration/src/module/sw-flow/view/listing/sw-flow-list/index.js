@@ -71,7 +71,9 @@ export default {
 
             criteria
                 .addSorting(Criteria.sort(this.sortBy, this.sortDirection))
-                .addSorting(Criteria.sort('updatedAt', 'DESC'));
+                .addSorting(Criteria.sort('updatedAt', 'DESC'))
+                .getAssociation('executions')
+                .addSorting(Criteria.sort('createdAt', 'DESC'));
 
             return criteria;
         },
@@ -91,6 +93,14 @@ export default {
                     allowResize: true,
                     routerLink: 'sw.flow.detail',
                     primary: true,
+                },
+                {
+                    property: 'mostRecentFailedExecutionDate',
+                    dataIndex: 'mostRecentFailedExecutionDate',
+                    label: this.$tc('sw-flow.list.labelColumnMostRecentFailedExecutionDate'),
+                    allowResize: false,
+                    multiLine: false,
+                    sortable: false,
                 },
                 {
                     property: 'eventName',

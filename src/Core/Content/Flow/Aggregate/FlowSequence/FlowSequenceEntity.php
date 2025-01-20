@@ -2,6 +2,7 @@
 
 namespace Shopware\Core\Content\Flow\Aggregate\FlowSequence;
 
+use Shopware\Core\Content\Flow\Dispatching\Execution\FlowExecutionCollection;
 use Shopware\Core\Content\Flow\FlowEntity;
 use Shopware\Core\Content\Rule\RuleEntity;
 use Shopware\Core\Framework\App\Aggregate\FlowAction\AppFlowActionEntity;
@@ -47,6 +48,8 @@ class FlowSequenceEntity extends Entity implements IdAware
     protected ?string $appFlowActionId = null;
 
     protected ?AppFlowActionEntity $appFlowAction = null;
+
+    protected ?FlowExecutionCollection $failedExecutions = null;
 
     public function getFlowId(): string
     {
@@ -192,5 +195,15 @@ class FlowSequenceEntity extends Entity implements IdAware
     public function setAppFlowAction(?AppFlowActionEntity $appFlowAction): void
     {
         $this->appFlowAction = $appFlowAction;
+    }
+
+    public function setFailedExecutions(FlowExecutionCollection $failedExecutions): void
+    {
+        $this->failedExecutions = $failedExecutions;
+    }
+
+    public function getFailedExecutions(): ?FlowExecutionCollection
+    {
+        return $this->failedExecutions;
     }
 }

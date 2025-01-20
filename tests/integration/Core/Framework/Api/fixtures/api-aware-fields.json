@@ -1062,6 +1062,8 @@
     "flow.updatedAt",
     "flow_sequence.createdAt",
     "flow_sequence.updatedAt",
+    "flow_execution.createdAt",
+    "flow_execution.updatedAt",
     "flow_template.createdAt",
     "flow_template.updatedAt",
     "customer.id",

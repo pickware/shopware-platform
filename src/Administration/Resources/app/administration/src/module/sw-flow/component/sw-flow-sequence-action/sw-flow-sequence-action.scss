@@ -18,6 +18,11 @@
         }
     }
 
+    .sw-flow-sequence-action__error {
+        border-color: $color-crimson-500;
+        background-color: $color-crimson-50;
+    }
+
     &__error-action {
         p {
             font-size: $font-size-xs;

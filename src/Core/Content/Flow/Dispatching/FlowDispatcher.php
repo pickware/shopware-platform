@@ -11,7 +11,9 @@ use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Event\FlowLogEvent;
+use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
+use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
@@ -49,6 +51,12 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         if (($event instanceof StoppableEventInterface && $event->isPropagationStopped())
             || $event->getContext()->hasState(Context::SKIP_TRIGGER_FLOW)
         ) {
+            return $event;
+        }
+
+        if (Feature::isActive('v6.7.0.0')) {
+            $this->dispatcher->dispatch(new BufferFlowExecutionEvent($event));
+
             return $event;
         }
 
@@ -113,8 +121,12 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         ];
     }
 
+    /**
+     * @deprecated tag:v6.7.0 - reason:replaced - flows will be executed by the BufferedFlowExecutor
+     */
     private function callFlowExecutor(StorableFlow $event): void
     {
+        Feature::triggerDeprecationOrThrow('v6.7.0.0', 'Flows will be executed by the BufferedFlowExecutor');
         $flows = $this->getFlows($event->getName());
 
         if (empty($flows)) {
@@ -124,9 +136,21 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         $flowExecutor = $this->container->get(FlowExecutor::class);
 
         foreach ($flows as $flow) {
+            $executionPayload = [
+                'id' => Uuid::randomBytes(),
+                'flow_id' => hex2bin($flow['id']),
+                'event_data' => json_encode($event->stored()),
+            ];
+
             try {
                 $payload = $flow['payload'];
                 $flowExecutor->execute($payload, $event);
+
+                $executionPayload = array_merge($executionPayload, [
+                    'successful' => 1,
+                    'error_message' => null,
+                    'failed_flow_sequence_id' => null,
+                ]);
             } catch (ExecuteSequenceException $e) {
                 $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
@@ -137,8 +161,22 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
+                $executionPayload = array_merge($executionPayload, [
+                    'successful' => 0,
+                    'error_message' => $e->getMessage(),
+                    'failed_flow_sequence_id' => hex2bin($e->getSequenceId()),
+                ]);
 
                 if ($e->getPrevious() && $this->isInNestedTransaction()) {
+                    $executionPayload = array_merge($executionPayload, [
+                        'successful' => 0,
+                        'error_message' => \sprintf(
+                            'Flow failed in nested transaction: %s',
+                            $e->getPrevious()->getMessage(),
+                        ),
+                        'failed_flow_sequence_id' => null,
+                    ]);
+
                     /**
                      * If we are already in a nested transaction, that does not have save points enabled, we must inform the caller of the rollback.
                      * We do this via an exception, so that the outer transaction can also be rolled back.
@@ -156,6 +194,13 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
+                $executionPayload = array_merge($executionPayload, [
+                    'successful' => 0,
+                    'error_message' => $e->getMessage(),
+                    'failed_flow_sequence_id' => null,
+                ]);
+            } finally {
+                $this->container->get(Connection::class)->insert('flow_execution', $executionPayload);
             }
         }
     }
