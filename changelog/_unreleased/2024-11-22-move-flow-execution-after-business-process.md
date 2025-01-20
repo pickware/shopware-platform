@@ -6,6 +6,8 @@ author: Benedikt Brunner
 author_email: benedikt.brunner@pickware.de
 author_github: Benedikt-Brunner
 ---
+# Core
+* Deprecated Flow execution during business process
 ___
 # Next Major Version Changes
 ## Move flow execution after business process
