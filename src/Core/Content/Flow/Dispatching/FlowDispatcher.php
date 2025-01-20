@@ -136,21 +136,9 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         $flowExecutor = $this->container->get(FlowExecutor::class);
 
         foreach ($flows as $flow) {
-            $executionPayload = [
-                'id' => Uuid::randomBytes(),
-                'flow_id' => hex2bin($flow['id']),
-                'event_data' => json_encode($event->stored()),
-            ];
-
             try {
                 $payload = $flow['payload'];
                 $flowExecutor->execute($payload, $event);
-
-                $executionPayload = array_merge($executionPayload, [
-                    'successful' => 1,
-                    'error_message' => null,
-                    'failed_flow_sequence_id' => null,
-                ]);
             } catch (ExecuteSequenceException $e) {
                 $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
@@ -161,22 +149,8 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
-                $executionPayload = array_merge($executionPayload, [
-                    'successful' => 0,
-                    'error_message' => $e->getMessage(),
-                    'failed_flow_sequence_id' => hex2bin($e->getSequenceId()),
-                ]);
 
                 if ($e->getPrevious() && $this->isInNestedTransaction()) {
-                    $executionPayload = array_merge($executionPayload, [
-                        'successful' => 0,
-                        'error_message' => \sprintf(
-                            'Flow failed in nested transaction: %s',
-                            $e->getPrevious()->getMessage(),
-                        ),
-                        'failed_flow_sequence_id' => null,
-                    ]);
-
                     /**
                      * If we are already in a nested transaction, that does not have save points enabled, we must inform the caller of the rollback.
                      * We do this via an exception, so that the outer transaction can also be rolled back.
@@ -194,13 +168,6 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
-                $executionPayload = array_merge($executionPayload, [
-                    'successful' => 0,
-                    'error_message' => $e->getMessage(),
-                    'failed_flow_sequence_id' => null,
-                ]);
-            } finally {
-                $this->container->get(Connection::class)->insert('flow_execution', $executionPayload);
             }
         }
     }

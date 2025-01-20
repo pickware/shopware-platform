@@ -3,7 +3,6 @@
 namespace Shopware\Core\Content\Flow;
 
 use Shopware\Core\Content\Flow\Aggregate\FlowSequence\FlowSequenceCollection;
-use Shopware\Core\Content\Flow\Dispatching\Execution\FlowExecutionCollection;
 use Shopware\Core\Content\Flow\Dispatching\Struct\Flow;
 use Shopware\Core\Framework\App\Aggregate\FlowEvent\AppFlowEventEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\Entity;
@@ -43,10 +42,6 @@ class FlowEntity extends Entity
     protected bool $invalid;
 
     protected ?FlowSequenceCollection $sequences = null;
-
-    protected ?FlowExecutionCollection $executions = null;
-
-    protected ?\DateTimeInterface $mostRecentFailedExecutionDate = null;
 
     public function getName(): string
     {
@@ -158,25 +153,5 @@ class FlowEntity extends Entity
     public function setAppFlowEventId(?string $appFlowEventId): void
     {
         $this->appFlowEventId = $appFlowEventId;
-    }
-
-    public function getExecutions(): ?FlowExecutionCollection
-    {
-        return $this->executions;
-    }
-
-    public function setExecutions(FlowExecutionCollection $executions): void
-    {
-        $this->executions = $executions;
-    }
-
-    public function getMostRecentFailedExecutionDate(): ?\DateTimeInterface
-    {
-        return $this->mostRecentFailedExecutionDate;
-    }
-
-    public function setMostRecentFailedExecutionDate(?\DateTimeInterface $mostRecentFailedExecutionDate): void
-    {
-        $this->mostRecentFailedExecutionDate = $mostRecentFailedExecutionDate;
     }
 }

@@ -2,7 +2,6 @@
 
 namespace Shopware\Core\Content\Flow\Aggregate\FlowSequence;
 
-use Shopware\Core\Content\Flow\Dispatching\Execution\FlowExecutionDefinition;
 use Shopware\Core\Content\Flow\FlowDefinition;
 use Shopware\Core\Content\Rule\RuleDefinition;
 use Shopware\Core\Framework\App\Aggregate\FlowAction\AppFlowActionDefinition;
@@ -18,7 +17,6 @@ use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\JsonField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ManyToOneAssociationField;
-use Shopware\Core\Framework\DataAbstractionLayer\Field\OneToManyAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ParentAssociationField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\ParentFkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\StringField;
@@ -79,7 +77,6 @@ class FlowSequenceDefinition extends EntityDefinition
             new CustomFields(),
             new FkField('app_flow_action_id', 'appFlowActionId', AppFlowActionDefinition::class),
             new ManyToOneAssociationField('appFlowAction', 'app_flow_action_id', AppFlowActionDefinition::class, 'id', false),
-            new OneToManyAssociationField('failedExecutions', FlowExecutionDefinition::class, 'failed_flow_sequence_id'),
         ]);
     }
 }

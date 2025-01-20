@@ -42,8 +42,6 @@ class BufferedFlowExecutorTest extends TestCase
 
     private MockObject&FlowFactory $flowFactoryMock;
 
-    private MockObject&EntityRepository $flowExecutionRepositoryMock;
-
     private MockObject&ContainerInterface $containerMock;
 
     protected function setUp(): void
@@ -52,11 +50,9 @@ class BufferedFlowExecutorTest extends TestCase
         $this->connectionMock = $this->createMock(Connection::class);
         $this->loggerMock = $this->createMock(LoggerInterface::class);
         $this->flowFactoryMock = $this->createMock(FlowFactory::class);
-        $this->flowExecutionRepositoryMock = $this->createMock(EntityRepository::class);
 
         $this->flowExecutor = new BufferedFlowExecutor(
             $this->containerMock,
-            $this->flowExecutionRepositoryMock
         );
     }
 
@@ -66,7 +62,6 @@ class BufferedFlowExecutorTest extends TestCase
 
         $executor = new BufferedFlowExecutor(
             $this->createMock(ContainerInterface::class),
-            $this->createMock(EntityRepository::class)
         );
 
         static::assertEmpty($executor::getSubscribedEvents());
@@ -106,19 +101,6 @@ class BufferedFlowExecutorTest extends TestCase
         );
 
         $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
-
-        $this->flowExecutionRepositoryMock->expects(static::once())
-            ->method('create')
-            ->with(
-                [
-                    [
-                        'flowId' => 'flow-1',
-                        'eventData' => $flow->stored(),
-                        'successful' => true,
-                    ],
-                ],
-                $event->getContext(),
-            );
 
         $this->flowExecutor->executeBufferedEvents();
     }
@@ -208,89 +190,6 @@ class BufferedFlowExecutorTest extends TestCase
                 })
             );
 
-        $this->flowExecutionRepositoryMock->expects(static::once())
-            ->method('create')
-            ->with(
-                [
-                    [
-                        'flowId' => 'flow-1',
-                        'eventData' => $flow->stored(),
-                        'successful' => false,
-                        'errorMessage' => 'Flow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found',
-                        'failedFlowSequenceId' => 'sequence-1',
-                    ],
-                ],
-                $event->getContext(),
-            );
-
-        $this->flowExecutor->executeBufferedEvents();
-    }
-
-    public function testGenericExceptionsAreLogged(): void
-    {
-        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
-
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
-
-        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
-        $this->flowFactoryMock->method('create')->willReturn($flow);
-
-        $flowLoader = $this->createMock(FlowLoader::class);
-        $flowLoader->method('load')->willReturn([
-            'state_enter.order.state.in_progress' => [
-                [
-                    'id' => 'flow-1',
-                    'name' => 'Order enters status in progress',
-                    'payload' => new Flow(Uuid::randomHex()),
-                ],
-            ],
-        ]);
-
-        $internalException = FlowException::transactionFailed(new TableNotFoundException(
-            new DbalPdoException('Table not found', null, 1146),
-            null
-        ));
-
-        $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->expects(static::once())
-            ->method('execute')
-            ->willThrowException($internalException);
-
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
-            $flowLoader,
-            $this->flowFactoryMock,
-            $flowExecutor,
-            $this->loggerMock,
-            $this->connectionMock,
-            $this->connectionMock,
-        );
-
-        $this->connectionMock->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
-
-        $this->loggerMock->expects(static::once())
-            ->method('error')
-            ->with(
-                "Could not execute flow with error message:\nFlow name: Order enters status in progress\nFlow id: flow-1\nFlow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found\nError Code: 0\n",
-                static::callback(static function (array $context) {
-                    return $context['exception'] instanceof FlowException;
-                })
-            );
-        $this->flowExecutionRepositoryMock->expects(static::once())
-            ->method('create')
-            ->with(
-                [
-                    [
-                        'flowId' => 'flow-1',
-                        'eventData' => $flow->stored(),
-                        'successful' => false,
-                        'errorMessage' => 'Flow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found',
-                    ],
-                ],
-                $event->getContext(),
-            );
-
         $this->flowExecutor->executeBufferedEvents();
     }
 
@@ -350,20 +249,6 @@ class BufferedFlowExecutorTest extends TestCase
                 static::callback(static function (array $context) {
                     return $context['exception'] instanceof ExecuteSequenceException;
                 })
-            );
-        $this->flowExecutionRepositoryMock->expects(static::once())
-            ->method('create')
-            ->with(
-                [
-                    [
-                        'flowId' => 'flow-1',
-                        'eventData' => $flow->stored(),
-                        'successful' => false,
-                        'errorMessage' => 'Transaction level was not 0 after flow execution',
-                        'failedFlowSequenceId' => 'sequence-1',
-                    ],
-                ],
-                $event->getContext(),
             );
 
         $this->flowExecutor->executeBufferedEvents();

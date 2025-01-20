@@ -3,20 +3,17 @@
 namespace Shopware\Core\Content\Flow;
 
 use Shopware\Core\Content\Flow\Aggregate\FlowSequence\FlowSequenceDefinition;
-use Shopware\Core\Content\Flow\Dispatching\Execution\FlowExecutionDefinition;
 use Shopware\Core\Framework\App\Aggregate\FlowEvent\AppFlowEventDefinition;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityDefinition;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\BlobField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\BoolField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\CustomFields;
-use Shopware\Core\Framework\DataAbstractionLayer\Field\DateField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\FkField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\ApiAware;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\CascadeDelete;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\PrimaryKey;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Required;
-use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\Runtime;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\Flag\WriteProtected;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IdField;
 use Shopware\Core\Framework\DataAbstractionLayer\Field\IntField;
@@ -30,7 +27,6 @@ use Shopware\Core\Framework\Log\Package;
 class FlowDefinition extends EntityDefinition
 {
     final public const ENTITY_NAME = 'flow';
-    final public const EVENT_LOADED = self::ENTITY_NAME . '.loaded';
 
     public function getEntityName(): string
     {
@@ -75,8 +71,6 @@ class FlowDefinition extends EntityDefinition
             new CustomFields(),
             new FkField('app_flow_event_id', 'appFlowEventId', AppFlowEventDefinition::class),
             new ManyToOneAssociationField('appFlowEvent', 'app_flow_event_id', AppFlowEventDefinition::class, 'id', false),
-            (new OneToManyAssociationField('executions', FlowExecutionDefinition::class, 'flow_id', 'id'))->addFlags(new CascadeDelete()),
-            (new DateField('most_recent_failed_execution_date', 'mostRecentFailedExecutionDate'))->addFlags(new Runtime()),
         ]);
     }
 }

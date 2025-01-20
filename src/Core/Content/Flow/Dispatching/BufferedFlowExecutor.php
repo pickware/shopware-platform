@@ -7,7 +7,6 @@ namespace Shopware\Core\Content\Flow\Dispatching;
 use Doctrine\DBAL\Connection;
 use Psr\Container\ContainerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
-use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
@@ -28,7 +27,6 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
 
     public function __construct(
         private readonly ContainerInterface $container,
-        private readonly EntityRepository $flowExecutionRepository,
     ) {
     }
 
@@ -92,15 +90,8 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         $flowExecutor = $this->container->get(FlowExecutor::class);
 
         foreach ($flows as $flow) {
-            $flowExecutionPayload = [
-                'flowId' => $flow['id'],
-                'eventData' => $event->stored(),
-            ];
-
             try {
                 $flowExecutor->execute($flow['payload'], $event);
-
-                $flowExecutionPayload['successful'] = true;
             } catch (ExecuteSequenceException $e) {
                 $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
@@ -111,21 +102,8 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
-                $flowExecutionPayload = array_merge($flowExecutionPayload, [
-                    'successful' => false,
-                    'errorMessage' => $e->getMessage(),
-                    'failedFlowSequenceId' => $e->getSequenceId(),
-                ]);
 
                 if ($e->getPrevious() && $this->isInNestedTransaction()) {
-                    $flowExecutionPayload = array_merge($flowExecutionPayload, [
-                        'successful' => false,
-                        'errorMessage' => \sprintf(
-                            'Flow failed in nested transaction: %s',
-                            $e->getPrevious()->getMessage(),
-                        ),
-                    ]);
-
                     /**
                      * If we are already in a nested transaction, that does not have save points enabled, we must inform the caller of the rollback.
                      * We do this via an exception, so that the outer transaction can also be rolled back.
@@ -143,12 +121,6 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
-                $flowExecutionPayload = array_merge($flowExecutionPayload, [
-                    'successful' => false,
-                    'errorMessage' => $e->getMessage(),
-                ]);
-            } finally {
-                $this->flowExecutionRepository->create([$flowExecutionPayload], $event->getContext());
             }
         }
     }
