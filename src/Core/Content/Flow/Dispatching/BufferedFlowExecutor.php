@@ -102,16 +102,6 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                     . 'Error Code: ' . $e->getCode() . "\n",
                     ['exception' => $e]
                 );
-
-                if ($e->getPrevious() && $this->isInNestedTransaction()) {
-                    /**
-                     * If we are already in a nested transaction, that does not have save points enabled, we must inform the caller of the rollback.
-                     * We do this via an exception, so that the outer transaction can also be rolled back.
-                     *
-                     * Otherwise, when it attempts to commit, it would fail.
-                     */
-                    throw $e->getPrevious();
-                }
             } catch (\Throwable $e) {
                 $this->container->get('logger')->error(
                     "Could not execute flow with error message:\n"
@@ -138,10 +128,5 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         }
 
         return $result;
-    }
-
-    private function isInNestedTransaction(): bool
-    {
-        return $this->container->get(Connection::class)->getTransactionNestingLevel() !== 1 && !$this->container->get(Connection::class)->getNestTransactionsWithSavepoints();
     }
 }
