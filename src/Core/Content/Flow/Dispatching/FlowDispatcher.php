@@ -11,7 +11,6 @@ use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Event\FlowLogEvent;
-use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -51,12 +50,6 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         if (($event instanceof StoppableEventInterface && $event->isPropagationStopped())
             || $event->getContext()->hasState(Context::SKIP_TRIGGER_FLOW)
         ) {
-            return $event;
-        }
-
-        if (Feature::isActive('v6.7.0.0')) {
-            $this->dispatcher->dispatch(new BufferFlowExecutionEvent($event));
-
             return $event;
         }
 
@@ -121,12 +114,8 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         ];
     }
 
-    /**
-     * @deprecated tag:v6.7.0 - reason:replaced - flows will be executed by the BufferedFlowExecutor
-     */
     private function callFlowExecutor(StorableFlow $event): void
     {
-        Feature::triggerDeprecationOrThrow('v6.7.0.0', 'Flows will be executed by the BufferedFlowExecutor');
         $flows = $this->getFlows($event->getName());
 
         if (empty($flows)) {
