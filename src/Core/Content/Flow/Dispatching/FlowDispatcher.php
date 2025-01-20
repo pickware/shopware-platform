@@ -21,7 +21,7 @@ use Symfony\Contracts\Service\ServiceSubscriberInterface;
 /**
  * @internal not intended for decoration or replacement
  */
-#[Package('services-settings')]
+#[Package('after-sales')]
 class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInterface
 {
     public function __construct(

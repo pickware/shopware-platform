@@ -366,7 +366,7 @@ class SalesChannelProxyController extends AbstractController
         $isSwitchNewCustomer = true;
         if ($context->getCustomer()) {
             // Check if customer switch to another customer or not
-            $isSwitchNewCustomer = $context->getCustomer()->getId() !== $parameters[self::CUSTOMER_ID];
+            $isSwitchNewCustomer = $context->getCustomerId() !== $parameters[self::CUSTOMER_ID];
         }
 
         if (!$isSwitchNewCustomer) {
@@ -384,7 +384,7 @@ class SalesChannelProxyController extends AbstractController
                 'languageId' => null,
                 'currencyId' => null,
             ],
-            $context->getSalesChannel()->getId()
+            $context->getSalesChannelId()
         );
         $event = new SalesChannelContextSwitchEvent($context, $data);
         $this->eventDispatcher->dispatch($event);
