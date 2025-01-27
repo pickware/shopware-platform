@@ -53,7 +53,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
     {
         $flowLoader = $this->container->get(FlowLoader::class);
         $flowFactory = $this->container->get(FlowFactory::class);
-        $batchCounter = 0;
+        $flowExecutionDepth = 0;
 
         // Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
         // If after the first iteration the buffer is still not empty, this means that the triggered flows added new
@@ -68,10 +68,10 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                 $this->callFlowExecutor($storableFlow, $flows);
             }
 
-            ++$batchCounter;
-        } while (!empty($this->bufferedEvents) && $batchCounter < self::MAXIMUM_EXECUTION_DEPTH);
+            ++$flowExecutionDepth;
+        } while (!empty($this->bufferedEvents) && $flowExecutionDepth < self::MAXIMUM_EXECUTION_DEPTH);
 
-        if ($batchCounter >= self::MAXIMUM_EXECUTION_DEPTH) {
+        if ($flowExecutionDepth >= self::MAXIMUM_EXECUTION_DEPTH) {
             $eventNames = array_map(
                 static fn (FlowEventAware $event) => $event->getName(),
                 $this->bufferedEvents
