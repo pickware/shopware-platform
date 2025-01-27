@@ -198,6 +198,9 @@ class FlowDispatcherTest extends TestCase
         $this->container->set(FlowLoader::class, $flowLoader);
         $this->container->set(FlowExecutor::class, $flowExecutor);
 
+        $this->expectException(FlowException::class);
+        $this->expectExceptionMessage('Flow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found');
+
         $this->logger->expects(static::once())
             ->method('warning')
             ->with(
