@@ -153,7 +153,7 @@ class FlowDispatcherTest extends TestCase
         $this->flowDispatcher->dispatch($event);
     }
 
-    public function testSequenceExceptionsAreLogged(): void
+    public function testNestedTransactionExceptionsAreRethrownWhenSavePointsAreNotEnabled(): void
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
@@ -195,7 +195,6 @@ class FlowDispatcherTest extends TestCase
                 $internalException
             ));
 
-        $this->connection->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
         $this->container->set(FlowLoader::class, $flowLoader);
         $this->container->set(FlowExecutor::class, $flowExecutor);
 
@@ -234,10 +233,12 @@ class FlowDispatcherTest extends TestCase
                 ],
             ],
         ]);
+
         $internalException = FlowException::transactionFailed(new TableNotFoundException(
             new DbalPdoException('Table not found', null, 1146),
             null
         ));
+
         $flowExecutor = $this->createMock(FlowExecutor::class);
         $flowExecutor->expects(static::once())
             ->method('execute')
