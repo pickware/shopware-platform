@@ -20,11 +20,12 @@ use Symfony\Contracts\Service\ServiceSubscriberInterface;
 #[Package('services-settings')]
 class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscriberInterface
 {
+    private const MAXIMUM_EXECUTION_DEPTH = 10;
+
     /**
      * @var array<FlowEventAware>
      */
     private array $bufferedEvents = [];
-    private const MAXIMUM_EXECUTION_DEPTH = 10;
 
     public function __construct(
         private readonly ContainerInterface $container,
@@ -54,9 +55,9 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         $flowFactory = $this->container->get(FlowFactory::class);
         $batchCounter = 0;
 
-        # Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
-        # If after the first iteration the buffer is still not empty, this means that the triggered flows added new
-        # events to the buffer, so we execute them as well.
+        // Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
+        // If after the first iteration the buffer is still not empty, this means that the triggered flows added new
+        // events to the buffer, so we execute them as well.
         do {
             $events = $this->bufferedEvents;
             $this->bufferedEvents = [];
@@ -67,7 +68,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                 $this->callFlowExecutor($storableFlow, $flows);
             }
 
-            $batchCounter++;
+            ++$batchCounter;
         } while (!empty($this->bufferedEvents) && $batchCounter < self::MAXIMUM_EXECUTION_DEPTH);
 
         if ($batchCounter >= self::MAXIMUM_EXECUTION_DEPTH) {

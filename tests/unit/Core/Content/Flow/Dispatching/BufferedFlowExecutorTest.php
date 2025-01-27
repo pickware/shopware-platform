@@ -155,17 +155,18 @@ class BufferedFlowExecutorTest extends TestCase
             ],
         ]);
         $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->method('execute')->willReturnCallback(function () {
-                $this->flowExecutor->handleBufferFlowExecutionEvent(new BufferFlowExecutionEvent(
-                    $this->createCheckoutOrderPlacedEvent(new OrderEntity())
-                ));
-            });
+        $flowExecutor->method('execute')->willReturnCallback(function (): void {
+            $this->flowExecutor->handleBufferFlowExecutionEvent(new BufferFlowExecutionEvent(
+                $this->createCheckoutOrderPlacedEvent(new OrderEntity())
+            ));
+        });
         $this->containerMock->method('get')->willReturnCallback(function (string $service) use ($flowLoader, $flowExecutor) {
             return match ($service) {
                 FlowLoader::class => $flowLoader,
                 FlowFactory::class => $this->flowFactoryMock,
                 FlowExecutor::class => $flowExecutor,
                 'logger' => $this->loggerMock,
+                default => null,
             };
         });
         $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
