@@ -54,7 +54,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         $flowFactory = $this->container->get(FlowFactory::class);
         $batchCounter = 0;
 
-        # Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen
+        # Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
         # If after the first iteration the buffer is still not empty, this means that the triggered flows added new
         # events to the buffer, so we execute them as well.
         do {
