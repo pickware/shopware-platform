@@ -24,6 +24,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
      * @var array<FlowEventAware>
      */
     private array $bufferedEvents = [];
+    private const MAXIMUM_EXECUTION_DEPTH = 10;
 
     public function __construct(
         private readonly ContainerInterface $container,
@@ -49,17 +50,37 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
 
     public function executeBufferedEvents(): void
     {
+        $flowLoader = $this->container->get(FlowLoader::class);
+        $flowFactory = $this->container->get(FlowFactory::class);
+        $batchCounter = 0;
+
+        # Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen
+        # If after the first iteration the buffer is still not empty, this means that the triggered flows added new
+        # events to the buffer, so we execute them as well.
         do {
             $events = $this->bufferedEvents;
             $this->bufferedEvents = [];
-            $flowLoader = $this->container->get(FlowLoader::class);
             $flows = $flowLoader->load();
 
             foreach ($events as $event) {
-                $storableFlow = $this->container->get(FlowFactory::class)->create($event);
+                $storableFlow = $flowFactory->create($event);
                 $this->callFlowExecutor($storableFlow, $flows);
             }
-        } while (!empty($this->bufferedEvents));
+
+            $batchCounter++;
+        } while (!empty($this->bufferedEvents) && $batchCounter < self::MAXIMUM_EXECUTION_DEPTH);
+
+        if ($batchCounter >= self::MAXIMUM_EXECUTION_DEPTH) {
+            $eventNames = array_map(
+                static fn (FlowEventAware $event) => $event->getName(),
+                $this->bufferedEvents
+            );
+
+            $this->container->get('logger')->error(
+                'Maximum execution depth reached for buffered flow executor. This might be caused by a cyclic flow execution.',
+                ['bufferedEvents' => $eventNames],
+            );
+        }
     }
 
     /**

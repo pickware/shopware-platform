@@ -132,6 +132,54 @@ class BufferedFlowExecutorTest extends TestCase
         $this->flowExecutor->executeBufferedEvents();
     }
 
+    public function testLogsErrorIfMaximumExecutionDepthIsExceeded(): void
+    {
+        $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
+
+        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
+
+        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+
+        $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
+        $this->flowFactoryMock->method('create')->willReturn($flow);
+
+        $flowLoader = $this->createMock(FlowLoader::class);
+        $flowPayload = new Flow(Uuid::randomHex());
+        $flowLoader->method('load')->willReturn([
+            'state_enter.order.state.in_progress' => [
+                [
+                    'id' => 'flow-1',
+                    'name' => 'Order enters status in progress',
+                    'payload' => $flowPayload,
+                ],
+            ],
+        ]);
+        $flowExecutor = $this->createMock(FlowExecutor::class);
+        $flowExecutor->method('execute')->willReturnCallback(function () {
+                $this->flowExecutor->handleBufferFlowExecutionEvent(new BufferFlowExecutionEvent(
+                    $this->createCheckoutOrderPlacedEvent(new OrderEntity())
+                ));
+            });
+        $this->containerMock->method('get')->willReturnCallback(function (string $service) use ($flowLoader, $flowExecutor) {
+            return match ($service) {
+                FlowLoader::class => $flowLoader,
+                FlowFactory::class => $this->flowFactoryMock,
+                FlowExecutor::class => $flowExecutor,
+                'logger' => $this->loggerMock,
+            };
+        });
+        $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
+
+        $this->loggerMock->expects(static::once())
+            ->method('error')
+            ->with(
+                'Maximum execution depth reached for buffered flow executor. This might be caused by a cyclic flow execution.',
+                ['bufferedEvents' => ['checkout.order.placed']],
+            );
+
+        $this->flowExecutor->executeBufferedEvents();
+    }
+
     public function testSequenceExceptionsAreLogged(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
