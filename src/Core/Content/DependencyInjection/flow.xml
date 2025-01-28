@@ -26,9 +26,9 @@
         </service>
 
         <service id="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor">
-            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowLoader" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
-            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowFactory" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
-            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
+            <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
+            <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
+            <argument type="service" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
             <argument type="service" id="logger"/>
 
             <tag name="kernel.event_subscriber"/>

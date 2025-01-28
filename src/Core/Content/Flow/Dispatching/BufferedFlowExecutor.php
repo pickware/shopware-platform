@@ -26,7 +26,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface
     private array $bufferedEvents = [];
 
     public function __construct(
-        private readonly FlowLoader $flowLoader,
+        private readonly AbstractFlowLoader $flowLoader,
         private readonly FlowFactory $flowFactory,
         private readonly FlowExecutor $flowExecutor,
         private readonly LoggerInterface $logger,
