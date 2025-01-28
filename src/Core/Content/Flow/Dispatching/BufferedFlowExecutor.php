@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace Shopware\Core\Content\Flow\Dispatching;
 
-use Psr\Log\LoggerInterface;
+use Psr\Container\ContainerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
  */
 #[Package('services-settings')]
-class BufferedFlowExecutor implements EventSubscriberInterface
+class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscriberInterface
 {
     private const MAXIMUM_EXECUTION_DEPTH = 10;
 
@@ -26,10 +27,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface
     private array $bufferedEvents = [];
 
     public function __construct(
-        private readonly AbstractFlowLoader $flowLoader,
-        private readonly FlowFactory $flowFactory,
-        private readonly FlowExecutor $flowExecutor,
-        private readonly LoggerInterface $logger,
+        private readonly ContainerInterface $container,
     ) {
     }
 
@@ -51,6 +49,8 @@ class BufferedFlowExecutor implements EventSubscriberInterface
 
     public function executeBufferedEvents(): void
     {
+        $flowLoader = $this->container->get(FlowLoader::class);
+        $flowFactory = $this->container->get(FlowFactory::class);
         $flowExecutionDepth = 0;
 
         // Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
@@ -59,10 +59,10 @@ class BufferedFlowExecutor implements EventSubscriberInterface
         do {
             $events = $this->bufferedEvents;
             $this->bufferedEvents = [];
-            $flows = $this->flowLoader->load();
+            $flows = $flowLoader->load();
 
             foreach ($events as $event) {
-                $storableFlow = $this->flowFactory->create($event);
+                $storableFlow = $flowFactory->create($event);
                 $this->callFlowExecutor($storableFlow, $flows);
             }
 
@@ -75,11 +75,24 @@ class BufferedFlowExecutor implements EventSubscriberInterface
                 $this->bufferedEvents
             );
 
-            $this->logger->error(
+            $this->container->get('logger')->error(
                 'Maximum execution depth reached for buffered flow executor. This might be caused by a cyclic flow execution.',
                 ['bufferedEvents' => $eventNames],
             );
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public static function getSubscribedServices(): array
+    {
+        return [
+            'logger',
+            FlowFactory::class,
+            FlowExecutor::class,
+            FlowLoader::class,
+        ];
     }
 
     /**
@@ -93,11 +106,13 @@ class BufferedFlowExecutor implements EventSubscriberInterface
             return;
         }
 
+        $flowExecutor = $this->container->get(FlowExecutor::class);
+
         foreach ($flows as $flow) {
             try {
-                $this->flowExecutor->execute($flow['payload'], $event);
+                $flowExecutor->execute($flow['payload'], $event);
             } catch (ExecuteSequenceException $e) {
-                $this->logger->error(
+                $this->container->get('logger')->warning(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -107,7 +122,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface
                     ['exception' => $e]
                 );
             } catch (\Throwable $e) {
-                $this->logger->error(
+                $this->container->get('logger')->error(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
