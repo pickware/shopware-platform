@@ -61,6 +61,14 @@ class BufferedFlowExecutorTest extends TestCase
         static::assertEmpty($executor::getSubscribedEvents());
     }
 
+    public function testDoesNotLoadServicesIfNoEventsAreBuffered(): void
+    {
+        $this->containerMock->expects(static::never())
+            ->method('get');
+
+        $this->bufferedFlowExecutor->executeBufferedEvents();
+    }
+
     public function testExecutesBufferedEvents(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
