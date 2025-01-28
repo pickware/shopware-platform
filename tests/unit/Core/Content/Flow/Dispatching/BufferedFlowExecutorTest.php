@@ -2,7 +2,6 @@
 
 namespace Shopware\Tests\Unit\Core\Content\Flow\Dispatching;
 
-use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Driver\PDO\Exception as DbalPdoException;
 use Doctrine\DBAL\Exception\TableNotFoundException;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -12,7 +11,6 @@ use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\Event\CheckoutOrderPlacedEvent;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor;
-use Shopware\Core\Content\Flow\Dispatching\BufferFlowExecutionEvent;
 use Shopware\Core\Content\Flow\Dispatching\FlowExecutor;
 use Shopware\Core\Content\Flow\Dispatching\FlowFactory;
 use Shopware\Core\Content\Flow\Dispatching\FlowLoader;
@@ -24,7 +22,6 @@ use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Uuid\Uuid;
 use Shopware\Core\Test\Generator;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * @internal
@@ -33,25 +30,28 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 #[CoversClass(BufferedFlowExecutor::class)]
 class BufferedFlowExecutorTest extends TestCase
 {
-    private BufferedFlowExecutor $flowExecutor;
+    private BufferedFlowExecutor $bufferedFlowExecutor;
 
-    private MockObject&Connection $connectionMock;
-
-    private MockObject&LoggerInterface $loggerMock;
+    private MockObject&FlowLoader $flowLoaderMock;
 
     private MockObject&FlowFactory $flowFactoryMock;
 
-    private MockObject&ContainerInterface $containerMock;
+    private MockObject&FlowExecutor $flowExecutorMock;
+
+    private MockObject&LoggerInterface $loggerMock;
 
     protected function setUp(): void
     {
-        $this->containerMock = $this->createMock(ContainerInterface::class);
-        $this->connectionMock = $this->createMock(Connection::class);
-        $this->loggerMock = $this->createMock(LoggerInterface::class);
+        $this->flowLoaderMock = $this->createMock(FlowLoader::class);
         $this->flowFactoryMock = $this->createMock(FlowFactory::class);
+        $this->flowExecutorMock = $this->createMock(FlowExecutor::class);
+        $this->loggerMock = $this->createMock(LoggerInterface::class);
 
-        $this->flowExecutor = new BufferedFlowExecutor(
-            $this->containerMock,
+        $this->bufferedFlowExecutor = new BufferedFlowExecutor(
+            $this->flowLoaderMock,
+            $this->flowFactoryMock,
+            $this->flowExecutorMock,
+            $this->loggerMock,
         );
     }
 
@@ -59,27 +59,20 @@ class BufferedFlowExecutorTest extends TestCase
     {
         Feature::skipTestIfActive('v6.7.0.0', $this);
 
-        $executor = new BufferedFlowExecutor(
-            $this->createMock(ContainerInterface::class),
-        );
-
-        static::assertEmpty($executor::getSubscribedEvents());
+        static::assertEmpty($this->bufferedFlowExecutor::getSubscribedEvents());
     }
 
     public function testExecutesBufferedEvents(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+        $this->bufferedFlowExecutor->bufferFlowExecution($event);
 
         $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
-        $flowLoader = $this->createMock(FlowLoader::class);
         $flowPayload = new Flow(Uuid::randomHex());
-        $flowLoader->method('load')->willReturn([
+        $this->flowLoaderMock->method('load')->willReturn([
             'state_enter.order.state.in_progress' => [
                 [
                     'id' => 'flow-1',
@@ -89,63 +82,41 @@ class BufferedFlowExecutorTest extends TestCase
             ],
         ]);
 
-        $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->expects(static::once())
-            ->method('execute');
+        $this->flowExecutorMock->expects(static::once())
+            ->method('execute')
+            ->with($flowPayload, $flow);
 
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
-            $flowLoader,
-            $this->flowFactoryMock,
-            $flowExecutor,
-        );
-
-        $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
-
-        $this->flowExecutor->executeBufferedEvents();
+        $this->bufferedFlowExecutor->executeBufferedEvents();
     }
 
     public function testExecuteBufferedEventsWithoutFlows(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+        $this->bufferedFlowExecutor->bufferFlowExecution($event);
 
         $flow = new StorableFlow('name', $event->getContext(), [], []);
         $this->flowFactoryMock->expects(static::once())
             ->method('create')
             ->willReturn($flow);
-
-        $flowLoader = $this->createMock(FlowLoader::class);
-        $flowLoader->expects(static::once())
+        $this->flowLoaderMock->expects(static::once())
             ->method('load')
             ->willReturn([]);
 
-        $this->containerMock->expects(static::exactly(2))
-            ->method('get')
-            ->willReturnOnConsecutiveCalls(
-                $flowLoader,
-                $this->flowFactoryMock
-            );
-
-        $this->flowExecutor->executeBufferedEvents();
+        $this->bufferedFlowExecutor->executeBufferedEvents();
     }
 
     public function testLogsErrorIfMaximumExecutionDepthIsExceeded(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+        $this->bufferedFlowExecutor->bufferFlowExecution($event);
 
         $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
-        $flowLoader = $this->createMock(FlowLoader::class);
         $flowPayload = new Flow(Uuid::randomHex());
-        $flowLoader->method('load')->willReturn([
+        $this->flowLoaderMock->method('load')->willReturn([
             'state_enter.order.state.in_progress' => [
                 [
                     'id' => 'flow-1',
@@ -154,23 +125,9 @@ class BufferedFlowExecutorTest extends TestCase
                 ],
             ],
         ]);
-        $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->method('execute')->willReturnCallback(function (): void {
-            $this->flowExecutor->handleBufferFlowExecutionEvent(new BufferFlowExecutionEvent(
-                $this->createCheckoutOrderPlacedEvent(new OrderEntity())
-            ));
+        $this->flowExecutorMock->method('execute')->willReturnCallback(function (): void {
+            $this->bufferedFlowExecutor->bufferFlowExecution($this->createCheckoutOrderPlacedEvent(new OrderEntity()));
         });
-        $this->containerMock->method('get')->willReturnCallback(function (string $service) use ($flowLoader, $flowExecutor) {
-            return match ($service) {
-                FlowLoader::class => $flowLoader,
-                FlowFactory::class => $this->flowFactoryMock,
-                FlowExecutor::class => $flowExecutor,
-                'logger' => $this->loggerMock,
-                default => null,
-            };
-        });
-        $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
-
         $this->loggerMock->expects(static::once())
             ->method('error')
             ->with(
@@ -178,22 +135,19 @@ class BufferedFlowExecutorTest extends TestCase
                 ['bufferedEvents' => ['checkout.order.placed']],
             );
 
-        $this->flowExecutor->executeBufferedEvents();
+        $this->bufferedFlowExecutor->executeBufferedEvents();
     }
 
     public function testSequenceExceptionsAreLogged(): void
     {
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+        $this->bufferedFlowExecutor->bufferFlowExecution($event);
 
         $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
-        $flowLoader = $this->createMock(FlowLoader::class);
-        $flowLoader->method('load')->willReturn([
+        $this->flowLoaderMock->method('load')->willReturn([
             'state_enter.order.state.in_progress' => [
                 [
                     'id' => 'flow-1',
@@ -208,8 +162,7 @@ class BufferedFlowExecutorTest extends TestCase
             null
         ));
 
-        $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->expects(static::once())
+        $this->flowExecutorMock->expects(static::once())
             ->method('execute')
             ->willThrowException(new ExecuteSequenceException(
                 'flow-1',
@@ -219,18 +172,8 @@ class BufferedFlowExecutorTest extends TestCase
                 $internalException
             ));
 
-        $this->connectionMock->method('getTransactionNestingLevel')->willReturnOnConsecutiveCalls(1);
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
-            $flowLoader,
-            $this->flowFactoryMock,
-            $flowExecutor,
-            $this->loggerMock,
-            $this->connectionMock,
-            $this->connectionMock,
-        );
-
         $this->loggerMock->expects(static::once())
-            ->method('warning')
+            ->method('error')
             ->with(
                 "Could not execute flow with error message:\nFlow name: Order enters status in progress\nFlow id: flow-1\nSequence id: sequence-1\nFlow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found\nError Code: 0\n",
                 static::callback(static function (array $context) {
@@ -238,23 +181,19 @@ class BufferedFlowExecutorTest extends TestCase
                 })
             );
 
-        $this->flowExecutor->executeBufferedEvents();
+        $this->bufferedFlowExecutor->executeBufferedEvents();
     }
 
-    public function testExceptionsAreLoggedAndExecutionContinuesWhenNestedTransactionsWithSavePointsIsEnabled(): void
+    public function testGenericExceptionsAreLogged(): void
     {
-        Feature::skipTestIfActive('v6.7.0.0', $this);
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
-        $bufferedFlowExecutionEvent = new BufferFlowExecutionEvent($event);
-
-        $this->flowExecutor->handleBufferFlowExecutionEvent($bufferedFlowExecutionEvent);
+        $this->bufferedFlowExecutor->bufferFlowExecution($event);
 
         $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
         $this->flowFactoryMock->method('create')->willReturn($flow);
 
-        $flowLoader = $this->createMock(FlowLoader::class);
-        $flowLoader->method('load')->willReturn([
+        $this->flowLoaderMock->method('load')->willReturn([
             'state_enter.order.state.in_progress' => [
                 [
                     'id' => 'flow-1',
@@ -263,43 +202,21 @@ class BufferedFlowExecutorTest extends TestCase
                 ],
             ],
         ]);
-        $internalException = FlowException::transactionFailed(new TableNotFoundException(
-            new DbalPdoException('Table not found', null, 1146),
-            null
-        ));
-        $flowExecutor = $this->createMock(FlowExecutor::class);
-        $flowExecutor->expects(static::once())
+
+        $this->flowExecutorMock->expects(static::once())
             ->method('execute')
-            ->willThrowException(new ExecuteSequenceException(
-                'flow-1',
-                'sequence-1',
-                $internalException->getMessage(),
-                0,
-                $internalException
-            ));
-
-        $this->containerMock->method('get')->willReturnOnConsecutiveCalls(
-            $flowLoader,
-            $this->flowFactoryMock,
-            $flowExecutor,
-            $this->loggerMock,
-            $this->connectionMock,
-            $this->connectionMock,
-        );
-
-        $this->connectionMock->method('getTransactionNestingLevel')->willReturn(1);
-        $this->connectionMock->method('getNestTransactionsWithSavepoints')->willReturn(true);
+            ->willThrowException(new \Exception('Something went wrong'));
 
         $this->loggerMock->expects(static::once())
-            ->method('warning')
+            ->method('error')
             ->with(
-                "Could not execute flow with error message:\nFlow name: Order enters status in progress\nFlow id: flow-1\nSequence id: sequence-1\nFlow action transaction could not be committed and was rolled back. Exception: An exception occurred in the driver: Table not found\nError Code: 0\n",
+                "Could not execute flow with error message:\nFlow name: Order enters status in progress\nFlow id: flow-1\nSomething went wrong\nError Code: 0\n",
                 static::callback(static function (array $context) {
-                    return $context['exception'] instanceof ExecuteSequenceException;
+                    return $context['exception'] instanceof \Exception;
                 })
             );
 
-        $this->flowExecutor->executeBufferedEvents();
+        $this->bufferedFlowExecutor->executeBufferedEvents();
     }
 
     private function createCheckoutOrderPlacedEvent(OrderEntity $order): CheckoutOrderPlacedEvent

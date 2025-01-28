@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\Event\CheckoutOrderPlacedEvent;
 use Shopware\Core\Checkout\Order\OrderEntity;
-use Shopware\Core\Content\Flow\Dispatching\BufferFlowExecutionEvent;
+use Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor;
 use Shopware\Core\Content\Flow\Dispatching\FlowDispatcher;
 use Shopware\Core\Content\Flow\Dispatching\FlowExecutor;
 use Shopware\Core\Content\Flow\Dispatching\FlowFactory;
@@ -47,6 +47,8 @@ class FlowDispatcherTest extends TestCase
 
     private MockObject&LoggerInterface $logger;
 
+    private MockObject&BufferedFlowExecutor $bufferedFlowExecutor;
+
     private FlowDispatcher $flowDispatcher;
 
     protected function setUp(): void
@@ -56,10 +58,12 @@ class FlowDispatcherTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->flowFactory = $this->createMock(FlowFactory::class);
         $this->connection = $this->createMock(Connection::class);
+        $this->bufferedFlowExecutor = $this->createMock(BufferedFlowExecutor::class);
 
         $this->container->set('logger', $this->logger);
         $this->container->set(FlowFactory::class, $this->flowFactory);
         $this->container->set(Connection::class, $this->connection);
+        $this->container->set(BufferedFlowExecutor::class, $this->bufferedFlowExecutor);
 
         $this->flowDispatcher = new FlowDispatcher($this->dispatcher, $this->container);
     }
@@ -121,17 +125,15 @@ class FlowDispatcherTest extends TestCase
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
 
-        if (Feature::isActive('v6.7.0.0')) {
-            $this->dispatcher->expects(static::exactly(3))
-                ->method('dispatch')
-                ->willReturnOnConsecutiveCalls($event, $flowLogEvent, new BufferFlowExecutionEvent($event));
-        } else {
-            $this->dispatcher->expects(static::exactly(2))
-                ->method('dispatch')
-                ->willReturnOnConsecutiveCalls($event, $flowLogEvent);
-        }
+        $this->dispatcher->expects(static::exactly(2))
+            ->method('dispatch')
+            ->willReturnOnConsecutiveCalls($event, $flowLogEvent);
 
-        if (!Feature::isActive('v6.7.0.0')) {
+        if (Feature::isActive('v6.7.0.0')) {
+            $this->bufferedFlowExecutor->expects(static::once())
+                ->method('bufferFlowExecution')
+                ->with($event);
+        } else {
             $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);
             $this->flowFactory->expects(static::once())
                 ->method('create')

@@ -21,17 +21,15 @@
                 <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowFactory" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
                 <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
                 <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowLoader" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
+                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor"/>
             </argument>
         </service>
 
         <service id="Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor">
-            <argument type="service_locator">
-                <argument type="service" key="logger" id="logger"/>
-                <argument type="service" key="Doctrine\DBAL\Connection" id="Doctrine\DBAL\Connection"/>
-                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowFactory" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
-                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
-                <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowLoader" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
-            </argument>
+            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowLoader" id="Shopware\Core\Content\Flow\Dispatching\FlowLoader"/>
+            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowFactory" id="Shopware\Core\Content\Flow\Dispatching\FlowFactory"/>
+            <argument type="service" key="Shopware\Core\Content\Flow\Dispatching\FlowExecutor" id="Shopware\Core\Content\Flow\Dispatching\FlowExecutor"/>
+            <argument type="service" id="logger"/>
 
             <tag name="kernel.event_subscriber"/>
         </service>

@@ -4,21 +4,19 @@ declare(strict_types=1);
 
 namespace Shopware\Core\Content\Flow\Dispatching;
 
-use Doctrine\DBAL\Connection;
-use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Content\Flow\Exception\ExecuteSequenceException;
 use Shopware\Core\Framework\Event\FlowEventAware;
 use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
  */
 #[Package('services-settings')]
-class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscriberInterface
+class BufferedFlowExecutor implements EventSubscriberInterface
 {
     private const MAXIMUM_EXECUTION_DEPTH = 10;
 
@@ -28,7 +26,10 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
     private array $bufferedEvents = [];
 
     public function __construct(
-        private readonly ContainerInterface $container,
+        private readonly FlowLoader $flowLoader,
+        private readonly FlowFactory $flowFactory,
+        private readonly FlowExecutor $flowExecutor,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -39,20 +40,17 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         }
 
         return [
-            BufferFlowExecutionEvent::class => 'handleBufferFlowExecutionEvent',
             KernelEvents::TERMINATE => 'executeBufferedEvents',
         ];
     }
 
-    public function handleBufferFlowExecutionEvent(BufferFlowExecutionEvent $bufferFlowExecutionEvent): void
+    public function bufferFlowExecution(FlowEventAware $flowEvent): void
     {
-        $this->bufferedEvents[] = $bufferFlowExecutionEvent->getEvent();
+        $this->bufferedEvents[] = $flowEvent;
     }
 
     public function executeBufferedEvents(): void
     {
-        $flowLoader = $this->container->get(FlowLoader::class);
-        $flowFactory = $this->container->get(FlowFactory::class);
         $flowExecutionDepth = 0;
 
         // Always attempt to execute the buffered events at least once, if the buffer is empty nothing will happen.
@@ -61,10 +59,10 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
         do {
             $events = $this->bufferedEvents;
             $this->bufferedEvents = [];
-            $flows = $flowLoader->load();
+            $flows = $this->flowLoader->load();
 
             foreach ($events as $event) {
-                $storableFlow = $flowFactory->create($event);
+                $storableFlow = $this->flowFactory->create($event);
                 $this->callFlowExecutor($storableFlow, $flows);
             }
 
@@ -77,25 +75,11 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                 $this->bufferedEvents
             );
 
-            $this->container->get('logger')->error(
+            $this->logger->error(
                 'Maximum execution depth reached for buffered flow executor. This might be caused by a cyclic flow execution.',
                 ['bufferedEvents' => $eventNames],
             );
         }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public static function getSubscribedServices(): array
-    {
-        return [
-            'logger',
-            Connection::class,
-            FlowFactory::class,
-            FlowExecutor::class,
-            FlowLoader::class,
-        ];
     }
 
     /**
@@ -109,13 +93,11 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
             return;
         }
 
-        $flowExecutor = $this->container->get(FlowExecutor::class);
-
         foreach ($flows as $flow) {
             try {
-                $flowExecutor->execute($flow['payload'], $event);
+                $this->flowExecutor->execute($flow['payload'], $event);
             } catch (ExecuteSequenceException $e) {
-                $this->container->get('logger')->warning(
+                $this->logger->error(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
@@ -125,7 +107,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
                     ['exception' => $e]
                 );
             } catch (\Throwable $e) {
-                $this->container->get('logger')->error(
+                $this->logger->error(
                     "Could not execute flow with error message:\n"
                     . 'Flow name: ' . $flow['name'] . "\n"
                     . 'Flow id: ' . $flow['id'] . "\n"
