@@ -4,12 +4,17 @@ namespace Shopware\Core\Content\Flow\Dispatching;
 
 use Psr\Container\ContainerInterface;
 use Shopware\Core\Framework\Feature;
+use Shopware\Core\Framework\Log\Package;
 use Symfony\Component\Console\ConsoleEvents;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
+/**
+ * @internal not intended for decoration or replacement
+ */
+#[Package('services-settings')]
 class BufferedFlowExecutionTriggersListener implements EventSubscriberInterface, ServiceSubscriberInterface
 {
     public function __construct(
@@ -20,10 +25,11 @@ class BufferedFlowExecutionTriggersListener implements EventSubscriberInterface,
 
     public static function getSubscribedEvents(): array
     {
-//        if (!Feature::isActive('v6.7.0.0')) {
-//            return [];
-//        }
+        if (!Feature::isActive('v6.7.0.0')) {
+            return [];
+        }
 
+        // Run buffered flows after any execution environment finishes one unit of work
         return [
             KernelEvents::TERMINATE => 'triggerBufferedFlowExecution',
             WorkerMessageHandledEvent::class => 'triggerBufferedFlowExecution',
@@ -36,7 +42,6 @@ class BufferedFlowExecutionTriggersListener implements EventSubscriberInterface,
         if ($this->bufferedFlowQueue->isEmpty()) {
             return;
         }
-        xdebug_break();
 
         $this->container->get(BufferedFlowExecutor::class)->executeBufferedFlows();
     }

@@ -22,7 +22,8 @@ class BufferedFlowExecutor
         private readonly FlowFactory $flowFactory,
         private readonly FlowExecutor $flowExecutor,
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function executeBufferedFlows(): void
     {
@@ -63,7 +64,7 @@ class BufferedFlowExecutor
     /**
      * @param array<string, array<array{id: string, name: string, payload: array<mixed>}>> $flowList
      *
-     * @return array<string, mixed>
+     * @return array<int, array{id: string, name: string, payload: array<mixed>}>
      */
     private function getFlowsForEvent(string $eventName, array $flowList): array
     {

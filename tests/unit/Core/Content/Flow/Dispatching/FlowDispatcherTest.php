@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\Event\CheckoutOrderPlacedEvent;
 use Shopware\Core\Checkout\Order\OrderEntity;
-use Shopware\Core\Content\Flow\Dispatching\BufferedFlowExecutor;
+use Shopware\Core\Content\Flow\Dispatching\BufferedFlowQueue;
 use Shopware\Core\Content\Flow\Dispatching\FlowDispatcher;
 use Shopware\Core\Content\Flow\Dispatching\FlowExecutor;
 use Shopware\Core\Content\Flow\Dispatching\FlowFactory;
@@ -47,7 +47,7 @@ class FlowDispatcherTest extends TestCase
 
     private MockObject&LoggerInterface $logger;
 
-    private MockObject&BufferedFlowExecutor $bufferedFlowExecutor;
+    private MockObject&BufferedFlowQueue $bufferedFlowQueue;
 
     private FlowDispatcher $flowDispatcher;
 
@@ -58,12 +58,12 @@ class FlowDispatcherTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->flowFactory = $this->createMock(FlowFactory::class);
         $this->connection = $this->createMock(Connection::class);
-        $this->bufferedFlowExecutor = $this->createMock(BufferedFlowExecutor::class);
+        $this->bufferedFlowQueue = $this->createMock(BufferedFlowQueue::class);
 
         $this->container->set('logger', $this->logger);
         $this->container->set(FlowFactory::class, $this->flowFactory);
         $this->container->set(Connection::class, $this->connection);
-        $this->container->set(BufferedFlowExecutor::class, $this->bufferedFlowExecutor);
+        $this->container->set(BufferedFlowQueue::class, $this->bufferedFlowQueue);
 
         $this->flowDispatcher = new FlowDispatcher($this->dispatcher, $this->container);
     }
@@ -130,8 +130,8 @@ class FlowDispatcherTest extends TestCase
             ->willReturnOnConsecutiveCalls($event, $flowLogEvent);
 
         if (Feature::isActive('v6.7.0.0')) {
-            $this->bufferedFlowExecutor->expects(static::once())
-                ->method('bufferFlowExecution')
+            $this->bufferedFlowQueue->expects(static::once())
+                ->method('queueFlow')
                 ->with($event);
         } else {
             $flow = new StorableFlow('state_enter.order.state.in_progress', $event->getContext(), [], []);

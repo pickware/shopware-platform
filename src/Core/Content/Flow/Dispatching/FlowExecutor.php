@@ -52,8 +52,7 @@ class FlowExecutor
     }
 
     /**
-     * @param array<string, mixed> $flowPayloads
-     * @param StorableFlow $event
+     * @param array<int, array<string, mixed>> $flowPayloads
      */
     public function executeFlows(array $flowPayloads, StorableFlow $event): void
     {
