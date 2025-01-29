@@ -11,7 +11,7 @@ use Shopware\Core\Framework\Log\Package;
 /**
  * @internal not intended for decoration or replacement
  */
-#[Package('services-settings')]
+#[Package('after-sales')]
 class BufferedFlowExecutor
 {
     private const MAXIMUM_EXECUTION_DEPTH = 10;

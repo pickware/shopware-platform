@@ -27,7 +27,7 @@ Flows are stored in memory and executed as soon as the execution environment sig
 finished a unit of work. These events are as follows:
 
 1. After a controller action has been executed (Web) => `KernelEvents::TERMINATE`
-2. After a queued message has been processed (Queue) => `WorkerMessageHandledEvent::class`
+2. After a queued message has been processed (Queue) => `WorkerMessageHandledEvent`
 3. After a command has been executed (CLI) => `ConsoleEvents::TERMINATE`
 
 Another option would be to handle flow executions as queue messages. This would entirely remove

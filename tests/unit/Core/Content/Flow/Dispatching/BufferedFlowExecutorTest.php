@@ -22,7 +22,7 @@ use Shopware\Core\Test\Generator;
 /**
  * @internal
  */
-#[Package('services-settings')]
+#[Package('after-sales')]
 #[CoversClass(BufferedFlowExecutor::class)]
 class BufferedFlowExecutorTest extends TestCase
 {

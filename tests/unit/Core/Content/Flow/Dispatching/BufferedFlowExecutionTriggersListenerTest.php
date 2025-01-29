@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 /**
  * @internal
  */
-#[Package('services-settings')]
+#[Package('after-sales')]
 #[CoversClass(BufferedFlowExecutionTriggersListener::class)]
 class BufferedFlowExecutionTriggersListenerTest extends TestCase
 {
