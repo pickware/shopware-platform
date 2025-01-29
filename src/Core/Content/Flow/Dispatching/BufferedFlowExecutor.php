@@ -11,6 +11,7 @@ use Shopware\Core\Framework\Feature;
 use Shopware\Core\Framework\Log\Package;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
@@ -39,6 +40,7 @@ class BufferedFlowExecutor implements EventSubscriberInterface, ServiceSubscribe
 
         return [
             KernelEvents::TERMINATE => 'executeBufferedEvents',
+            WorkerMessageHandledEvent::class => 'executeBufferedEvents',
         ];
     }
 
