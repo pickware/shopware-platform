@@ -54,7 +54,7 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         }
 
         if (Feature::isActive('v6.7.0.0')) {
-            $this->container->get(BufferedFlowExecutor::class)->bufferFlowExecution($event);
+            $this->container->get(BufferedFlowQueue::class)->queueFlow($event);
 
             return $event;
         }
@@ -117,7 +117,7 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
             FlowFactory::class,
             FlowExecutor::class,
             FlowLoader::class,
-            BufferedFlowExecutor::class,
+            BufferedFlowQueue::class,
         ];
     }
 

@@ -4,6 +4,7 @@ namespace Shopware\Core\Content\Flow\Dispatching;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception as DBALException;
+use Psr\Log\LoggerInterface;
 use Shopware\Core\Checkout\Cart\AbstractRuleLoader;
 use Shopware\Core\Checkout\Order\OrderEntity;
 use Shopware\Core\Content\Flow\Dispatching\Action\FlowAction;
@@ -44,9 +45,50 @@ class FlowExecutor
         private readonly FlowRuleScopeBuilder $scopeBuilder,
         private readonly Connection $connection,
         private readonly ExtensionDispatcher $extensions,
+        private readonly LoggerInterface $logger,
         $actions
     ) {
         $this->actions = $actions instanceof \Traversable ? iterator_to_array($actions) : $actions;
+    }
+
+    /**
+     * @param array<string, mixed> $flowPayloads
+     * @param StorableFlow $event
+     */
+    public function executeFlows(array $flowPayloads, StorableFlow $event): void
+    {
+        foreach ($flowPayloads as $flowPayload) {
+            $flow = $flowPayload['payload'];
+            $id = $flowPayload['id'];
+            $name = $flowPayload['name'];
+
+            try {
+                $this->extensions->publish(
+                    name: FlowExecutorExtension::NAME,
+                    extension: new FlowExecutorExtension($flow, $event),
+                    function: $this->_execute(...)
+                );
+            } catch (ExecuteSequenceException $e) {
+                $this->logger->error(
+                    "Could not execute flow with error message:\n"
+                    . 'Flow name: ' . $name . "\n"
+                    . 'Flow id: ' . $id . "\n"
+                    . 'Sequence id: ' . $e->getSequenceId() . "\n"
+                    . $e->getMessage() . "\n"
+                    . 'Error Code: ' . $e->getCode() . "\n",
+                    ['exception' => $e]
+                );
+            } catch (\Throwable $e) {
+                $this->logger->error(
+                    "Could not execute flow with error message:\n"
+                    . 'Flow name: ' . $name . "\n"
+                    . 'Flow id: ' . $id . "\n"
+                    . $e->getMessage() . "\n"
+                    . 'Error Code: ' . $e->getCode() . "\n",
+                    ['exception' => $e]
+                );
+            }
+        }
     }
 
     public function execute(Flow $flow, StorableFlow $event): void
