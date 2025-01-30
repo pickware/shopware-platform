@@ -169,7 +169,7 @@ class FlowExecutor
             try {
                 $this->executeSequence($sequence, $event);
             } catch (\Exception $e) {
-                throw new ExecuteSequenceException(
+                throw ExecuteSequenceException::sequenceExecutionFailed(
                     $sequence->flowId,
                     $sequence->sequenceId,
                     $e->getMessage(),
