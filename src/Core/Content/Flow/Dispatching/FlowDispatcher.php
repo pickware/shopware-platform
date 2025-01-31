@@ -53,7 +53,7 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
             return $event;
         }
 
-        if (Feature::isActive('v6.7.0.0')) {
+        if (Feature::isActive('FLOW_EXECUTION_AFTER_BUSINESS_PROCESS')) {
             $this->container->get(BufferedFlowQueue::class)->queueFlow($event);
 
             return $event;
@@ -121,12 +121,8 @@ class FlowDispatcher implements EventDispatcherInterface, ServiceSubscriberInter
         ];
     }
 
-    /**
-     * @deprecated tag:v6.7.0 - reason:replaced - flows will be executed by the BufferedFlowExecutor
-     */
     private function callFlowExecutor(StorableFlow $event): void
     {
-        Feature::triggerDeprecationOrThrow('v6.7.0.0', 'Flows will be executed by the BufferedFlowExecutor');
         $flows = $this->getFlows($event->getName());
 
         if (empty($flows)) {

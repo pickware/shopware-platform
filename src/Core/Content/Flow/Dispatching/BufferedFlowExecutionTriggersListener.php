@@ -13,6 +13,7 @@ use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
+ * @experimental stableVersion:v6.8.0 feature:FLOW_EXECUTION_AFTER_BUSINESS_PROCESS
  */
 #[Package('after-sales')]
 class BufferedFlowExecutionTriggersListener implements EventSubscriberInterface, ServiceSubscriberInterface
@@ -25,7 +26,7 @@ class BufferedFlowExecutionTriggersListener implements EventSubscriberInterface,
 
     public static function getSubscribedEvents(): array
     {
-        if (!Feature::isActive('v6.7.0.0')) {
+        if (!Feature::isActive('FLOW_EXECUTION_AFTER_BUSINESS_PROCESS')) {
             return [];
         }
 

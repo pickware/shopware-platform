@@ -42,3 +42,8 @@ shopware:
         major: true
         toggleable: false
         description: "Rework of http cache and store api cache"
+      - name: FLOW_EXECUTION_AFTER_BUSINESS_PROCESS
+        default: false
+        major: false
+        toggleable: true
+        description: "Experimental! Execute flows after the main unit of work has concluded"

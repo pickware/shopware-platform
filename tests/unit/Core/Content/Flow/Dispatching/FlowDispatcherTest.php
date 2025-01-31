@@ -93,7 +93,7 @@ class FlowDispatcherTest extends TestCase
 
     public function testDispatchWithoutFlows(): void
     {
-        Feature::skipTestIfActive('v6.7.0.0', $this);
+        Feature::skipTestIfActive('FLOW_EXECUTION_AFTER_BUSINESS_PROCESS', $this);
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
@@ -157,7 +157,7 @@ class FlowDispatcherTest extends TestCase
 
     public function testNestedTransactionExceptionsAreRethrownWhenSavePointsAreNotEnabled(): void
     {
-        Feature::skipTestIfActive('v6.7.0.0', $this);
+        Feature::skipTestIfActive('FLOW_EXECUTION_AFTER_BUSINESS_PROCESS', $this);
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $flowLogEvent = new FlowLogEvent(FlowLogEvent::NAME, $event);
@@ -217,7 +217,7 @@ class FlowDispatcherTest extends TestCase
 
     public function testExceptionsAreLoggedAndExecutionContinuesWhenNestedTransactionsWithSavePointsIsEnabled(): void
     {
-        Feature::skipTestIfActive('v6.7.0.0', $this);
+        Feature::skipTestIfActive('FLOW_EXECUTION_AFTER_BUSINESS_PROCESS', $this);
         $event = $this->createCheckoutOrderPlacedEvent(new OrderEntity());
 
         $this->dispatcher->method('dispatch')->willReturnOnConsecutiveCalls(
