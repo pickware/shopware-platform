@@ -13,6 +13,7 @@ use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
 /**
  * @internal not intended for decoration or replacement
+ *
  * @experimental stableVersion:v6.8.0 feature:FLOW_EXECUTION_AFTER_BUSINESS_PROCESS
  */
 #[Package('after-sales')]
