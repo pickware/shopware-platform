@@ -13,7 +13,7 @@ use Shopware\Core\Framework\Log\Package;
 /**
  * @internal
  */
-#[Package('core')]
+#[Package('framework')]
 class MySQLFactory
 {
     /**
@@ -58,6 +58,10 @@ class MySQLFactory
 
         if (EnvironmentHelper::getVariable('DATABASE_PERSISTENT_CONNECTION')) {
             $parameters['driverOptions'][\PDO::ATTR_PERSISTENT] = true;
+        }
+
+        if (EnvironmentHelper::getVariable('DATABASE_PROTOCOL_COMPRESSION')) {
+            $parameters['driverOptions'][\PDO::MYSQL_ATTR_COMPRESS] = true;
         }
 
         if ($replicaUrl) {

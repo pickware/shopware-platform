@@ -6,14 +6,16 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use Shopware\Core\Checkout\Document\Exception\InvalidFileGeneratorTypeException;
 use Shopware\Core\Framework\Log\Package;
+use Shopware\Core\Test\Annotation\DisabledFeatures;
 
 /**
  * @internal
  */
-#[Package('checkout')]
+#[Package('after-sales')]
 #[CoversClass(InvalidFileGeneratorTypeException::class)]
 class InvalidFileGeneratorTypeExceptionTest extends TestCase
 {
+    #[DisabledFeatures(['v6.7.0.0'])]
     public function testConstruct(): void
     {
         $exception = new InvalidFileGeneratorTypeException('foo');

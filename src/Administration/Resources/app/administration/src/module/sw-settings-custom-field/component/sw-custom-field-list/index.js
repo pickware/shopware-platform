@@ -1,5 +1,5 @@
 /**
- * @package services-settings
+ * @sw-package framework
  */
 import template from './sw-custom-field-list.html.twig';
 import './sw-custom-field-list.scss';
@@ -122,6 +122,7 @@ export default {
 
         onAddCustomField() {
             const customField = this.customFieldRepository.create();
+            customField.storeApiAware = true;
             this.onCustomFieldEdit(customField);
         },
 

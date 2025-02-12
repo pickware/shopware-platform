@@ -15,12 +15,17 @@
         "shopware/elasticsearch": "self.version",
         "symfony/polyfill-ctype": "*",
         "symfony/polyfill-iconv": "*",
+        "symfony/polyfill-mbstring": "*",
+        "symfony/polyfill-intl-grapheme": "*",
+        "symfony/polyfill-intl-idn": "*",
+        "symfony/polyfill-intl-normalizer": "*",
         "symfony/polyfill-php72": "*",
         "symfony/polyfill-php73": "*",
         "symfony/polyfill-php74": "*",
         "symfony/polyfill-php80": "*",
         "symfony/polyfill-php81": "*",
-        "symfony/polyfill-php82": "*"
+        "symfony/polyfill-php82": "*",
+        "paragonie/random_compat": "*"
     },
     "support": {
         "issues": "https://github.com/shopware/shopware/issues",
@@ -50,11 +55,12 @@
             "composer/package-versions-deprecated": true,
             "phpstan/extension-installer": true,
             "cweagans/composer-patches": true,
-            "symfony/runtime": true
+            "symfony/runtime": true,
+            "php-http/discovery": false
         }
     },
     "require": {
-        "php": "~8.2.0 || ~8.3.0",
+        "php": "~8.2.0 || ~8.3.0 || ~8.4.0",
         "ext-curl": "*",
         "ext-dom": "*",
         "ext-fileinfo": "*",
@@ -84,8 +90,9 @@
         "ezyang/htmlpurifier": "^4.16",
         "guzzlehttp/guzzle": "^7.5.0",
         "guzzlehttp/psr7": "^2.4",
+        "horstoeko/zugferd": "^1.0.104",
         "lcobucci/clock": "^3.1.0",
-        "lcobucci/jwt": "^5.0",
+        "lcobucci/jwt": "^5.5",
         "league/flysystem": "^3.10.3",
         "league/flysystem-memory": "^3.10.3",
         "league/mime-type-detection": "^1.13.0",
@@ -105,7 +112,7 @@
         "scssphp/scssphp": "v1.12.0",
         "setasign/fpdi": "^2.3.7",
         "setasign/tfpdf": "^1.33",
-        "shopware/conflicts": ">=0.2.0",
+        "shopware/conflicts": "0.4.0",
         "shyim/opensearch-php-dsl": "^1.0.5",
         "squirrelphp/twig-php-syntax": "^1.8.0",
         "symfony/asset": "~7.2.0",
@@ -136,7 +143,8 @@
         "symfony/monolog-bridge": "~7.2.0",
         "symfony/monolog-bundle": "~3.10.0",
         "symfony/options-resolver": "~7.2.0",
-        "symfony/polyfill-php83": "~1.29.0",
+        "symfony/polyfill-php83": ">=1.31.0",
+        "symfony/polyfill-php84": ">=1.31.0",
         "symfony/process": "~7.2.0",
         "symfony/property-access": "~7.2.0",
         "symfony/property-info": "~7.2.0",
@@ -162,7 +170,7 @@
         "tecnickcom/tcpdf": "^6.7.7",
         "twig/intl-extra": "^3.10.0",
         "twig/string-extra": "^3.10.0",
-        "twig/twig": "^3.14.0",
+        "twig/twig": "^3.19.0",
         "zircote/swagger-php": "^4.9.2"
     },
     "require-dev": {
