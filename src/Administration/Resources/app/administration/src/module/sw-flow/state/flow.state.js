@@ -217,11 +217,7 @@ export default {
                     return;
                 }
 
-                if (!state.originAvailableActions.includes(action.name)) {
-                    state.originAvailableActions.push(action.name);
-                }
-
-                availableAction.push(action.name);
+                availableActions.push(action.name);
             });
 
             return availableActions;
