@@ -500,6 +500,7 @@
       },
       "orderDateFilter": {
         "label": "Order date",
+        "placeholder": "Select timeframe...",
         "options": {
           "lastYear": "Last year",
           "lastQuarter": "Last quarter",

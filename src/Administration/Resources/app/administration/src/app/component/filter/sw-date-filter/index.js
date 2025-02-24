@@ -95,6 +95,10 @@ Component.register('sw-date-filter', {
         showDivider() {
             return !this.isDateTimeType && !this.filter.showTimeframe;
         },
+
+        placeholder() {
+            return this.filter.placeholder || this.$tc('sw-order.filters.orderDateFilter.placeholder');
+        },
     },
 
     watch: {

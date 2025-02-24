@@ -15,7 +15,7 @@
         v-if="filter.showTimeframe"
         v-model:value="dateValue.timeframe"
         class="sw-date-filter__timeframe"
-        placeholder="Select timeframe"
+        :placeholder="placeholder"
         :options="timeframeOptions"
         @update:value="onTimeframeSelect"
     />
