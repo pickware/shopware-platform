@@ -5,7 +5,7 @@ author_email: john.sorial@pickware.de
 author_github: @John98Zakaria
 ---
 
-# Elasticsearch
+# Core
 
 * Changed `Elasticsearch/Resources/config/services.xml` -> `ElasticsearchAdminResetCommand` to use the correct
   Opensearch client for the administration.
