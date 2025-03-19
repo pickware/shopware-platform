@@ -369,6 +369,124 @@ The hidden radio input will no longer be in the HTML. The current page value wil
     </a>
 {% endblock %}
 ```
+
+## Use `<button>` elements instead of `<a>` to open modal windows
+
+Modal triggers that were previously using anchor `<a>` elements are now using `<button>` elements.
+Anchor `<a>` elements are recognized as native links by the screen-reader and should not open a dialog/modal window instead of redirecting to a new page.
+A modal window should be opened via `<button>` and is mainly driven by JavaScript. `<a href="#">` elements should only be native hyperlinks and not trigger additional modals. This can confuse screen-reader users.
+
+To maintain the link appearance, the classes `btn btn-link-inline` are used. The "link" looks like a regular link but is semantically a `<button>` when it triggers a modal.
+
+### Ajax modal trigger before:
+```html
+<a data-ajax-modal="true" data-url="/some-route" href="/some-route">Open ajax modal</a>
+```
+
+### Ajax modal trigger after:
+```html
+<button data-ajax-modal="true" data-url="/some-route" class="btn btn-link-inline">Open ajax modal</button>
+```
+
+### New translation keys with button modal triggers
+
+Some modal triggers are inside translation texts. With 6.7 new translation keys are used that have buttons instead of links.
+There are also new translation parameters to avoid too much HTML and modal logic inside the translation strings.
+
+| Old key                             | Old params                   | New key                                  | New params                                                                                   |
+|-------------------------------------|------------------------------|------------------------------------------|----------------------------------------------------------------------------------------------|
+| `general.privacyNoticeText`         | `%privacyUrl%`, `%tosUrl%`   | `general.privacyNoticeTextModal`         | `%privacyModalTagOpen%`, `%privacyModalTagClose%`, `%tosModalTagOpen%`, `%tosModalTagClose%` |
+| `contact.privacyNoticeText`         | `%privacyUrl%`, `%prevUrl%`  | `contact.privacyNoticeTextModal`         | `%privacyModalTagOpen%`, `%privacyModalTagClose%`                                            |
+| `checkout.confirmRevocationNotice`  | `%url%`                      | `checkout.confirmRevocationNoticeModal`  | `%revocationModalTagOpen%`, `%revocationModalTagClose%`                                      |
+| `checkout.confirmTermsText`         | `%url%`                      | `checkout.confirmTermsTextModal`         | `%tosModalTagOpen%`, `%tosModalTagClose%`                                                    |
+| `checkout.confirmTermsReminderText` | `%url%`                      | `checkout.confirmTermsReminderTextModal` | `%tosModalTagOpen%`, `'%tosModalTagClose%`                                                   |
+
+### Old translation string structure
+The HTML of the modal trigger was part of the translation.
+
+```twig
+{{ 'checkout.confirmTermsReminderText')|trans({
+    '%url%': path('frontend.cms.page', { id: config('core.basicInformation.tosPage') }),
+})|raw }}
+```
+```json
+{
+  "confirmTermsReminderText": "You have already accepted the <a data-ajax-modal=\"true\" data-url=\"%url%\" href=\"%url%\" title=\"general terms and conditions\">general terms and conditions</a>."
+}
+```
+
+### New translation string structure
+The HTML of the modal trigger is now inside the twig template instead.
+
+```twig
+{{ 'checkout.confirmTermsReminderTextModal')|trans({
+    '%tosModalTagOpen%': '<button type="button" class="btn btn-link-inline" data-ajax-modal="true" data-url="' ~ path(cmsPath, { id: config('core.basicInformation.tosPage') }) ~ '">',
+    '%tosModalTagClose%': '</button>'
+})|raw }}
+```
+```json
+{
+  "confirmTermsReminderTextModal": "You have already accepted the %tosModalTagOpen%general terms and conditions%tosModalTagClose%."
+}
+```
+
+## Storefront `{% sw_icon %}` are `aria-hidden="true"` by default
+Storefront icons that are rendered via `{% sw_icon 'icon-name' %}` will apply `aria-hidden="true"` by default so they are hidden for screen readers.
+In most scenarios icons are of decorative nature and should therefore not be read as "graphic" by the screen reader. **This change does not affect the actual rendering or appearance of the icons.**
+In many areas the icons were already set to `ariaHidden: true` manually. For things like "icon only" buttons there should always be an alternative text available that describes the action.
+
+It is still possible to disable `aria-hidden` by applying `ariaHidden: false` on the icon: 
+```twig
+{% sw_icon 'plus' style { ariaHidden: false } %}
+```
+
+```twig
+{# 
+    Icon only button 
+    ======================================================
+#}
+<button class="btn btn-primary my-action" aria-label="Label for icon only button">
+    {% sw_icon 'plus' %} {# Icon is hidden for screen reader. #}
+</button>
+
+{# Will render: #}
+<button class="btn btn-primary my-action" aria-label="Label for icon only button">
+    <span class="icon icon-plus" aria-hidden="true">
+        <svg ...></svg>
+    </div>
+</button>
+
+{# 
+    Additional icon button 
+    ======================================================
+#}
+<button class="btn btn-primary my-action">
+    {% sw_icon 'plus' %} {# Icon is hidden for screen reader. #}
+    Label for the button {# Button is labelled by the actual text. #}
+</button>
+
+{# Will render: #}
+<button class="btn btn-primary my-action">
+    <span class="icon icon-plus" aria-hidden="true">
+        <svg ...></svg>
+    </div>
+    Label for the button {# Button is labelled by the actual text. #}
+</button>
+
+{# 
+    Label for icon SVG
+    ======================================================
+#}
+
+{# In rare occasions, you can optionally disable aria-hidden. It is also possible to apply an aria-label to the SVG. #}
+{% sw_icon 'plus' style { ariaHidden: false, ariaLabel: 'My label' } %}
+
+{# Will render: #}
+<span class="icon icon-plus">
+    <svg aria-label="My label"...></svg>
+</div>
+```
+
 </details>
 
 # Further Changes
@@ -441,7 +559,6 @@ All PHP class properties now have a native type.
 If you have extended classes with properties, which didn't have a native type before, make sure you now add them as well.
 
 ## Reduced data loaded in Store-API Register Route and Register related events
-
 The customer entity does not have all associations loaded by default anymore.
 This change reduces the amount of data loaded in the Store-API Register Route and Register related events to improve the performance.
 
@@ -487,8 +604,16 @@ Merchants must review their custom created payment and shipping methods for the 
 ## Required foreign key in mapping definition for many-to-many associations
 If the mapping definition of a many-to-many association does not contain foreign key fields, an exception will be thrown.
 
-## Elasticsearch: Return type of AbstractElasticsearchDefinition::buildTermQuery changed to BuilderInterface
+## Change in entity extensions
+If you have extended entities via an implementation of `\Shopware\Core\Framework\DataAbstractionLayer\EntityExtension`, you need to adjust those classes.
+The method `EntityExtension::getEntityName()` is now abstract and required to be implemented.
+Return the entity name of the entity you are extending, e.g. `product_media`.
 
+## Logger is required for ScheduledTaskHandler
+The abstract class `\Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskHandler` now requires an implementation of `Psr\Log\LoggerInterface` as second argument.
+If you have implemented a custom `ScheduledTaskHandler`, you need to adjust the constructor accordingly.
+
+## Elasticsearch: Return type of AbstractElasticsearchDefinition::buildTermQuery changed to BuilderInterface
 The return type of `\Shopware\Elasticsearch\Framework\AbstractElasticsearchDefinition::buildTermQuery()` and `\Shopware\Elasticsearch\Product\AbstractProductSearchQueryBuilder::build()` changed from BoolQuery to BuilderInterface.
 It is not necessary to wrap the return value in a BoolQuery anymore.
 Before:
@@ -522,14 +647,12 @@ public function buildTermQuery(Context $context, Criteria $criteria): BuilderInt
 Changed the return type of the `Shopware\Core\Checkout\Promotion\Gateway\PromotionGatewayInterface` from `EntityCollection<PromotionEntity>` to `PromotionCollection`
 
 ## ImportExport signature changes
-
 * Added a new optional parameter `bool $useBatchImport` to `ImportExportFactory::create`. If you extend the `ImportExportFactory` class, you should properly handle the new parameter in your custom implementation.
 * Removed method `ImportExportProfileEntity::getName()` and `ImportExportProfileEntity::setName()`. Use `getTechnicalName()` and `setTechnicalName()` instead.
 * Removed `profile` attribute from `ImportEntityCommand`. Use `--profile-technical-name` instead.
 * Removed `name` field from `ImportExportProfileEntity`.
 
 ## SitemapHandleFactoryInterface::create method signature change
-
 We added a new optional parameter `string $domainId` to `SitemapHandleFactoryInterface::create` and `SitemapHandleFactory::create`.
 If you implement the `SitemapHandleFactoryInterface` or extend the `SitemapHandleFactory` class, you should properly handle the new parameter in your custom implementation.
 
@@ -537,7 +660,6 @@ If you implement the `SitemapHandleFactoryInterface` or extend the `SitemapHandl
 Removed `\Core\Framework\Api\Controller\AuthController::authorize` method (API route `/api/oauth/authorize`) without replacement.
 
 ## TreeUpdater::batchUpdate signature change
-
 We added a new optional parameter `bool $recursive` to `TreeUpdater::batchUpdate`.
 If you extend the `TreeUpdater` class, you should properly handle the new parameter in your custom implementation.
 ```php
@@ -551,17 +673,16 @@ class CustomTreeUpdater extends TreeUpdater
     }
 }
 ```
-## removal of \Shopware\Core\Framework\DataAbstractionLayer\Command\CreateSchemaCommand:
-`\Shopware\Core\Framework\DataAbstractionLayer\Command\CreateSchemaCommand` will be removed. You can use `\Shopware\Core\Framework\DataAbstractionLayer\Command\CreateMigrationCommand` instead.
+## Removal of CreateSchemaCommand:
+`\Shopware\Core\Framework\DataAbstractionLayer\Command\CreateSchemaCommand` was removed. Use `\Shopware\Core\Framework\DataAbstractionLayer\Command\CreateMigrationCommand` instead.
 
-## Removal of \Shopware\Core\Framework\DataAbstractionLayer\SchemaGenerator:
-`\Shopware\Core\Framework\DataAbstractionLayer\SchemaGenerator` will be removed. You can use `\Shopware\Core\Framework\DataAbstractionLayer\MigrationQueryGenerator` instead.
+## Removal of SchemaGenerator:
+`\Shopware\Core\Framework\DataAbstractionLayer\SchemaGenerator` was removed. Use `\Shopware\Core\Framework\DataAbstractionLayer\MigrationQueryGenerator` instead.
 
 ## AccountService refactoring
-
 The `Shopware\Core\Checkout\Customer\SalesChannel\AccountService::login` method is removed. Use `AccountService::loginByCredentials` or `AccountService::loginById` instead.
 
-Unused constant `Shopware\Core\Checkout\Customer\CustomerException::CUSTOMER_IS_INACTIVE` and unused method `Shopware\Core\Checkout\Customer\CustomerException::inactiveCustomer` are removed.
+Unused constant `Shopware\Core\Checkout\Customer\CustomerException::CUSTOMER_IS_INACTIVE` and unused method `Shopware\Core\Checkout\Customer\CustomerException::inactiveCustomer` were removed.
 
 ## Removed `CustomFieldRule` comparison methods:
 `floatMatch` and `arrayMatch` methods in `src/Core/Framework/Rule/CustomFieldRule.php` will be removed for Shopware 6.7.0.0
@@ -2372,7 +2493,8 @@ We made some changes in the Storefront, which might affect your plugins and them
 * The following blocks were moved from `src/Storefront/Resources/views/storefront/base.html.twig` to `src/Storefront/Resources/views/storefront/layout/footer.html.twig`.
   * `base_footer`
   * `base_footer_inner`
-* The template variable `page` in following templates was removed. Provide `header` or `footer` directly.
+* The template variable `page` in following templates was removed. The data is now available in the `header` or `footer` variables.
+  If you need to access custom data in the footer or header, use the `HeaderPageletLoadedEvent` or `FooterPageletLoadedEvent` to extend those variables.
   * `src/Storefront/Resources/views/storefront/layout/footer/footer.html.twig`
   * `src/Storefront/Resources/views/storefront/layout/header/actions/currency-widget.html.twig`
   * `src/Storefront/Resources/views/storefront/layout/header/actions/language-widget.html.twig`
