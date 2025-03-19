@@ -18,6 +18,8 @@ use Shopware\Core\Test\TestDefaults;
 
 /**
  * @final
+ *
+ * @phpstan-type OrderCustomer array{id: string, orderId: string, customerId: string, versionId: string, orderVersionId: string, firstName: string, lastName: string, email: string}|null
  */
 #[Package('checkout')]
 class OrderBuilder
@@ -58,6 +60,11 @@ class OrderBuilder
     protected array $addresses = [];
 
     protected string $stateId;
+
+    /**
+     * @var OrderCustomer
+     */
+    protected ?array $orderCustomer;
 
     public function __construct(
         IdsCollection $ids,
@@ -160,6 +167,22 @@ class OrderBuilder
         ], $customParams);
 
         $this->addresses[$key] = $address;
+
+        return $this;
+    }
+
+    public function orderCustomer(string $firstName, string $customerNumber): self
+    {
+        $this->orderCustomer = [
+            'id' => $this->ids->get('orderCustomer'),
+            'orderId' => $this->id,
+            'customerId' => $this->ids->get($customerNumber),
+            'versionId' => Defaults::LIVE_VERSION,
+            'orderVersionId' => Defaults::LIVE_VERSION,
+            'firstName' => $firstName,
+            'lastName' => 'Mustermann',
+            'email' => 'some@mail.de',
+        ];
 
         return $this;
     }

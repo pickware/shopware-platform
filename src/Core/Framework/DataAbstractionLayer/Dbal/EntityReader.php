@@ -212,6 +212,12 @@ class EntityReader implements EntityReaderInterface
                     $basics = $this->addAssociationFieldsToCriteria($joinCriteria, $reference, $basics);
                 }
 
+                $referenceField = $reference->getFields()->getByStorageName($field->getReferenceField());
+                if ($isPartial && $referenceField && !isset($partial[$field->getPropertyName()][$referenceField->getPropertyName()])) {
+                    $partial[$field->getPropertyName()] = $partial[$field->getPropertyName()] ?? [];
+                    $partial[$field->getPropertyName()][$referenceField->getPropertyName()] = [];
+                }
+
                 $this->joinBasic($reference, $context, $alias, $query, $basics, $joinCriteria, $partial[$field->getPropertyName()] ?? []);
 
                 continue;
