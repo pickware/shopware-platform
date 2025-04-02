@@ -212,24 +212,22 @@ class EntityReaderTest extends TestCase
     {
         $ids = new IdsCollection();
 
-        $customer = (new CustomerBuilder($ids, 'c1'));
-        $order = (new OrderBuilder($ids, 'o1'))->orderCustomer('oc1', 'c1');
+        $customer = (new CustomerBuilder($ids, 'customer1'));
+        $order = (new OrderBuilder($ids, 'order1'))->orderCustomer('First Name Test', 'customer1');
 
         $this->customerRepository->create([$customer->build()], Context::createDefaultContext());
         $this->orderRepository->create([$order->build()], Context::createDefaultContext());
 
-        $criteria = new Criteria([$ids->get('o1')]);
+        $criteria = new Criteria([$ids->get('order1')]);
         $criteria->addFields(['id', 'orderNumber', 'orderCustomer.firstName']);
 
-        $values = $this->orderRepository->search($criteria, Context::createDefaultContext());
+        $partialOrder = $this->orderRepository->search($criteria, Context::createDefaultContext())->first();
 
-        $entity = $values->first();
+        static::assertInstanceOf(PartialEntity::class, $partialOrder);
+        static::assertSame('order1', $partialOrder->get('orderNumber'));
 
-        static::assertInstanceOf(PartialEntity::class, $entity);
-        static::assertSame('o1', $entity->get('orderNumber'));
-
-        static::assertInstanceOf(PartialEntity::class, $entity->get('orderCustomer'));
-        static::assertSame('oc1', $entity->get('orderCustomer')->get('firstName'));
+        static::assertInstanceOf(PartialEntity::class, $partialOrder->get('orderCustomer'));
+        static::assertSame('First Name Test', $partialOrder->get('orderCustomer')->get('firstName'));
     }
 
     public function testPartialLoadingOneToMany(): void

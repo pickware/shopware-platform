@@ -18,8 +18,6 @@ use Shopware\Core\Test\TestDefaults;
 
 /**
  * @final
- *
- * @phpstan-type OrderCustomer array{id: string, orderId: string, customerId: string, versionId: string, orderVersionId: string, firstName: string, lastName: string, email: string}|null
  */
 #[Package('checkout')]
 class OrderBuilder
@@ -62,7 +60,7 @@ class OrderBuilder
     protected string $stateId;
 
     /**
-     * @var OrderCustomer
+     * @var array{id: string, orderId: string, customerId: string, versionId: string, orderVersionId: string, firstName: string, lastName: string, email: string}|null
      */
     protected ?array $orderCustomer;
 
