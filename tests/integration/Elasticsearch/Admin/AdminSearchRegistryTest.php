@@ -5,7 +5,6 @@ namespace Shopware\Tests\Integration\Elasticsearch\Admin;
 use Doctrine\DBAL\Connection;
 use OpenSearch\Client;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IteratorFactory;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityWriteResult;
@@ -63,7 +62,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $this->client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );

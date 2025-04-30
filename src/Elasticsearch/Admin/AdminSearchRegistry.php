@@ -6,8 +6,6 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception;
 use OpenSearch\Client;
-use OpenSearch\Common\Exceptions\OpenSearchException;
-use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\DataAbstractionLayer\Event\EntityWrittenContainerEvent;
 use Shopware\Core\Framework\Event\ProgressAdvancedEvent;
 use Shopware\Core\Framework\Event\ProgressFinishedEvent;
@@ -52,7 +50,6 @@ class AdminSearchRegistry implements EventSubscriberInterface
         private readonly EventDispatcherInterface $dispatcher,
         private readonly Client $client,
         private readonly AdminElasticsearchHelper $adminEsHelper,
-        private readonly LoggerInterface $logger,
         array $config,
         private readonly array $mapping
     ) {
@@ -138,13 +135,7 @@ class AdminSearchRegistry implements EventSubscriberInterface
         }
 
         if ($this->adminEsHelper->getRefreshIndices()) {
-            try {
-                $this->refreshIndices();
-            } catch (OpenSearchException $e) {
-                $this->logger->error('Could not refresh indices. Run "bin/console es:admin:mapping:update" & "bin/console es:admin:index" to update indices and reindex. Error: ' . $e->getMessage());
-
-                return;
-            }
+            $this->refreshIndices();
         }
 
         /** @var array<string, string> $indices */
@@ -243,13 +234,7 @@ class AdminSearchRegistry implements EventSubscriberInterface
             'body' => $documents,
         ];
 
-        try {
-            $result = $this->client->bulk($arguments);
-        } catch (OpenSearchException $e) {
-            $this->logger->error('Could not index documents. Run "bin/console es:admin:index" to reindex. Error: ' . $e->getMessage());
-
-            return;
-        }
+        $result = $this->client->bulk($arguments);
 
         if (\is_array($result) && !empty($result['errors'])) {
             $errors = $this->parseErrors($result);

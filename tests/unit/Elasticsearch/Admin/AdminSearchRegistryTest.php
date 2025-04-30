@@ -4,13 +4,11 @@ namespace Shopware\Tests\Unit\Elasticsearch\Admin;
 
 use Doctrine\DBAL\Connection;
 use OpenSearch\Client;
-use OpenSearch\Common\Exceptions\NoNodesAvailableException;
 use OpenSearch\Namespaces\IndicesNamespace;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
 use Shopware\Core\Framework\Context;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\IterableQuery;
 use Shopware\Core\Framework\DataAbstractionLayer\EntityWriteResult;
@@ -63,7 +61,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $this->createMock(Client::class),
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -94,7 +91,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -112,7 +108,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $this->createMock(Client::class),
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -130,7 +125,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $this->createMock(Client::class),
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -170,7 +164,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -206,7 +199,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             ['settings' => $constructorConfig],
             []
         );
@@ -257,7 +249,6 @@ class AdminSearchRegistryTest extends TestCase
             $eventDispatcher,
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -337,50 +328,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
-            [],
-            []
-        );
-
-        $index->refresh(new EntityWrittenContainerEvent(Context::createDefaultContext(), new NestedEventCollection([
-            new EntityWrittenEvent('promotion', [
-                new EntityWriteResult(
-                    'c1a28776116d4431a2208eb2960ec340',
-                    [],
-                    'promotion',
-                    EntityWriteResult::OPERATION_INSERT
-                ),
-            ], Context::createDefaultContext()),
-        ]), []));
-    }
-
-    public function testRefreshLogsAndDoesNotIndexIfExceptionIsThrownDuringRefreshIndices(): void
-    {
-        $this->indexer->method('getName')->willReturn('promotion-listing');
-        $this->indexer->method('getEntity')->willReturn('promotion');
-        $this->indexer->expects($this->never())->method('fetch');
-
-        $client = $this->createMock(Client::class);
-        $client->expects($this->never())->method('bulk');
-
-        $client->method('indices')->willThrowException(new NoNodesAvailableException('no nodes'));
-
-        $connection = $this->createMock(Connection::class);
-
-        $searchHelper = new AdminElasticsearchHelper(true, true, 'sw-admin');
-        $logger = $this->createMock(LoggerInterface::class);
-        $logger->expects($this->once())
-            ->method('error')
-            ->with('Could not refresh indices. Run "bin/console es:admin:mapping:update" & "bin/console es:admin:index" to update indices and reindex. Error: no nodes');
-
-        $index = new AdminSearchRegistry(
-            ['promotion' => $this->indexer],
-            $connection,
-            $this->createMock(MessageBusInterface::class),
-            $this->createMock(EventDispatcherInterface::class),
-            $client,
-            $searchHelper,
-            $logger,
             [],
             []
         );
@@ -440,7 +387,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
@@ -497,7 +443,6 @@ class AdminSearchRegistryTest extends TestCase
             $this->createMock(EventDispatcherInterface::class),
             $client,
             $searchHelper,
-            $this->createMock(LoggerInterface::class),
             [],
             []
         );
