@@ -175,9 +175,6 @@ parameters:
             message: '#.* generic class Shopware\\Core\\Framework\\DataAbstractionLayer\\EntityRepository.*not specify its types: TEntityCollection#'
             paths:
                 - src/Core/Content/**
-                - src/Core/Maintenance/**
-                - src/Core/Profiling/**
-                - src/Core/Service/**
                 - src/Core/Test/**
                 - tests/integration/Core/Content/**
                 - tests/integration/Core/Framework/**
