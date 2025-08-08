@@ -77,6 +77,9 @@ return [
         preg_quote('REMOVED: Method Shopware\Core\Framework\DataAbstractionLayer\Attribute\Required#__construct() was removed', '/'),
         preg_quote('REMOVED: Method Shopware\Core\Framework\DataAbstractionLayer\Attribute\PrimaryKey#__construct() was removed', '/'),
 
+        // The rule class is declared @final, and its constructor is marked as @internal.
+        preg_quote('REMOVED: Property Shopware\Core\Framework\Rule\Container\MatchAllLineItemsRule#$type was removed', '/'),
+
         // The classes were never properly released and are not use.
         preg_quote('REMOVED: Class Shopware\Core\System\Snippet\Struct\Language has been deleted', '/'),
         preg_quote('REMOVED: Class Shopware\Core\System\Snippet\Struct\SnippetPaths has been deleted', '/'),
