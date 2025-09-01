@@ -134,8 +134,8 @@ class CrossSellingRouteTest extends TestCase
         static::assertSame('Test Cross Selling', $element->getCrossSelling()->getName());
 
         $lastPrice = 0;
-        foreach ($element->getProducts() as $product) {
-            $productPrice = $product->getCurrencyPrice(Defaults::CURRENCY);
+        foreach ($element->getProducts() as $crossSellingProduct) {
+            $productPrice = $crossSellingProduct->getCurrencyPrice(Defaults::CURRENCY);
             static::assertNotNull($productPrice);
             static::assertGreaterThanOrEqual($lastPrice, $productPrice->getGross());
             $lastPrice = $productPrice->getGross();
@@ -174,8 +174,8 @@ class CrossSellingRouteTest extends TestCase
         static::assertSame('Test Cross Selling', $element->getCrossSelling()->getName());
 
         $lastPrice = 0;
-        foreach ($element->getProducts() as $product) {
-            $productPrice = $product->getCurrencyPrice(Defaults::CURRENCY);
+        foreach ($element->getProducts() as $crossSellingProduct) {
+            $productPrice = $crossSellingProduct->getCurrencyPrice(Defaults::CURRENCY);
             static::assertNotNull($productPrice);
             static::assertGreaterThanOrEqual($lastPrice, $productPrice->getGross());
             $lastPrice = $productPrice->getGross();
@@ -214,8 +214,8 @@ class CrossSellingRouteTest extends TestCase
         static::assertSame('Test Cross Selling', $element->getCrossSelling()->getName());
 
         $lastPrice = 0;
-        foreach ($element->getProducts() as $product) {
-            $productPrice = $product->getCurrencyPrice(Defaults::CURRENCY);
+        foreach ($element->getProducts() as $crossSellingProduct) {
+            $productPrice = $crossSellingProduct->getCurrencyPrice(Defaults::CURRENCY);
             static::assertNotNull($productPrice);
             static::assertGreaterThanOrEqual($lastPrice, $productPrice->getGross());
             $lastPrice = $productPrice->getGross();
