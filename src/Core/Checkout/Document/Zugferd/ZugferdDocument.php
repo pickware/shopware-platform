@@ -66,6 +66,7 @@ class ZugferdDocument
     public function __construct(
         protected readonly ZugferdDocumentBuilder $zugferdBuilder,
         protected readonly bool $isGross = false,
+        protected readonly bool $isIntraCommunityDelivery = false,
     ) {
     }
 
@@ -383,6 +384,10 @@ class ZugferdDocument
 
     protected function getTaxCode(?CalculatedTax $tax): string
     {
+        if ($this->isIntraCommunityDelivery) {
+            return ZugferdDutyTaxFeeCategories::VAT_EXEMPT_FOR_EEA_INTRACOMMUNITY_SUPPLY_OF_GOODS_AND_SERVICES;
+        }
+
         return match ($tax?->getTaxRate() ?? 0.0) {
             0.0 => ZugferdDutyTaxFeeCategories::ZERO_RATED_GOODS,
             default => ZugferdDutyTaxFeeCategories::STANDARD_RATE,

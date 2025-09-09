@@ -126,6 +126,42 @@ class ZugferdBuilderTest extends TestCase
         }
     }
 
+    public function testBuildDocumentForIntraCommunityDelivery(): void
+    {
+        $order = $this->buildOrder();
+
+        $country = new CountryEntity();
+        $country->setId(Uuid::randomHex());
+        $country->setIso('UK');
+
+        $config = [
+            'documentNumber' => 'test-1000',
+            'companyCountryId' => $country->getId(),
+            'companyStreet' => 'Musterstreet 1',
+            'companyZipcode' => '12345',
+            'companyCity' => 'Mustercity',
+            'companyName' => 'Muster company SE',
+            'companyEmail' => 'test@example.de',
+            'companyPhone' => '0123456789',
+            'executiveDirector' => 'Max Mustermann',
+            'placeOfJurisdiction' => 'Muster',
+            'taxNumber' => '0123456789',
+            'vatId' => '012356789',
+            'paymentDueDate' => '+30 day',
+            'intraCommunityDelivery' => true,
+        ];
+
+        $documentConfig = DocumentConfigurationFactory::createConfiguration($config);
+        $documentConfig->setCompanyCountry($country);
+
+        $xmlContent = (new ZugferdBuilder(
+            $this->createMock(EventDispatcherInterface::class),
+            new AmountCalculator(new CashRounding(), new PercentageTaxRuleBuilder(), new TaxCalculator())
+        ))->buildDocument($order, $documentConfig, Context::createDefaultContext());
+
+        static::assertStringContainsString('CategoryCode>K', $xmlContent);
+    }
+
     private function buildOrder(): OrderEntity
     {
         $normalId = Uuid::randomHex();

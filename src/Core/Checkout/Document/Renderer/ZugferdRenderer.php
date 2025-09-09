@@ -17,6 +17,7 @@ use Shopware\Core\Framework\DataAbstractionLayer\EntityRepository;
 use Shopware\Core\Framework\Log\Package;
 use Shopware\Core\Framework\Plugin\Exception\DecorationPatternException;
 use Shopware\Core\System\NumberRange\ValueGenerator\NumberRangeValueGeneratorInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 #[Package('after-sales')]
@@ -36,6 +37,7 @@ class ZugferdRenderer extends AbstractDocumentRenderer
         protected EventDispatcherInterface $eventDispatcher,
         protected DocumentConfigLoader $documentConfigLoader,
         protected NumberRangeValueGeneratorInterface $numberRangeValueGenerator,
+        protected ValidatorInterface $validator,
     ) {
     }
 
@@ -105,6 +107,10 @@ class ZugferdRenderer extends AbstractDocumentRenderer
             'custom' => [
                 'invoiceNumber' => $number,
             ],
+            'intraCommunityDelivery' => $this->isAllowIntraCommunityDelivery(
+                $config->jsonSerialize(),
+                $order,
+            ) && $this->isValidVat($order, $this->validator),
         ]);
 
         // create version of order to ensure the document stays the same even if the order changes

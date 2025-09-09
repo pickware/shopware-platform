@@ -57,7 +57,13 @@ class ZugferdBuilder
         }
 
         $taxStatus = $order->getTaxStatus() ?? $order->getPrice()->getTaxStatus();
-        $document = (new ZugferdDocument(ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_XRECHNUNG_3), $taxStatus === CartPrice::TAX_STATE_GROSS))
+
+        $isIntraCommunityDelivery = false;
+        if ($config->__isset('intraCommunityDelivery') && \is_bool($config->__get('intraCommunityDelivery'))) {
+            $isIntraCommunityDelivery = $config->__get('intraCommunityDelivery');
+        }
+
+        $document = (new ZugferdDocument(ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_XRECHNUNG_3), $taxStatus === CartPrice::TAX_STATE_GROSS, $isIntraCommunityDelivery))
             ->withBuyerInformation($customer, $billingAddress)
             ->withSellerInformation($config)
             ->withDelivery($order->getDeliveries() ?? new OrderDeliveryCollection())
