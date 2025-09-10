@@ -1,5 +1,5 @@
 ---
-title: Fix type error when using named arguments in validation constraints
+title: Fix type error when using named arguments in the Length validation constraint
 author: Grzegorz Jan Rolka
 author_email: grzegorz.rolka@pickware.de
 author_github: @grzegorzrolka
