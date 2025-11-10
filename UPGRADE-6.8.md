@@ -340,6 +340,12 @@ Refection has significantly improved in particular since PHP 8.1, therefore the 
 + $fileName = \ReflectionClass(MyClass::class)->getFileName();
 ```
 
+## Removal of ErrorRoutes
+
+`Shopware\Core\Checkout\Cart\Error\ErrorRoute` is specific to the standard Storefront and therefore should not be in the Core package.
+At the same time, the Storefront does not properly use this class.
+Therefore, the class, and the `route` property of `Shopware\Core\Checkout\Cart\Error\CartError` have been removed.
+
 </details>
 
 # Administration
