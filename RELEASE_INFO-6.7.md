@@ -7,8 +7,27 @@ The tax-free detection logic if the cart changed to handle B2B and B2C customers
 Previously, enabling "Tax-free for B2C" in the country settings also affected B2B customers.
 Now, tax rules are applied **correctly** based on customer type.
 
-
 ## API
+
+### Add the possibility to specify indexer in context
+
+When you want to specify which indexer should run, you can add the `EntityIndexerRegistry::EXTENSION_INDEXER_ONLY` extension to the context as follows:
+
+```php
+$context->addExtension(EntityIndexerRegistry::EXTENSION_INDEXER_ONLY,
+    new ArrayEntity([
+        ProductIndexer::STOCK_UPDATER // Only execute STOCK_UPDATER.
+    ]),
+);
+```
+
+When making a call to the Sync API, specify the required indexer in the header:
+
+```bash
+curl -X POST "http://localhost:8000/api/_action/sync" \
+-H "indexing-only: product.stock" \
+#...
+```
 
 ## Core
 
