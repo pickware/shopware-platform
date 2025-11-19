@@ -129,6 +129,10 @@ Example usage:
 <one-to-many name="custom_entity" reference="quote_comment" ignore-missing-reference="true" store-api-aware="false" on-delete="set-null" />
 ```
 
+### Translatable product manufacturer links
+
+The `link` property of the product manufacturer entity is now translatable.
+
 ## Administration
 
 ### URL restrictions for product and category SEO URLs
