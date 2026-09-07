@@ -254,6 +254,12 @@ Store API responses requested with the `sw-include-seo-urls` header now also inc
 
 ## Administration
 
+### Newly created customer addresses are selectable in all order address fields
+
+Creating or editing a customer address from the invoice address field of an order now updates the shipping address field as well, and vice versa. Previously the address only appeared in the field it was created in, and the order had to be reloaded before it could be used as the other address.
+
+The customer is loaded once into the `swOrderDetail` store and shared by all `sw-order-address-selection` components. Extensions that override `sw-order-address-selection` and read or replace its `customer` data property, or that override its removed `customerCriteria` computed property, need to use the store's `customer` state and `loadCustomer` action instead.
+
 ### Order drafts are cleaned up when leaving the detail page
 
 Reloading or leaving an order detail page now reliably removes the temporary order version created by the Administration. This prevents unused order versions from accumulating; no action is required.
